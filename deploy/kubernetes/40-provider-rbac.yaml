@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dsh-provider
+  namespace: dsh-sandbox
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dsh-provider
+  namespace: dsh-sandbox
+rules:
+  - apiGroups: [extensions.agents.x-k8s.io]
+    resources: [sandboxclaims]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [agents.x-k8s.io]
+    resources: [sandboxes]
+    verbs: [get, list, patch, watch]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [dsh-runner-public-key]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dsh-provider
+  namespace: dsh-sandbox
+subjects:
+  - kind: ServiceAccount
+    name: dsh-provider
+    namespace: dsh-sandbox
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dsh-provider

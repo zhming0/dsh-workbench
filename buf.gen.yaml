@@ -1,0 +1,18 @@
+version: v2
+clean: true
+plugins:
+  - local: protoc-gen-go
+    out: runner/gen
+    opt:
+      - paths=source_relative
+  - local: protoc-gen-connect-go
+    out: runner/gen
+    opt:
+      - paths=source_relative
+  - local: protoc-gen-es
+    out: provider/src/gen
+    opt:
+      - target=ts
+      - import_extension=js
+inputs:
+  - directory: proto

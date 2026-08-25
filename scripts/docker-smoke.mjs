@@ -1,0 +1,115 @@
+#!/usr/bin/env node
+
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { DockerBackend } from "../provider/dist/backends/docker.js";
+import { ProviderKeyStore } from "../provider/dist/key-store.js";
+
+const image = process.env.DSH_RUNNER_IMAGE ?? "dsh-runner:dev";
+const stateDir = await mkdtemp(join(tmpdir(), "dsh-docker-smoke-"));
+const keys = new ProviderKeyStore(join(stateDir, "provider-key.pem"));
+const backend = new DockerBackend({ image });
+let handle;
+
+try {
+  await keys.initialize();
+  handle = await backend.provision({
+    sessionId: `smoke-${Date.now()}`,
+    repositoryUrl: "https://github.com/example/unused.git",
+    publicKeyPem: keys.publicKeyPem,
+  });
+
+  let client = await waitForRunner(backend, handle.reference, keys);
+  await client.setSecrets({ SMOKE_VALUE: "present" });
+  await run(client, [
+    "/bin/bash",
+    "-lc",
+    'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version',
+  ]);
+
+  await run(client, ["mkdir", "-p", "/workspace/.git", "/workspace/.dsh"]);
+  await client.writeFile({
+    path: "/workspace/.dsh/setup.sh",
+    content: new TextEncoder().encode(
+      "#!/bin/sh\nset -eu\nprintf 'workspace survived' > /workspace/sentinel\n",
+    ),
+    guard: { case: "createIfAbsent", value: true },
+  });
+  await run(client, ["chmod", "+x", "/workspace/.dsh/setup.sh"]);
+  const firstSetup = await client.setup({
+    repositoryUrl: "https://github.com/example/unused.git",
+    revision: "",
+    workspace: "/workspace",
+  });
+  if (!firstSetup.ran) throw new Error("first setup did not run");
+
+  await backend.hibernate(handle.reference);
+  handle = await backend.wake(handle.reference);
+  client = await waitForRunner(backend, handle.reference, keys);
+  const secondSetup = await client.setup({
+    repositoryUrl: "https://github.com/example/unused.git",
+    revision: "",
+    workspace: "/workspace",
+  });
+  if (secondSetup.ran) throw new Error("setup marker did not survive hibernation");
+  const sentinel = await client.readFile({
+    path: "/workspace/sentinel",
+    maxBytes: 1024n,
+  });
+  if (new TextDecoder().decode(sentinel.content) !== "workspace survived") {
+    throw new Error("workspace content did not survive hibernation");
+  }
+
+  process.stdout.write("PASS: Docker runner auth, tools, setup, and hibernate/wake\n");
+} finally {
+  if (handle !== undefined) await backend.destroy(handle.reference).catch(() => {});
+  await rm(stateDir, { recursive: true, force: true });
+}
+
+async function waitForRunner(backend, reference, auth) {
+  const deadline = Date.now() + 30_000;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      const client = await backend.connect(reference, auth);
+      await client.health({ timeoutMs: 2_000 });
+      return client;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+  throw new Error(`runner did not become ready: ${String(lastError)}`);
+}
+
+async function run(client, argv) {
+  let stderr = "";
+  let exited = false;
+  for await (const response of client.exec({
+    argv,
+    cwd: "/workspace",
+    env: {},
+    stdin: new Uint8Array(),
+  })) {
+    if (response.event.case === "stdout") process.stdout.write(response.event.value);
+    if (response.event.case === "stderr") {
+      stderr += new TextDecoder().decode(response.event.value);
+    }
+    if (response.event.case === "exited") {
+      exited = true;
+      if (
+        response.event.value.exitCode !== 0 ||
+        response.event.value.signal !== ""
+      ) {
+        const status =
+          response.event.value.signal === ""
+            ? `exit ${response.event.value.exitCode}`
+            : `signal ${response.event.value.signal}`;
+        throw new Error(`command failed with ${status}: ${stderr}`);
+      }
+    }
+  }
+  if (!exited) throw new Error("command stream ended without an exit status");
+}
