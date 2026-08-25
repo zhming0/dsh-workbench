@@ -124,14 +124,14 @@ describe("provider building blocks", () => {
         return request.plural === "sandboxclaims"
           ? {
               spec: {},
-              status: {
-                sandbox: {
-                  name: "sandbox-one",
-                  serviceFQDN: "sandbox-one.example.internal",
-                },
-              },
+              status: { sandbox: { name: "sandbox-one" } },
             }
-          : { status: { conditions: [{ type: "Ready", status: "True" }] } };
+          : {
+              status: {
+                serviceFQDN: "sandbox-one.example.internal",
+                conditions: [{ type: "Ready", status: "True" }],
+              },
+            };
       },
       async patchNamespacedCustomObject(request: {
         plural: string;
@@ -163,6 +163,51 @@ describe("provider building blocks", () => {
         body: [{ op: "add", path: "/spec/operatingMode", value: "Running" }],
       },
     ]);
+  });
+
+  it("reads a Kubernetes runner endpoint from the assigned Sandbox", async () => {
+    const reads: string[] = [];
+    const api = {
+      async createNamespacedCustomObject() {
+        return {};
+      },
+      async getNamespacedCustomObject(request: { plural: string }) {
+        reads.push(request.plural);
+        return request.plural === "sandboxclaims"
+          ? {
+              status: {
+                sandbox: { name: "sandbox-one" },
+                conditions: [{ type: "Ready", status: "True" }],
+              },
+            }
+          : {
+              status: {
+                serviceFQDN: "sandbox-one.example.internal",
+                conditions: [{ type: "Ready", status: "True" }],
+              },
+            };
+      },
+    } as unknown as CustomObjectsApi;
+    const backend = new KasBackend(
+      { namespace: "test", warmPool: "test" },
+      api,
+    );
+
+    const result = await backend.provision({
+      sessionId: "session-one",
+      repositoryUrl: "https://github.com/example/repo.git",
+      publicKeyPem: "public key",
+    });
+
+    expect(result).toEqual({
+      sandboxId: "sandbox-one",
+      reference: {
+        claimName: kasTesting.claimNameFor("session-one"),
+        sandboxId: "sandbox-one",
+        serviceFqdn: "sandbox-one.example.internal",
+      },
+    });
+    expect(reads).toEqual(["sandboxclaims", "sandboxes"]);
   });
 
   it("recovers a Docker container created before its session was saved", async () => {

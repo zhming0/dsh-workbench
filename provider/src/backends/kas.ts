@@ -25,13 +25,16 @@ interface KasReference extends BackendReference {
 interface ClaimObject {
   spec?: { lifecycle?: unknown };
   status?: {
-    sandbox?: { name?: string; serviceFQDN?: string };
+    sandbox?: { name?: string };
     conditions?: Array<{ type?: string; status?: string }>;
   };
 }
 
 interface SandboxObject {
-  status?: { conditions?: Array<{ type?: string; status?: string }> };
+  status?: {
+    serviceFQDN?: string;
+    conditions?: Array<{ type?: string; status?: string }>;
+  };
 }
 
 export interface KasBackendOptions {
@@ -90,11 +93,13 @@ export class KasBackend implements SandboxBackend {
     }
     const claim = await this.waitForClaim(claimName);
     const sandboxId = claim.status?.sandbox?.name;
-    const serviceFqdn = claim.status?.sandbox?.serviceFQDN;
-    if (sandboxId === undefined || serviceFqdn === undefined) {
-      throw new Error(
-        `SandboxClaim ${claimName} became ready without an endpoint`,
-      );
+    if (sandboxId === undefined) {
+      throw new Error(`SandboxClaim ${claimName} became ready unassigned`);
+    }
+    const sandbox = await this.waitForSandboxCondition(sandboxId, "Ready");
+    const serviceFqdn = sandbox.status?.serviceFQDN;
+    if (serviceFqdn === undefined) {
+      throw new Error(`Sandbox ${sandboxId} became ready without an endpoint`);
     }
     return { sandboxId, reference: { claimName, sandboxId, serviceFqdn } };
   }
@@ -120,9 +125,16 @@ export class KasBackend implements SandboxBackend {
     try {
       await this.clearExpiry(ref.claimName);
       await this.patchSandbox(ref.sandboxId, "Running");
-      await this.waitForSandboxCondition(ref.sandboxId, "Ready");
-      const claim = await this.getClaim(ref.claimName);
-      const serviceFqdn = claim.status?.sandbox?.serviceFQDN ?? ref.serviceFqdn;
+      const sandbox = await this.waitForSandboxCondition(
+        ref.sandboxId,
+        "Ready",
+      );
+      const serviceFqdn = sandbox.status?.serviceFQDN;
+      if (serviceFqdn === undefined) {
+        throw new Error(
+          `Sandbox ${ref.sandboxId} became ready without an endpoint`,
+        );
+      }
       return { sandboxId: ref.sandboxId, reference: { ...ref, serviceFqdn } };
     } catch (error) {
       if (isKubernetesStatus(error, 404)) {
@@ -257,8 +269,7 @@ export class KasBackend implements SandboxBackend {
       async () => {
         const claim = await this.getClaim(name);
         return conditionIsTrue(claim.status?.conditions, "Ready") &&
-          claim.status?.sandbox?.name !== undefined &&
-          claim.status.sandbox.serviceFQDN !== undefined
+          claim.status?.sandbox?.name !== undefined
           ? claim
           : undefined;
       },
@@ -280,9 +291,13 @@ export class KasBackend implements SandboxBackend {
           plural: "sandboxes",
           name,
         })) as SandboxObject;
-        return conditionIsTrue(sandbox.status?.conditions, condition)
-          ? sandbox
-          : undefined;
+        const conditionMet = conditionIsTrue(
+          sandbox.status?.conditions,
+          condition,
+        );
+        const endpointReady =
+          condition !== "Ready" || sandbox.status?.serviceFQDN !== undefined;
+        return conditionMet && endpointReady ? sandbox : undefined;
       },
       this.readyTimeoutMs,
       `Sandbox ${name} did not become ${condition.toLowerCase()}`,

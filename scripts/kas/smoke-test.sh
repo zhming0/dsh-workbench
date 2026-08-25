@@ -61,8 +61,8 @@ echo "Adopted Sandbox/$sandbox in ${adoption_ms}ms"
 (( adoption_ms < 1000 )) || { echo "error: warm Sandbox adoption took 1s or longer" >&2; exit 1; }
 kubectl -n "$NAMESPACE" wait --for=condition=Ready "sandboxclaim/$MAIN_CLAIM" --timeout="$TIMEOUT"
 
-fqdn="$(kubectl -n "$NAMESPACE" get sandboxclaim "$MAIN_CLAIM" -o jsonpath='{.status.sandbox.serviceFQDN}')"
-[[ -n "$fqdn" ]] || { echo "error: SandboxClaim has no assigned service endpoint" >&2; exit 1; }
+fqdn="$(kubectl -n "$NAMESPACE" get sandbox "$sandbox" -o jsonpath='{.status.serviceFQDN}')"
+[[ -n "$fqdn" ]] || { echo "error: Sandbox has no service endpoint" >&2; exit 1; }
 echo "Endpoint: ${fqdn}:8080"
 selector="$(kubectl -n "$NAMESPACE" get sandbox "$sandbox" -o jsonpath='{.status.selector}')"
 [[ -n "$selector" ]] || { echo "error: Sandbox has no status.selector" >&2; exit 1; }

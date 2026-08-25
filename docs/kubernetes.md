@@ -65,10 +65,10 @@ Sandbox, so both injection policies are deliberately `Disallowed`.
 ## Connectivity and isolation
 
 Each Sandbox gets a headless Service (`service: true`). Its runner endpoint is
-only available in-cluster at the assigned
-**`SandboxClaim.status.sandbox.serviceFQDN:8080`**; it is not an ingress or a
-public URL. The provider process therefore needs an in-cluster route or an
-equivalent private network path.
+only available in-cluster at the assigned Sandbox's
+**`status.serviceFQDN:8080`**; it is not an ingress or a public URL. The claim's
+`status.sandbox.name` identifies that Sandbox. The provider process therefore
+needs an in-cluster route or an equivalent private network path.
 
 The template asks the extension controller to manage a default-deny
 NetworkPolicy. Ingress allows TCP 8080 only from the `dsh-sandbox` namespace.
