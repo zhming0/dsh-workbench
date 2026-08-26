@@ -21,6 +21,7 @@ import {
 import { SandboxManager } from "../src/index.js";
 import { ProviderKeyStore } from "../src/key-store.js";
 import type { RunnerClient } from "../src/runner-client.js";
+import { pathInSandbox } from "../src/sandbox-path.js";
 import { testing as shellTesting } from "../src/shell.js";
 import { SessionStore } from "../src/state-store.js";
 import { testing as subprocessTesting } from "../src/subprocess.js";
@@ -267,6 +268,46 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
       nextOffset: 6,
       lossy: true,
     });
+  });
+
+  it("maps dsh workspace paths into the sandbox workspace", () => {
+    const sessionWorkspace = "/home/user/project";
+    const sandboxWorkspace = "/workspace";
+
+    expect(
+      pathInSandbox(sessionWorkspace, sessionWorkspace, sandboxWorkspace),
+    ).toBe("/workspace");
+    expect(
+      pathInSandbox(
+        "/home/user/project/packages/api",
+        sessionWorkspace,
+        sandboxWorkspace,
+      ),
+    ).toBe("/workspace/packages/api");
+    expect(
+      pathInSandbox(
+        "/workspace/packages/web",
+        sessionWorkspace,
+        sandboxWorkspace,
+      ),
+    ).toBe("/workspace/packages/web");
+    expect(
+      pathInSandbox(
+        "/home/user/another-project",
+        sessionWorkspace,
+        sandboxWorkspace,
+      ),
+    ).toBe("/home/user/another-project");
+    expect(
+      pathInSandbox(
+        "/home/user/project/../outside",
+        sessionWorkspace,
+        sandboxWorkspace,
+      ),
+    ).toBe("/home/user/project/../outside");
+    expect(
+      pathInSandbox("packages/worker", sessionWorkspace, sandboxWorkspace),
+    ).toBe("packages/worker");
   });
 
   it("provisions, hibernates, and wakes one sandbox per session", async () => {

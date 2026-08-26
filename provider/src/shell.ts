@@ -12,6 +12,7 @@ import z from "@deepseek-ai/schemastery";
 import { metrics } from "@opentelemetry/api";
 
 import type { RunnerClient } from "./runner-client.js";
+import { pathInSandbox } from "./sandbox-path.js";
 
 const execDuration = metrics
   .getMeter("dsh-sandbox-provider")
@@ -66,9 +67,15 @@ export class SandboxShellExecutor extends ShellExecutor {
     );
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
       throw new Error("shell timeout must be positive");
+    const sessionWorkspace =
+      this.ctx.agents.requireInitiator().session.header.cwd;
     return {
       command: request.command,
-      workdir: request.workdir ?? this.config.cwd,
+      workdir: pathInSandbox(
+        request.workdir ?? this.config.cwd,
+        sessionWorkspace,
+        this.config.cwd,
+      ),
       timeoutMs,
       stdoutMaxBytes: request.stdoutMaxBytes ?? this.config.outputMaxBytes,
       ...(request.signal === undefined ? {} : { signal: request.signal }),

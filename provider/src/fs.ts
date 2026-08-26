@@ -18,6 +18,7 @@ import {
 } from "@deepseek-ai/dsh-fs";
 
 import { FileType } from "./gen/dsh/sandbox/v1/runner_pb.js";
+import { pathInSandbox } from "./sandbox-path.js";
 
 const textDecoder = new TextDecoder("utf-8", { fatal: true });
 const MAX_TEXT_BYTES = 64 * 1024 * 1024;
@@ -32,9 +33,19 @@ export class SandboxFileSystem extends FileSystem {
     if (path.trim().length === 0)
       throw new FsError("file path must not be empty", "FS_NOT_FOUND");
     try {
+      const sessionWorkspace =
+        this.ctx.agents.requireInitiator().session.header.cwd;
+      const sandboxWorkspace = this.ctx.sandboxManager.workspace;
       const client = await this.ctx.sandboxManager.clientForCurrentAgent();
       const result = await client.resolvePath(
-        { path, cwd: options?.cwd ?? this.ctx.sandboxManager.workspace },
+        {
+          path: pathInSandbox(path, sessionWorkspace, sandboxWorkspace),
+          cwd: pathInSandbox(
+            options?.cwd ?? sandboxWorkspace,
+            sessionWorkspace,
+            sandboxWorkspace,
+          ),
+        },
         signalOptions(options?.signal),
       );
       return {
