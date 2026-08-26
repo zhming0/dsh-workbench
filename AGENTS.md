@@ -56,8 +56,3 @@ generated-code diff when the contract or generator settings change.
 
 Update the relevant README or `docs/` page when behavior, configuration,
 security boundaries, setup, or supported limits change.
-
-## Continuous integration
-
-Do not add GitHub Actions. Buildkite may be evaluated separately in a future
-change.
