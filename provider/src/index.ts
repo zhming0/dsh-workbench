@@ -14,6 +14,7 @@ import { DockerBackend } from "./backends/docker.js";
 import { KasBackend } from "./backends/kas.js";
 import { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
 import { ProviderKeyStore } from "./key-store.js";
+import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { RunnerClient } from "./runner-client.js";
 import { SessionStore } from "./state-store.js";
 import { SandboxNotFoundError } from "./types.js";
@@ -111,7 +112,7 @@ export class SandboxManager extends Service {
     githubClientId: z.string(),
     wipCommit: z.boolean().default(false),
     docker: z.object({
-      image: z.string().default("dsh-runner:dev"),
+      image: z.string().default(DEFAULT_RUNNER_IMAGE),
       binary: z.string(),
     }),
     kas: z.object({
@@ -547,7 +548,7 @@ function resolveConfig(config: Config): ResolvedConfig {
       : { githubClientId: config.githubClientId }),
     wipCommit: config.wipCommit ?? false,
     docker: {
-      image: config.docker?.image ?? "dsh-runner:dev",
+      image: config.docker?.image ?? DEFAULT_RUNNER_IMAGE,
       ...(config.docker?.binary === undefined
         ? {}
         : { binary: config.docker.binary }),
@@ -589,7 +590,7 @@ function injectChallenge(agent: Agent, challenge: AuthChallenge): void {
           text: `GitHub authorization is needed. Visit ${challenge.verificationUri} and enter ${challenge.userCode}.`,
         },
       ],
-      source: { kind: "plugin", plugin: "dsh-sandbox" },
+      source: { kind: "plugin", plugin: "dsh-workbench" },
     }),
   );
 }

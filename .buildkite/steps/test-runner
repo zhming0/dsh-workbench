@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd runner
+
+echo "--- :golang: Vetting"
+go vet ./...
+
+echo "--- :hammer: Building"
+go build ./...
+
+echo "+++ :golang: Running tests"
+go test -race ./...

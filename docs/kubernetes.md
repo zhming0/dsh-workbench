@@ -17,7 +17,7 @@ From a blank machine, install Docker, then install
 [`kubectl`](https://kubernetes.io/docs/tasks/tools/). From the repository root:
 
 ```sh
-docker build -t dsh-runner:dev runner
+docker buildx bake dev --load
 node provider/dist/cli.js key public > /tmp/dsh-provider.pub
 
 scripts/kas/dev-cluster.sh \

@@ -1,0 +1,29 @@
+steps:
+  - label: ":calendar: Calculate version"
+    command: .buildkite/steps/set-calver
+
+  - wait
+
+  # The image must exist before the package that names it by default, so a
+  # published provider never points at a tag nobody can pull.
+  - label: ":docker: Build & Push runner image"
+    agents:
+      queue: hosted-amd64-small
+    secrets:
+      - GITHUB_TOKEN
+    command: .buildkite/steps/build-and-push-image
+
+  - wait
+
+  - label: ":npm: Publish provider"
+    image: node:24.19.0@sha256:4196d66a565c6f195728d9952f161f4adfe2ad753052a08b7ec7f1c5a6bda42b
+    secrets:
+      - NPM_TOKEN
+    command: .buildkite/steps/publish-npm
+
+  - wait
+
+  - label: ":github: Create GitHub release"
+    secrets:
+      - GITHUB_TOKEN
+    command: .buildkite/steps/create-github-release

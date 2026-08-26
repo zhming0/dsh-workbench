@@ -60,11 +60,11 @@ async function main(arguments_: string[]): Promise<void> {
   }
 
   process.stdout.write(`Usage:
-  dsh-sandbox auth github
-  dsh-sandbox secret list
-  printf '%s' VALUE | dsh-sandbox secret set NAME
-  dsh-sandbox secret delete NAME
-  dsh-sandbox key public
+  dsh-workbench auth github
+  dsh-workbench secret list
+  printf '%s' VALUE | dsh-workbench secret set NAME
+  dsh-workbench secret delete NAME
+  dsh-workbench key public
 `);
   if (command !== undefined) process.exitCode = 2;
 }

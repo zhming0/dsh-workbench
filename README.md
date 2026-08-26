@@ -1,10 +1,17 @@
-# dsh-sandbox
+# dsh-workbench
 
-`dsh-sandbox` gives each DeepSeek Harness session its own working environment.
-Normal dsh file and command tools use that environment without needing special
-tool versions.
+`dsh-workbench` gives each DeepSeek Harness session its own working
+environment. Normal dsh file and command tools use that environment without
+needing special tool versions.
 
-Milestone 1 implements the complete workspace lifecycle:
+The name avoids dsh's own two meanings of "sandbox" (same-world process
+confinement, per `@deepseek-ai/dsh-sandbox`) and "workspace" (the Web UI's
+registry of local directories, and the `workspace-write` permission root).
+Inside this repository, "sandbox" still means one provisioned environment: it is
+the term used by the protobuf contract, the Go module, and the Kubernetes
+manifests.
+
+Milestone 1 implements the complete environment lifecycle:
 
 ```text
 new session -> start sandbox -> clone and set up repository -> run tools
@@ -27,6 +34,17 @@ The Kubernetes integration is pinned to agent-sandbox **v0.5.4** and its
 `v1beta1` APIs. Both agent-sandbox and dsh are pre-release dependencies, so the
 versions in this repository are intentional.
 
+## Install
+
+```sh
+dsh plugin --profile <name> add @zhming0/dsh-workbench
+```
+
+Every release publishes two artifacts together: the `@zhming0/dsh-workbench`
+package on npm, and a `ghcr.io/zhming0/dsh-runner` image built for
+`linux/amd64` and `linux/arm64`. They share one version, and the provider
+defaults to the image tag matching its own version, so the pair cannot drift.
+
 ## Repository layout
 
 | Path | Purpose |
@@ -45,9 +63,9 @@ the expected sandbox identity.
 ## Build and test
 
 Required tools are Node.js 24 or 22.19+, pnpm 11.7, Go 1.26.7, and Buf. Docker
-is needed for the end-to-end local test. The reference runner image currently
-targets Linux amd64 because its pinned `jj` and `mise` downloads are amd64
-builds.
+is needed for the end-to-end local test. `docker buildx bake dev` builds the
+runner image for the current machine; the release build covers `linux/amd64`
+and `linux/arm64`.
 
 ```sh
 pnpm install
@@ -56,7 +74,7 @@ pnpm test
 pnpm build
 
 (cd runner && go test -race ./... && go vet ./... && go build ./cmd/dsh-runner)
-docker build -t dsh-runner:dev runner
+docker buildx bake dev --load
 pnpm test:docker
 ```
 
@@ -77,11 +95,14 @@ persistence, and expiry.
 
 ## Try it with dsh
 
-Build the provider and runner, then use
-[`examples/agent.cordis.yml`](examples/agent.cordis.yml) in a dsh installation
-that has this workspace package linked. The example keeps the lifecycle
-manager, filesystem, shell, subprocess, and their model-facing tools in one
-isolated group.
+[`examples/agent.cordis.yml`](examples/agent.cordis.yml) is a small preset that
+keeps the lifecycle manager, filesystem, shell, subprocess, and their
+model-facing tools in one isolated group. Use it against an installed release,
+or against a checkout linked into a dsh profile:
+
+```sh
+dsh plugin --profile <name> add "$PWD/provider"
+```
 
 Provider configuration and credential commands are documented in
 [`provider/README.md`](provider/README.md).
@@ -127,6 +148,19 @@ and command time through the dsh host's OpenTelemetry setup. The runner exports
 HTTP traces and command-duration metrics when standard `OTEL_*` exporter or
 collector environment variables are present. With no telemetry configuration,
 it does not try to contact a local collector.
+
+## Releasing
+
+Buildkite runs [`.buildkite/pipeline.yml`](.buildkite/pipeline.yml) on every
+branch: provider checks and tests, runner tests, a check that the generated
+protobuf code is current, and the Docker lifecycle smoke test.
+
+On `main` a manual block step unlocks
+[`.buildkite/pipeline.release.yml`](.buildkite/pipeline.release.yml), which
+picks a calendar version, pushes the multi-architecture runner image, publishes
+the npm package at the same version, and tags a GitHub release. The image is
+pushed before the package so a published provider never names a tag that does
+not exist yet.
 
 ## Milestone 1 boundaries
 

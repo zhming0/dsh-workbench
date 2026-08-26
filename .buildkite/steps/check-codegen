@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# `buf generate` drives three plugins: two Go binaries and one Node binary, so
+# this step needs both toolchains. It runs on the Go image and adds Node.
+source "$(dirname "$0")/lib/node.bash"
+ensure_node
+
+echo "--- :golang: Installing protobuf plugins"
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
+go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1
+
+echo "--- :pnpm: Installing dependencies"
+pnpm install --frozen-lockfile
+
+echo "+++ :protobuf: Regenerating and comparing"
+pnpm proto:generate
+
+# --intent-to-add makes newly generated untracked files visible to git diff.
+git add --intent-to-add --all
+if ! git diff --exit-code; then
+  echo "^^^ +++"
+  echo "Generated code is out of date. Run 'pnpm proto:generate' and commit the result." >&2
+  exit 1
+fi
+echo "Generated code is current"

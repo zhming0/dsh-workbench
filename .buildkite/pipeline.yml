@@ -1,0 +1,25 @@
+steps:
+  - label: ":typescript: Provider"
+    image: node:24.19.0@sha256:4196d66a565c6f195728d9952f161f4adfe2ad753052a08b7ec7f1c5a6bda42b
+    command: .buildkite/steps/test-provider
+
+  - label: ":golang: Runner"
+    image: golang:1.26.7@sha256:dc2521c2a906db43073b8b4d99f491b6341cf15610b6ebbab187c45153f9959e
+    command: .buildkite/steps/test-runner
+
+  - label: ":protobuf: Generated code is current"
+    image: golang:1.26.7@sha256:dc2521c2a906db43073b8b4d99f491b6341cf15610b6ebbab187c45153f9959e
+    command: .buildkite/steps/check-codegen
+
+  - label: ":docker: Runner image & smoke test"
+    agents:
+      queue: hosted-amd64-small
+    command: .buildkite/steps/smoke-test
+
+  - block: ":rocket: Release"
+    if: build.branch == "main"
+    prompt: "Publish the runner image and the npm package?"
+
+  - label: ":pipeline: Upload release pipeline"
+    if: build.branch == "main"
+    command: buildkite-agent pipeline upload .buildkite/pipeline.release.yml
