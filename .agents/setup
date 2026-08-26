@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+GO_VERSION=1.26.7
+GO_ROOT="$HOME/.local/go-${GO_VERSION}"
+
+mkdir -p "$HOME/.local/bin"
+
+if [[ ! -x "$GO_ROOT/bin/go" ]]; then
+  archive="/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+  curl --fail --location --silent --show-error \
+    "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+    --output "$archive"
+  rm -rf "$GO_ROOT"
+  mkdir -p "$GO_ROOT"
+  tar -xzf "$archive" --strip-components=1 -C "$GO_ROOT"
+fi
+
+ln -sf "$GO_ROOT/bin/go" "$HOME/.local/bin/go"
+ln -sf "$GO_ROOT/bin/gofmt" "$HOME/.local/bin/gofmt"
+
+npm exec --yes --package=pnpm@11.7.0 -- pnpm install --frozen-lockfile
+
+PATH="$HOME/.local/bin:$PATH" GOBIN="$HOME/.local/bin" \
+  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
+PATH="$HOME/.local/bin:$PATH" GOBIN="$HOME/.local/bin" \
+  go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1

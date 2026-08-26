@@ -1,0 +1,174 @@
+syntax = "proto3";
+
+package dsh.sandbox.v1;
+
+option go_package = "github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1;sandboxv1";
+
+service RunnerService {
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc Exec(ExecRequest) returns (stream ExecResponse);
+  rpc ResolveExecutable(ResolveExecutableRequest) returns (ResolveExecutableResponse);
+  rpc ResolvePath(ResolvePathRequest) returns (ResolvePathResponse);
+  rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
+  rpc EditFile(EditFileRequest) returns (EditFileResponse);
+  rpc Stat(StatRequest) returns (StatResponse);
+  rpc List(ListRequest) returns (ListResponse);
+  rpc SetSecrets(SetSecretsRequest) returns (SetSecretsResponse);
+  rpc SetGitCredentials(SetGitCredentialsRequest) returns (SetGitCredentialsResponse);
+  rpc Setup(SetupRequest) returns (SetupResponse);
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  string sandbox_id = 1;
+  bool setup_complete = 2;
+}
+
+message ExecRequest {
+  repeated string argv = 1;
+  string cwd = 2;
+  map<string, string> env = 3;
+  bytes stdin = 4;
+}
+
+message ExecResponse {
+  oneof event {
+    ExecStarted started = 1;
+    bytes stdout = 2;
+    bytes stderr = 3;
+    ExecExited exited = 4;
+  }
+}
+
+message ExecStarted {
+  int64 pid = 1;
+}
+
+message ExecExited {
+  int32 exit_code = 1;
+  string signal = 2;
+}
+
+message ResolveExecutableRequest {
+  string command = 1;
+  map<string, string> env = 2;
+}
+
+message ResolveExecutableResponse {
+  string path = 1;
+}
+
+message ResolvePathRequest {
+  string path = 1;
+  string cwd = 2;
+}
+
+message ResolvePathResponse {
+  string canonical_path = 1;
+  string display_path = 2;
+}
+
+message ReadFileRequest {
+  string path = 1;
+  int64 max_bytes = 2;
+}
+
+message ReadFileResponse {
+  bytes content = 1;
+}
+
+message WriteFileRequest {
+  string path = 1;
+  bytes content = 2;
+  oneof guard {
+    bool create_if_absent = 3;
+    string expected_version = 4;
+  }
+}
+
+message WriteFileResponse {
+  bool created = 1;
+  bool had_before = 2;
+  bytes before = 3;
+  string version = 4;
+}
+
+message EditFileRequest {
+  string path = 1;
+  string old_string = 2;
+  string new_string = 3;
+  bool replace_all = 4;
+  string expected_version = 5;
+}
+
+message EditFileResponse {
+  bytes before = 1;
+  bytes after = 2;
+  string version = 3;
+}
+
+message StatRequest {
+  string path = 1;
+  bool follow_symlinks = 2;
+}
+
+enum FileType {
+  FILE_TYPE_UNSPECIFIED = 0;
+  FILE_TYPE_REGULAR = 1;
+  FILE_TYPE_DIRECTORY = 2;
+  FILE_TYPE_SYMLINK = 3;
+  FILE_TYPE_OTHER = 4;
+}
+
+message StatResponse {
+  bool exists = 1;
+  FileType type = 2;
+  int64 size = 3;
+  string version = 4;
+}
+
+message ListRequest {
+  string path = 1;
+}
+
+message ListEntry {
+  string name = 1;
+  string canonical_path = 2;
+  FileType type = 3;
+  int64 size = 4;
+  string version = 5;
+}
+
+message ListResponse {
+  repeated ListEntry entries = 1;
+}
+
+message SetSecretsRequest {
+  map<string, string> secrets = 1;
+}
+
+message SetSecretsResponse {}
+
+message GitCredential {
+  string host = 1;
+  string username = 2;
+  string password = 3;
+}
+
+message SetGitCredentialsRequest {
+  repeated GitCredential credentials = 1;
+}
+
+message SetGitCredentialsResponse {}
+
+message SetupRequest {
+  string repository_url = 1;
+  string revision = 2;
+  string workspace = 3;
+}
+
+message SetupResponse {
+  bool ran = 1;
+}

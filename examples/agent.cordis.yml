@@ -1,0 +1,42 @@
+# A small dsh preset that keeps all filesystem and command work in one sandbox.
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: You are a helpful software engineer assistant.
+    complete: true
+    includeRuntimeContext: false
+
+- id: sandbox-capabilities
+  name: cordis:group
+  group: true
+  isolate:
+    sandboxManager: true
+    fs: true
+    shell: true
+    subprocess: true
+  config:
+    - id: sandbox-manager
+      name: '@dsh-sandbox/provider'
+      config:
+        backend: docker
+        docker:
+          image: dsh-runner:dev
+
+    - id: sandbox-subprocess
+      name: '@dsh-sandbox/provider/subprocess'
+
+    - id: sandbox-shell
+      name: '@dsh-sandbox/provider/shell'
+
+    - id: sandbox-filesystem
+      name: '@dsh-sandbox/provider/fs'
+
+    - id: filesystem-observation
+      name: '@deepseek-ai/dsh-fs-observation-policy'
+
+    - id: filesystem-tools
+      name: '@deepseek-ai/dsh-tool-fs'
+
+    - id: bash-tool
+      name: '@deepseek-ai/dsh-tool-bash'

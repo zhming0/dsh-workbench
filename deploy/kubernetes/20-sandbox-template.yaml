@@ -1,0 +1,94 @@
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxTemplate
+metadata:
+  name: dsh-universal
+  namespace: dsh-sandbox
+spec:
+  service: true
+  envVarsInjectionPolicy: Disallowed
+  volumeClaimTemplatesPolicy: Disallowed
+  networkPolicyManagement: Managed
+  networkPolicy:
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: dsh-sandbox
+        ports:
+          - protocol: TCP
+            port: 8080
+    egress:
+      # DNS is the only cluster service this reference policy explicitly permits.
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+            podSelector:
+              matchLabels:
+                k8s-app: kube-dns
+        ports:
+          - protocol: UDP
+            port: 53
+          - protocol: TCP
+            port: 53
+      # HTTPS is needed for source/package downloads. This also permits private
+      # and cluster IPs on 443; replace it with organization CIDRs/FQDN-aware
+      # CNI policy in production. All other egress is denied.
+      - ports:
+          - protocol: TCP
+            port: 443
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi
+  podTemplate:
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: runner
+          image: DSH_RUNNER_IMAGE_PLACEHOLDER
+          imagePullPolicy: IfNotPresent
+          env:
+            # agent-sandbox v0.5.4 normally names the backing pod after its
+            # Sandbox. The provider signs this same assigned Sandbox name.
+            - name: SANDBOX_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: PROVIDER_PUBLIC_KEY_FILE
+              value: /etc/dsh/keys/public-key.pem
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 1
+            periodSeconds: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: runner-public-key
+              mountPath: /etc/dsh/keys
+              readOnly: true
+      volumes:
+        - name: runner-public-key
+          configMap:
+            name: dsh-runner-public-key

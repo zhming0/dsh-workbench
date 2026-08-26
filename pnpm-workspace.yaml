@@ -1,0 +1,5 @@
+packages:
+  - provider
+
+allowBuilds:
+  '@bufbuild/buf': true
