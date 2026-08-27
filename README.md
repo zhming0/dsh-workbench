@@ -114,9 +114,9 @@ Each dsh session gets its own sandbox. Two sessions never share files.
 ## Configuring the backend
 
 Configuration is YAML, not a settings screen. dsh's Web settings page does have
-a plugin configuration surface, but it only renders for plugins that register a
-settings namespace, and this one does not. Everything below goes in your
-profile's own layer:
+a Plugins tab, but a plugin appears there only if it both registers a settings
+namespace on the host and ships a hand-written browser card for it. This plugin
+does neither, so everything below goes in your profile's own layer:
 
 ```text
 $DSH_HOME/profiles/<name>/cordis.patch.yml
