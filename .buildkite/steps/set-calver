@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# One version string serves both the npm package and the runner image tag.
+#
+# Layout is major.minor.patch = YEAR.MONTHDAY.1HHMMSS. Unlike a `-HHMMSS`
+# prerelease suffix this stays an ordinary release version, so npm caret ranges
+# behave normally, and every component still compares numerically in order.
+YEAR="$(date -u +'%Y')"
+MONTH_DAY="$(date -u +'%-m%d')"
+# Prefixed with 1 to keep a fixed width without a leading zero.
+TIME="1$(date -u +'%H%M%S')"
+VERSION="${YEAR}.${MONTH_DAY}.${TIME}"
+
+echo "Version: $VERSION"
+buildkite-agent meta-data set "release-version" "$VERSION"

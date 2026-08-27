@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
+
+VERSION="$(buildkite-agent meta-data get release-version)"
+TAG="$VERSION"
+IMAGE="ghcr.io/zhming0/dsh-runner"
+PACKAGE="@zhming0/dsh-workbench"
+
+echo "--- :git: Configuring HTTPS authentication"
+git config url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+
+echo "--- :git: Tagging $TAG"
+git tag "$TAG"
+git push origin "$TAG"
+
+echo "+++ :github: Creating GitHub release"
+gh release create "$TAG" --title "$TAG" --generate-notes --notes "## Install
+
+\`\`\`
+dsh plugin --profile <name> add ${PACKAGE}@${VERSION}
+\`\`\`
+
+## Runner image
+
+\`\`\`
+docker pull ${IMAGE}:${VERSION}
+\`\`\`
+
+Built for \`linux/amd64\` and \`linux/arm64\`. The provider defaults to the
+image tag matching its own version, so these two always ship together.
+"

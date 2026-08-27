@@ -1,18 +1,18 @@
 {
-  "name": "dsh-sandbox-workspace",
+  "name": "dsh-workbench-workspace",
   "private": true,
   "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": "^22.19.0 || >=24"
   },
   "scripts": {
-    "build": "pnpm --filter @dsh-sandbox/provider build",
-    "check": "pnpm proto:check && pnpm --filter @dsh-sandbox/provider check",
-    "format": "pnpm --filter @dsh-sandbox/provider format",
-    "format:check": "pnpm --filter @dsh-sandbox/provider format:check",
+    "build": "pnpm --filter @zhming0/dsh-workbench build",
+    "check": "pnpm proto:check && pnpm --filter @zhming0/dsh-workbench check",
+    "format": "pnpm --filter @zhming0/dsh-workbench format",
+    "format:check": "pnpm --filter @zhming0/dsh-workbench format:check",
     "proto:check": "buf lint && buf format --diff --exit-code",
     "proto:generate": "buf generate",
-    "test": "pnpm --filter @dsh-sandbox/provider test",
+    "test": "pnpm --filter @zhming0/dsh-workbench test",
     "test:docker": "node scripts/docker-smoke.mjs"
   },
   "devDependencies": {

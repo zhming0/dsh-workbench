@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
+
+VERSION="$(buildkite-agent meta-data get release-version)"
+
+echo "--- :pnpm: Installing dependencies"
+pnpm install --frozen-lockfile
+
+echo "--- :label: Setting version to ${VERSION}"
+npm --prefix provider version "$VERSION" --no-git-tag-version --allow-same-version
+
+echo "--- :package: Building"
+pnpm build
+
+# The provider derives its default runner image from its own version, so a
+# mismatch here means the published package would point at a tag that the
+# image step never pushed.
+echo "--- :mag: Verifying the default runner image"
+EXPECTED="ghcr.io/zhming0/dsh-runner:${VERSION}"
+ACTUAL="$(node --input-type=module -e "
+  const { DEFAULT_RUNNER_IMAGE } = await import('./provider/dist/runner-image.js');
+  console.log(DEFAULT_RUNNER_IMAGE);
+")"
+if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+  echo "Default runner image is '${ACTUAL}', expected '${EXPECTED}'" >&2
+  exit 1
+fi
+echo "Default runner image: ${ACTUAL}"
+
+echo "--- :npm: Authenticating"
+echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "${HOME}/.npmrc"
+
+echo "+++ :npm: Publishing @zhming0/dsh-workbench@${VERSION}"
+(cd provider && npm publish)

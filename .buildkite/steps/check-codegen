@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# `buf generate` drives three plugins: two Go binaries and one Node binary. The
+# Go plugins come from mise.toml; protoc-gen-es comes from pnpm below.
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
+
+echo "--- :pnpm: Installing dependencies"
+pnpm install --frozen-lockfile
+
+echo "+++ :protobuf: Regenerating and comparing"
+pnpm proto:generate
+
+# --intent-to-add makes newly generated untracked files visible to git diff.
+git add --intent-to-add --all
+if ! git diff --exit-code; then
+  echo "^^^ +++"
+  echo "Generated code is out of date. Run 'pnpm proto:generate' and commit the result." >&2
+  exit 1
+fi
+echo "Generated code is current"

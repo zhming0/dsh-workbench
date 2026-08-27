@@ -17,20 +17,20 @@
     subprocess: true
   config:
     - id: sandbox-manager
-      name: '@dsh-sandbox/provider'
+      name: '@zhming0/dsh-workbench'
       config:
         backend: docker
         docker:
           image: dsh-runner:dev
 
     - id: sandbox-subprocess
-      name: '@dsh-sandbox/provider/subprocess'
+      name: '@zhming0/dsh-workbench/subprocess'
 
     - id: sandbox-shell
-      name: '@dsh-sandbox/provider/shell'
+      name: '@zhming0/dsh-workbench/shell'
 
     - id: sandbox-filesystem
-      name: '@dsh-sandbox/provider/fs'
+      name: '@zhming0/dsh-workbench/fs'
 
     - id: filesystem-observation
       name: '@deepseek-ai/dsh-fs-observation-policy'

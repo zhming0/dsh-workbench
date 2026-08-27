@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
+
+echo "--- :docker: Building the runner image"
+docker buildx bake dev --load
+
+echo "--- :pnpm: Installing dependencies"
+pnpm install --frozen-lockfile
+
+echo "--- :package: Building the provider"
+pnpm build
+
+echo "+++ :docker: Running the lifecycle smoke test"
+DSH_RUNNER_IMAGE="dsh-runner:dev" pnpm test:docker

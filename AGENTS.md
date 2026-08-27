@@ -31,6 +31,9 @@
   `pnpm proto:generate`.
 - The pinned dsh, agent-sandbox, Go, `jj`, and `mise` versions are intentional.
   Update them only as part of an explicit compatibility change.
+- `mise.toml` is the only place CI and local development read tool versions
+  from. Do not reintroduce a version in a pipeline image, a step script, or the
+  README. pnpm is the exception: `packageManager` in `package.json` pins it.
 
 ## Test the affected path
 

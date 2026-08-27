@@ -22,9 +22,14 @@ the container platform boundary.
 sandbox data. ConnectRPC health and all capability calls still require a valid
 token.
 
-The reference Dockerfile currently builds a Linux amd64 image. Its `jj` and
-`mise` archives are pinned amd64 releases; add and verify the matching checksums
-before extending the image to another architecture.
+The reference Dockerfile builds `linux/amd64` and `linux/arm64`. It selects the
+`jj` and `mise` archives from `TARGETARCH` and verifies a pinned checksum per
+architecture, so adding another one means adding both the archive name and its
+checksum. The Go stage cross-compiles from the builder's own architecture rather
+than running the toolchain under emulation.
+
+Releases are published to `ghcr.io/zhming0/dsh-runner`, tagged with the same
+version as the `@zhming0/dsh-workbench` package that expects them.
 
 When standard `OTEL_EXPORTER_OTLP_*`, `OTEL_TRACES_EXPORTER`, or
 `OTEL_METRICS_EXPORTER` settings are present, the runner exports HTTP traces and

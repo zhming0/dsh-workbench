@@ -1,0 +1,30 @@
+steps:
+  - label: ":calendar: Calculate version"
+    command: .buildkite/steps/set-calver
+
+  - wait
+
+  # The image must exist before the package that names it by default, so a
+  # published provider never points at a tag nobody can pull.
+  - label: ":docker: Build & Push runner image"
+    agents:
+      queue: hosted-amd64-small
+    secrets:
+      - GITHUB_TOKEN
+    command: .buildkite/steps/build-and-push-image
+
+  - wait
+
+  # Same toolchain image as .buildkite/pipeline.yml. Node comes from mise.toml.
+  - label: ":npm: Publish provider"
+    image: buildpack-deps:trixie@sha256:fc37e60062783dc2c137f05d7b22cca1b20a642ecf1881f778b2ce7211038347
+    secrets:
+      - NPM_TOKEN
+    command: .buildkite/steps/publish-npm
+
+  - wait
+
+  - label: ":github: Create GitHub release"
+    secrets:
+      - GITHUB_TOKEN
+    command: .buildkite/steps/create-github-release

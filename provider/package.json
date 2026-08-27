@@ -1,7 +1,16 @@
 {
-  "name": "@dsh-sandbox/provider",
+  "name": "@zhming0/dsh-workbench",
   "version": "0.1.0",
-  "description": "Sandbox lifecycle and capability provider for DeepSeek Harness",
+  "description": "Remote sandbox lifecycle and capability provider for DeepSeek Harness",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhming0/dsh-sandbox.git",
+    "directory": "provider"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,7 +33,7 @@
     }
   },
   "bin": {
-    "dsh-sandbox": "./dist/cli.js"
+    "dsh-workbench": "./dist/cli.js"
   },
   "files": [
     "dist",
@@ -34,6 +43,7 @@
     "node": "^22.19.0 || >=24"
   },
   "scripts": {
+    "prepack": "tsc -p tsconfig.build.json",
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts' '*.md'",

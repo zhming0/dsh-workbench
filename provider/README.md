@@ -1,22 +1,32 @@
-# Sandbox provider
+# dsh-workbench provider
 
-This package connects DeepSeek Harness sessions to isolated workspaces. It owns
-the sandbox lifecycle and supplies remote filesystem, shell, and subprocess
-implementations to the normal dsh tools.
+This package connects DeepSeek Harness sessions to isolated environments. It
+owns the sandbox lifecycle and supplies remote filesystem, shell, and
+subprocess implementations to the normal dsh tools.
 
 The default backend uses Docker on the same machine as dsh. The Kubernetes
 backend uses Kubernetes SIG agent-sandbox and must run somewhere that can reach
 the in-cluster Sandbox service names.
 
-## Use it in a dsh preset
-
-Build the runner image and this package first:
+## Install
 
 ```sh
-docker build -t dsh-runner:dev runner
+dsh plugin --profile <name> add @zhming0/dsh-workbench
+```
+
+Each release publishes a runner image tagged with the same version as this
+package, and the provider defaults to that exact tag. Pulling the image is
+automatic on the first session.
+
+To work from a checkout instead, build the runner image and this package:
+
+```sh
+docker buildx bake dev --load
 pnpm install
 pnpm build
 ```
+
+## Use it in a dsh preset
 
 See [`../examples/agent.cordis.yml`](../examples/agent.cordis.yml) for a small
 preset. The manager, capability providers, and tools are deliberately in one
@@ -36,7 +46,7 @@ The manager accepts these settings:
 | `stateDir`       | `~/.dsh-sandbox`     | Provider keys, session records, and broker data     |
 | `githubClientId` | none                 | GitHub OAuth app client ID for private repositories |
 | `wipCommit`      | `false`              | Make a local safety commit before hibernating       |
-| `docker.image`   | `dsh-runner:dev`     | Runner image used by Docker                         |
+| `docker.image`   | matching release tag | Runner image used by Docker                         |
 | `docker.binary`  | `docker`             | Docker-compatible command                           |
 | `kas.namespace`  | `dsh-sandbox`        | Namespace containing claims and warm sandboxes      |
 | `kas.warmPool`   | `dsh-universal`      | Warm pool used for claims                           |

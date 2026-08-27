@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
+
+cd runner
+
+echo "--- :golang: Vetting"
+go vet ./...
+
+echo "--- :hammer: Building"
+go build ./...
+
+echo "+++ :golang: Running tests"
+go test -race ./...
