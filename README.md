@@ -42,10 +42,13 @@ versions in this repository are intentional.
 - [dsh](https://www.npmjs.com/package/@deepseek-ai/dsh) `0.1.1-rc.2`, and pnpm
   on your `PATH`, which is what dsh uses to install plugins.
 - Docker running on the same machine as dsh.
-- A git checkout to work on. dsh-workbench reads its `origin` remote and clones
-  that repository into the sandbox, so it must be a repository the sandbox can
-  reach. Public repositories need nothing; private ones need the GitHub step
-  below.
+- **A git checkout with an `origin` remote**, and you launch dsh from it. This
+  one is load-bearing, not a nicety: the provider runs `git remote get-url
+origin` in the session's working directory and clones the result into the
+  sandbox. A session started somewhere without an `origin` fails with
+  `cannot resolve a repository from <path>`, and the fix is to set `repository`
+  explicitly. Public repositories need nothing more; private ones need the
+  GitHub step below.
 
 ### What a dsh profile is
 
@@ -77,16 +80,36 @@ dsh plugin --profile web add @zhming0/dsh-workbench
 That is the whole install. This package declares a bundle patch, so dsh appends
 it to the profile's layer stack and the patch applies on the next boot.
 
-### 2. What that did
+### 2. Choose where sandboxes run
+
+**Docker: nothing to do.** The defaults are a complete working configuration,
+which is why there is no configuration step here:
+
+| Setting        | Resolves to                                                      |
+| -------------- | ---------------------------------------------------------------- |
+| `backend`      | `docker`                                                         |
+| `docker.image` | the runner image released with this package, pulled on first use |
+| `stateDir`     | `~/.dsh-sandbox`, with a signing key generated on first boot     |
+| `repository`   | the `origin` remote of the session's working directory           |
+| `workspace`    | `/workspace` inside the sandbox                                  |
+
+**Kubernetes: this is not a laptop path.** A runner is only reachable in-cluster
+at its Sandbox service name, so the dsh process itself has to run in or beside
+the cluster. It also needs agent-sandbox v0.5.4, a warm pool, and the provider's
+public key deployed before the first claim. Set `backend: kas` as shown under
+[Configuring the backend](#configuring-the-backend), and read
+[Pointing at a real cluster](#pointing-at-a-real-cluster) first.
+
+### 3. What the install changed
 
 The bundle patch is [`provider/cordis.patch.yml`](provider/cordis.patch.yml).
 It turns off three host capability rows and inserts sandbox-backed replacements:
 
-| Row | Before | After |
-| --- | --- | --- |
-| `fs-sandbox` | reads and writes your disk | reads and writes the sandbox workspace |
-| `bash-sandbox` | runs `bash` on your machine | runs `bash` in the sandbox |
-| `subprocess` | spawns host processes | spawns processes in the sandbox |
+| Row            | Before                      | After                                  |
+| -------------- | --------------------------- | -------------------------------------- |
+| `fs-sandbox`   | reads and writes your disk  | reads and writes the sandbox workspace |
+| `bash-sandbox` | runs `bash` on your machine | runs `bash` in the sandbox             |
+| `subprocess`   | spawns host processes       | spawns processes in the sandbox        |
 
 It leaves every tool row alone, so the stock `standard` and `code` agent presets
 keep working and simply point at the sandbox.
@@ -98,7 +121,7 @@ Searching a remote filesystem needs a provider-side search backend that this
 milestone does not have. The agent can still use `grep` and `find` through
 `bash`.
 
-### 3. Run it
+### 4. Start a session
 
 ```sh
 cd ~/code/your-repo
@@ -108,6 +131,10 @@ dsh web
 The first session pulls the runner image, starts a container, clones the
 repository's `origin` into `/workspace`, and runs `.dsh/setup.sh` if the
 repository has one. Later sessions on a warm image start in a few seconds.
+
+A web session's working directory is the workspace you pick in the UI, and
+otherwise the directory you launched dsh from. That directory is what decides
+which repository the sandbox clones.
 
 Each dsh session gets its own sandbox. Two sessions never share files.
 
@@ -167,13 +194,13 @@ the device-code challenge into the conversation and waits.
 
 ## What changes for the agent
 
-| | Before | After |
-| --- | --- | --- |
-| `read`, `write`, `edit`, `str_replace_editor` | your disk | sandbox workspace |
-| `bash` | your machine | sandbox |
-| `glob`, `grep` | ripgrep on your machine | unavailable; use `bash` |
-| Working directory | wherever you launched dsh | `/workspace` in the sandbox |
-| Session logs, attachments, spill files | your disk | unchanged, still your disk |
+|                                               | Before                    | After                       |
+| --------------------------------------------- | ------------------------- | --------------------------- |
+| `read`, `write`, `edit`, `str_replace_editor` | your disk                 | sandbox workspace           |
+| `bash`                                        | your machine              | sandbox                     |
+| `glob`, `grep`                                | ripgrep on your machine   | unavailable; use `bash`     |
+| Working directory                             | wherever you launched dsh | `/workspace` in the sandbox |
+| Session logs, attachments, spill files        | your disk                 | unchanged, still your disk  |
 
 Turning off `fs-sandbox` also turns off dsh's host-side permission model:
 `workspace-write` and the approval prompts came from that row. This is
@@ -184,12 +211,12 @@ the prompt, as the thing standing between a repository and your machine.
 
 ## Where files live
 
-| Path | What |
-| --- | --- |
-| `$DSH_HOME/profiles/<name>/` | installed plugins and your override layer |
-| `$DSH_HOME/profiles/<name>/node_modules/.bin/dsh-workbench` | the CLI |
-| `~/.dsh-sandbox/` | signing key, session records, broker store, owner-only |
-| `/workspace` inside the sandbox | the cloned repository |
+| Path                                                        | What                                                   |
+| ----------------------------------------------------------- | ------------------------------------------------------ |
+| `$DSH_HOME/profiles/<name>/`                                | installed plugins and your override layer              |
+| `$DSH_HOME/profiles/<name>/node_modules/.bin/dsh-workbench` | the CLI                                                |
+| `~/.dsh-sandbox/`                                           | signing key, session records, broker store, owner-only |
+| `/workspace` inside the sandbox                             | the cloned repository                                  |
 
 ## Per-session sandboxes instead of profile-wide
 
@@ -205,11 +232,51 @@ cp -r examples ~/.dsh/.agent-presets/sandbox
 the profile edits that neutralize the bundle layer first. The two routes are
 alternatives; running both gives a session two sandboxes.
 
-## Kubernetes reference environment
+## Kubernetes
 
-The provider must be able to reach in-cluster Sandbox service names, so this
-path suits a dsh instance running in or next to the cluster. The scripts below
-run from a checkout of this repository.
+### Pointing at a real cluster
+
+Four things have to be true before `backend: kas` can work, and only the last
+one is plugin configuration.
+
+1. **The cluster runs agent-sandbox v0.5.4**, with a SandboxTemplate and a warm
+   pool applied from `deploy/kubernetes/`. See
+   [`docs/kubernetes.md`](docs/kubernetes.md).
+2. **The runner image is pullable by the cluster**, substituted into the
+   template in place of `DSH_RUNNER_IMAGE_PLACEHOLDER`.
+3. **The provider's public key is deployed as a ConfigMap.** Warm pods are
+   created before any session claims them, so the key has to be there before
+   the first claim. Print it from the same `stateDir` dsh uses:
+
+   ```sh
+   "$DSH" key public
+   ```
+
+   The private key never leaves the dsh host.
+
+4. **dsh runs where it can reach Sandbox service names.** A runner is only
+   addressable in-cluster at `status.serviceFQDN:8080`, which is not an ingress
+   and not a public URL, so a laptop cannot use this backend over the internet.
+
+Then set the backend in your profile layer:
+
+```yaml
+- id: sandbox-manager
+  config:
+    backend: kas
+    kas:
+      namespace: dsh-sandbox
+      warmPool: dsh-universal
+```
+
+The reference manifests use normal container isolation so they work in kind.
+Hostile workloads need a stronger runtime such as gVisor and a network policy
+suited to the cluster.
+
+### Disposable dev cluster
+
+From a checkout of this repository, these scripts create a kind cluster, check
+warm claim, suspend, resume, volume persistence, and expiry, then remove it:
 
 ```sh
 node provider/dist/cli.js key public > /tmp/dsh-provider.pub
@@ -220,14 +287,6 @@ scripts/kas/dev-cluster.sh \
 scripts/kas/smoke-test.sh
 scripts/kas/teardown.sh
 ```
-
-Warm pods carry the provider's public key, so it has to be in the cluster before
-the first claim. The private key never leaves the dsh host.
-
-Read [`docs/kubernetes.md`](docs/kubernetes.md) before using the manifests in a
-real cluster. The example uses normal container isolation so it works in kind;
-hostile workloads need a stronger runtime such as gVisor and a network policy
-suited to the cluster.
 
 ## Trust boundaries
 
@@ -245,14 +304,14 @@ suited to the cluster.
 
 ## Repository layout
 
-| Path | Purpose |
-| --- | --- |
-| `provider/` | TypeScript dsh plugin, bundle patch, lifecycle policy, backends, credential broker |
-| `runner/` | Go server that runs inside each sandbox |
-| `proto/` | Single ConnectRPC contract used by provider and runner |
-| `deploy/kubernetes/` | Reference warm pool, template, network policy, and RBAC |
-| `scripts/kas/` | Disposable kind cluster and lifecycle smoke test |
-| `examples/` | Agent preset for the per-session route |
+| Path                 | Purpose                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| `provider/`          | TypeScript dsh plugin, bundle patch, lifecycle policy, backends, credential broker |
+| `runner/`            | Go server that runs inside each sandbox                                            |
+| `proto/`             | Single ConnectRPC contract used by provider and runner                             |
+| `deploy/kubernetes/` | Reference warm pool, template, network policy, and RBAC                            |
+| `scripts/kas/`       | Disposable kind cluster and lifecycle smoke test                                   |
+| `examples/`          | Agent preset for the per-session route                                             |
 
 ## Build and test
 
@@ -291,9 +350,8 @@ To regenerate code after editing the protobuf file:
 pnpm proto:generate
 ```
 
-To test the Kubernetes lifecycle locally, the scripts in `scripts/kas/` create a
-disposable kind cluster and check warm claim, suspend, resume, volume
-persistence, and expiry.
+For the Kubernetes lifecycle, use the
+[disposable dev cluster](#disposable-dev-cluster) scripts.
 
 To run a checkout instead of a release, build first and install the directory:
 
