@@ -15,8 +15,9 @@ steps:
 
   - wait
 
+  # Same toolchain image as .buildkite/pipeline.yml. Node comes from mise.toml.
   - label: ":npm: Publish provider"
-    image: node:24.19.0@sha256:4196d66a565c6f195728d9952f161f4adfe2ad753052a08b7ec7f1c5a6bda42b
+    image: buildpack-deps:trixie@sha256:fc37e60062783dc2c137f05d7b22cca1b20a642ecf1881f778b2ce7211038347
     secrets:
       - NPM_TOKEN
     command: .buildkite/steps/publish-npm

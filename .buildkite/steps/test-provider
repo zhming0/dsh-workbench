@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source "$(dirname "$0")/lib/node.bash"
-ensure_node
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
 
 echo "--- :pnpm: Installing dependencies"
 pnpm install --frozen-lockfile

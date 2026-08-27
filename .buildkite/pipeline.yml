@@ -1,14 +1,18 @@
 steps:
+  # Every step installs its toolchain from mise.toml, so the image only has to
+  # supply git, curl, and a C compiler, the last of which `go test -race` needs.
+  # Pinning a language image here would put a second version of Go or Node next
+  # to the one mise.toml already pins.
   - label: ":typescript: Provider"
-    image: node:24.19.0@sha256:4196d66a565c6f195728d9952f161f4adfe2ad753052a08b7ec7f1c5a6bda42b
+    image: &toolchain buildpack-deps:trixie@sha256:fc37e60062783dc2c137f05d7b22cca1b20a642ecf1881f778b2ce7211038347
     command: .buildkite/steps/test-provider
 
   - label: ":golang: Runner"
-    image: golang:1.26.7@sha256:dc2521c2a906db43073b8b4d99f491b6341cf15610b6ebbab187c45153f9959e
+    image: *toolchain
     command: .buildkite/steps/test-runner
 
   - label: ":protobuf: Generated code is current"
-    image: golang:1.26.7@sha256:dc2521c2a906db43073b8b4d99f491b6341cf15610b6ebbab187c45153f9959e
+    image: *toolchain
     command: .buildkite/steps/check-codegen
 
   - label: ":docker: Runner image & smoke test"

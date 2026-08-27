@@ -1,0 +1,21 @@
+# Single source of truth for tool versions, used by CI and local development.
+# After cloning, run `mise install`.
+#
+# pnpm is deliberately absent. The root package.json `packageManager` field
+# already pins it, and corepack, bundled with the Node below, reads that field.
+min_version = "2025.11.0"
+
+[tools]
+node = "24.19.0"
+go = "1.26.7"
+
+# `buf generate` calls these two plugins as local binaries. Keep the versions
+# equal to the matching modules in runner/go.mod, or generated code and the
+# runtime it compiles against can drift. The third plugin, protoc-gen-es, comes
+# from pnpm because it shares a version with @bufbuild/protobuf.
+"go:google.golang.org/protobuf/cmd/protoc-gen-go" = "1.36.10"
+"go:connectrpc.com/connect/cmd/protoc-gen-connect-go" = "1.19.1"
+
+# Only the release pipeline needs the GitHub CLI. The aqua registry entry for it
+# fails attestation verification, so this uses the ubi backend instead.
+"ubi:cli/cli" = { version = "2.87.2", exe = "gh" }

@@ -62,10 +62,20 @@ the expected sandbox identity.
 
 ## Build and test
 
-Required tools are Node.js 24 or 22.19+, pnpm 11.7, Go 1.26.7, and Buf. Docker
-is needed for the end-to-end local test. `docker buildx bake dev` builds the
-runner image for the current machine; the release build covers `linux/amd64`
-and `linux/arm64`.
+[`mise.toml`](mise.toml) pins Node, Go, and the protobuf plugins, and CI
+installs from the same file, so a build and a laptop agree by construction.
+Install [mise](https://mise.jdx.dev), then:
+
+```sh
+mise install
+corepack enable pnpm
+```
+
+pnpm is pinned by the `packageManager` field in `package.json` rather than by
+`mise.toml`, and corepack reads it. Buf arrives with `pnpm install`. Docker is
+needed for the end-to-end local test. `docker buildx bake dev` builds the runner
+image for the current machine; the release build covers `linux/amd64` and
+`linux/arm64`.
 
 ```sh
 pnpm install
@@ -84,8 +94,6 @@ first-run setup, and file survival across stop/start.
 To regenerate code after editing the protobuf file:
 
 ```sh
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
-go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1
 pnpm proto:generate
 ```
 

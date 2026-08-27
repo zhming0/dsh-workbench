@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
+
 cd runner
 
 echo "--- :golang: Vetting"

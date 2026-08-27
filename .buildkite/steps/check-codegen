@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# `buf generate` drives three plugins: two Go binaries and one Node binary, so
-# this step needs both toolchains. It runs on the Go image and adds Node.
-source "$(dirname "$0")/lib/node.bash"
-ensure_node
-
-echo "--- :golang: Installing protobuf plugins"
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
-go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1
+# `buf generate` drives three plugins: two Go binaries and one Node binary. The
+# Go plugins come from mise.toml; protoc-gen-es comes from pnpm below.
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
 
 echo "--- :pnpm: Installing dependencies"
 pnpm install --frozen-lockfile
