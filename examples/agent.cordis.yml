@@ -1,4 +1,30 @@
-# A small dsh preset that keeps all filesystem and command work in one sandbox.
+# An agent preset that keeps one session's file and command work in a sandbox.
+#
+# This is the alternative to the shipped bundle patch, not an addition to it.
+# Installing @zhming0/dsh-workbench already swaps the host capability rows for
+# every session in the profile, which is what most people want. Use this preset
+# only when you want sandbox tools in some sessions and host tools in others,
+# and first neutralize the bundle layer in the profile's cordis.patch.yml:
+#
+#   - id: fs-sandbox
+#     disabled: false
+#   - id: bash-sandbox
+#     disabled: false
+#   - id: subprocess
+#     disabled: false
+#   - id: sandbox-manager
+#     disabled: true
+#   - id: sandbox-fs
+#     disabled: true
+#   - id: sandbox-shell
+#     disabled: true
+#   - id: sandbox-subprocess
+#     disabled: true
+#
+# Copy this directory to $DSH_HOME/.agent-presets/<id>/ and pick it in the web
+# UI. A preset may not publish a service into the root realm, so the manager and
+# its three capability providers share one isolated group with the tools that
+# read them.
 
 - id: persona
   name: '@deepseek-ai/dsh-persona'
@@ -18,10 +44,10 @@
   config:
     - id: sandbox-manager
       name: '@zhming0/dsh-workbench'
+      # Defaults to the runner image released with this package. Point it at
+      # dsh-runner:dev to test a locally built image.
       config:
         backend: docker
-        docker:
-          image: dsh-runner:dev
 
     - id: sandbox-subprocess
       name: '@zhming0/dsh-workbench/subprocess'

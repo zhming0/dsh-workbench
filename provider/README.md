@@ -1,39 +1,48 @@
 # dsh-workbench provider
 
 This package connects DeepSeek Harness sessions to isolated environments. It
-owns the sandbox lifecycle and supplies remote filesystem, shell, and
-subprocess implementations to the normal dsh tools.
+owns the sandbox lifecycle and supplies remote filesystem, shell, and subprocess
+implementations to the normal dsh tools.
+
+```sh
+dsh plugin --profile web add @zhming0/dsh-workbench
+```
+
+The [repository README](https://github.com/zhming0/dsh-sandbox#getting-started)
+covers the whole setup. This page is the reference: what the bundle patch does,
+every setting, and the CLI.
+
+## What installing it changes
+
+The package declares a bundle patch, so `dsh plugin add` appends it to the
+profile's layer stack and it applies on the next boot. The patch replaces three
+host capability rows (`fs-sandbox`, `bash-sandbox`, `subprocess`) with
+sandbox-backed ones, and turns off `tool-fs-search` because `glob` and `grep`
+spawn a host ripgrep binary that does not exist inside the sandbox.
+
+Tool rows are left alone, so the stock agent presets keep working and point at
+the sandbox instead of the host.
+
+Turning off `fs-sandbox` also removes dsh's host-side permission model, since
+`workspace-write` and the approval prompts came from that row. The container is
+the boundary instead.
 
 The default backend uses Docker on the same machine as dsh. The Kubernetes
 backend uses Kubernetes SIG agent-sandbox and must run somewhere that can reach
-the in-cluster Sandbox service names.
+in-cluster Sandbox service names.
 
-## Install
+## Settings
 
-```sh
-dsh plugin --profile <name> add @zhming0/dsh-workbench
+Configuration is YAML in the profile's own layer,
+`$DSH_HOME/profiles/<name>/cordis.patch.yml`. A patch entry replaces the whole
+`config` of the row it names, so restate the fields you want to keep.
+
+```yaml
+- id: sandbox-manager
+  config:
+    backend: docker
+    idleMs: 300000
 ```
-
-Each release publishes a runner image tagged with the same version as this
-package, and the provider defaults to that exact tag. Pulling the image is
-automatic on the first session.
-
-To work from a checkout instead, build the runner image and this package:
-
-```sh
-docker buildx bake dev --load
-pnpm install
-pnpm build
-```
-
-## Use it in a dsh preset
-
-See [`../examples/agent.cordis.yml`](../examples/agent.cordis.yml) for a small
-preset. The manager, capability providers, and tools are deliberately in one
-isolated Cordis group. This gives each agent the matching `sandboxManager`,
-`fs`, `shell`, and `subprocess` services.
-
-The manager accepts these settings:
 
 | Setting          | Default              | Meaning                                             |
 | ---------------- | -------------------- | --------------------------------------------------- |
@@ -52,61 +61,74 @@ The manager accepts these settings:
 | `kas.warmPool`   | `dsh-universal`      | Warm pool used for claims                           |
 | `kas.kubeconfig` | normal client lookup | Optional kubeconfig path                            |
 
-## Credentials and secrets
+`repository` defaults to the `origin` remote of the directory dsh was launched
+from. Each release publishes a runner image tagged with the same version as this
+package, and the provider defaults to that exact tag, so `docker.image` only
+matters when testing a locally built image.
+
+## CLI
+
+Secrets and tokens never go in YAML, because a profile layer is a plain file and
+a chat transcript is durable. They go through this package's CLI, which
+`dsh plugin add` installs at
+`$DSH_HOME/profiles/<name>/node_modules/.bin/dsh-workbench`.
+
+```sh
+dsh-workbench auth github
+dsh-workbench secret list
+printf '%s' VALUE | dsh-workbench secret set NAME
+dsh-workbench secret delete NAME
+dsh-workbench key public
+```
+
+It reads two environment variables and takes no flags:
+
+| Variable                       | Default          | Meaning                               |
+| ------------------------------ | ---------------- | ------------------------------------- |
+| `DSH_SANDBOX_STATE_DIR`        | `~/.dsh-sandbox` | Must match the `stateDir` setting     |
+| `DSH_SANDBOX_GITHUB_CLIENT_ID` | none             | GitHub OAuth app client ID for `auth` |
+
+`secret set` refuses an interactive terminal so a value cannot end up in shell
+history by accident. The provider reloads the broker file before the next
+sandbox command, so CLI changes take effect without restarting dsh.
+
+Sandbox code can read injected secrets, which is their purpose. The broker
+improves storage and cleanup, not confidentiality from the repository being run.
+
+GitHub's device flow produces a user token that can reach every repository the
+user granted to the OAuth app. It is not limited to the current repository. Use
+a dedicated account when that scope is too broad. Skip `auth github` entirely if
+you only work on public repositories.
+
+## Credentials at rest
 
 Provider state belongs on the dsh host, not in a sandbox. Files in `stateDir`
 are created with owner-only permissions. The runner receives current values in
 memory before it starts a command. Git credentials are served through a Unix
 socket and are never written to the workspace.
 
-Authorize GitHub before starting dsh, or let the provider put a device-code
-challenge into the session:
-
-```sh
-export DSH_SANDBOX_GITHUB_CLIENT_ID=your-oauth-app-client-id
-node provider/dist/cli.js auth github
-```
-
-GitHub's device flow produces a user token that can reach every repository the
-user granted to the OAuth app. It is not limited to the current repository.
-Use a dedicated account or wait for a future GitHub App broker when that scope
-is too broad.
-
-Set generic secrets out of band so their values never enter a chat transcript:
-
-```sh
-printf '%s' "$API_KEY" | node provider/dist/cli.js secret set API_KEY
-node provider/dist/cli.js secret list
-node provider/dist/cli.js secret delete API_KEY
-```
-
-The provider reloads the broker file before the next sandbox command, so CLI
-changes take effect without restarting dsh. Sandbox code can read injected
-secrets; the broker improves storage and cleanup, not confidentiality from the
-repository being run.
-
 ## Kubernetes key setup
 
 Kubernetes warm pods need the provider's public key before a session claims
-them. Generate the key in the same `stateDir` used by dsh:
+them, because a pod exists before any session binds to it. Generate the key from
+the same `stateDir` dsh uses:
 
 ```sh
-node provider/dist/cli.js key public > /tmp/dsh-provider.pub
-scripts/kas/dev-cluster.sh \
-  --runner-image dsh-runner:dev \
-  --public-key-file /tmp/dsh-provider.pub \
-  --load-runner-image
+dsh-workbench key public > /tmp/dsh-provider.pub
 ```
 
-The private key never goes into Kubernetes.
+The private key never goes into Kubernetes. See
+[`docs/kubernetes.md`](https://github.com/zhming0/dsh-sandbox/blob/main/docs/kubernetes.md).
 
 ## Milestone 1 limits
 
+- `glob` and `grep` are turned off. Searching a remote filesystem needs a
+  provider-side search backend, which does not exist yet.
 - Interactive terminals and streaming subprocess input are not implemented.
   One-shot stdin, streamed stdout/stderr, cancellation, and background process
   handles are supported.
 - Shell and subprocess output is kept in bounded in-memory tails. Truncated
   output is reported, but it is not copied to a spill file.
-- Docker stop/start keeps the same container. Kubernetes suspension removes
-  the pod and keeps its workspace volume.
+- Docker stop/start keeps the same container. Kubernetes suspension removes the
+  pod and keeps its workspace volume.
 - There is no service exposure or portal support yet.

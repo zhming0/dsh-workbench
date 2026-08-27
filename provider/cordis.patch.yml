@@ -1,0 +1,43 @@
+# The dsh-workbench bundle patch. `dsh plugin add` appends this package to the
+# profile's bundle list, so this layer applies after dsh-base and after the
+# surface bundle (dsh-web-app, dsh-headless).
+#
+# It swaps the three host capability rows and nothing else. Tool rows stay
+# wherever the surface bundle put them: in the host plane for headless, behind
+# agent presets for web. That is what lets the stock presets work unchanged.
+
+# The host filesystem provider, so `read`, `write`, `edit`, and
+# str_replace_editor address the session's sandbox workspace.
+- id: fs-sandbox
+  disabled: true
+
+# The host shell executor, so `bash` runs in the sandbox.
+- id: bash-sandbox
+  disabled: true
+
+# The host process spawner. The shell executor above is built on it, so this
+# is the seam that actually moves execution off the dsh host.
+- id: subprocess
+  disabled: true
+
+# `glob` and `grep` spawn a ripgrep binary resolved from the dsh host's own
+# node_modules, then run it through `subprocess`. That host path does not exist
+# in the sandbox, so every call would fail. Searching a remote filesystem needs
+# a provider-side search backend, which this milestone does not have.
+- id: tool-fs-search
+  disabled: true
+
+- insert:
+    # Owns one sandbox per dsh session: provision, idle hibernate, wake, expiry,
+    # and the credential broker. Every default works as-is against local Docker.
+    - id: sandbox-manager
+      name: '@zhming0/dsh-workbench'
+
+    - id: sandbox-fs
+      name: '@zhming0/dsh-workbench/fs'
+
+    - id: sandbox-shell
+      name: '@zhming0/dsh-workbench/shell'
+
+    - id: sandbox-subprocess
+      name: '@zhming0/dsh-workbench/subprocess'
