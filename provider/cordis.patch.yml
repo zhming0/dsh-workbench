@@ -2,9 +2,10 @@
 # profile's bundle list, so this layer applies after dsh-base and after the
 # surface bundle (dsh-web-app, dsh-headless).
 #
-# It swaps the three host capability rows and nothing else. Tool rows stay
-# wherever the surface bundle put them: in the host plane for headless, behind
-# agent presets for web. That is what lets the stock presets work unchanged.
+# It swaps the three host capability rows and disables host-only helpers that
+# cannot operate through the remote boundary. Tool rows stay wherever the
+# surface bundle put them: in the host plane for headless, behind agent presets
+# for web. That lets the stock agent compositions work unchanged.
 
 # The host filesystem provider, so `read`, `write`, `edit`, and
 # str_replace_editor address the session's sandbox workspace.
@@ -20,11 +21,23 @@
 - id: subprocess
   disabled: true
 
+# Permission presets switch dsh's local shell sandbox modes. The remote shell
+# runs in one fixed container boundary and does not claim to enforce those
+# per-command modes, so dsh correctly refuses to compose the preset service.
+- id: permission
+  disabled: true
+
 # `glob` and `grep` spawn a ripgrep binary resolved from the dsh host's own
 # node_modules, then run it through `subprocess`. That host path does not exist
 # in the sandbox, so every call would fail. Searching a remote filesystem needs
 # a provider-side search backend, which this milestone does not have.
 - id: tool-fs-search
+  disabled: true
+
+# Replace the Web app's host-directory chooser with this package's repository
+# URL flow. This patch is skipped with a warning in profiles, such as headless,
+# where the Web-only row does not exist.
+- id: directory-picker
   disabled: true
 
 - insert:

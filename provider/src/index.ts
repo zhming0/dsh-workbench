@@ -3,10 +3,12 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { Service, type Context } from "@deepseek-ai/cordis";
+import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import type { Session } from "@deepseek-ai/dsh-session";
+import type {} from "@deepseek-ai/dsh-typert-registry";
+import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import z from "@deepseek-ai/schemastery";
 import { metrics, trace } from "@opentelemetry/api";
 
@@ -14,6 +16,7 @@ import { DockerBackend } from "./backends/docker.js";
 import { KasBackend } from "./backends/kas.js";
 import { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
 import { ProviderKeyStore } from "./key-store.js";
+import { repositoryWorkspaceHost } from "./repository-workspace-remote.js";
 import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { RunnerClient } from "./runner-client.js";
 import { SessionStore } from "./state-store.js";
@@ -24,6 +27,10 @@ import type {
   SandboxBackend,
   SessionRecord,
 } from "./types.js";
+import {
+  createRepositoryAnchor,
+  repositoryForAnchor,
+} from "./workspace-anchor.js";
 
 const execute = promisify(execFile);
 const tracer = trace.getTracer("dsh-sandbox-provider");
@@ -84,6 +91,11 @@ export interface ManagerDependencies {
   store?: SessionStore;
   broker?: CredentialBroker;
   keys?: ProviderKeyStore;
+  workspaceRegistry?: WorkspaceRegistryLike;
+}
+
+interface WorkspaceRegistryLike {
+  create(path: string, title?: string): Promise<{ path: string }>;
 }
 
 declare module "@deepseek-ai/cordis" {
@@ -93,7 +105,7 @@ declare module "@deepseek-ai/cordis" {
 }
 
 /** Owns one durable sandbox record per dsh session. */
-export class SandboxManager extends Service {
+export class SandboxManager extends TypertRemoteService {
   static inject = ["agents"];
   static Config = z.object({
     backend: z.union([z.const("docker"), z.const("kas")]).default("docker"),
@@ -130,6 +142,7 @@ export class SandboxManager extends Service {
   private readonly store: SessionStore;
   private readonly broker: CredentialBroker;
   private readonly keys: ProviderKeyStore;
+  private readonly workspaceRegistry: WorkspaceRegistryLike | undefined;
   private readonly ready: Promise<void>;
   private readonly operations = new Map<string, Promise<void>>();
   private readonly clients = new Map<string, RunnerClient>();
@@ -159,7 +172,19 @@ export class SandboxManager extends Service {
           : { githubClientId: this.config.githubClientId }),
       });
     this.backend = dependencies.backend ?? createBackend(this.config);
+    this.workspaceRegistry = dependencies.workspaceRegistry;
     this.ready = this.initialize();
+
+    // The Web API requires a directory-picker capability. This package owns
+    // the browser flow instead, so expose an unknown kind that makes the stock
+    // folder RPCs unavailable without loading their competing browser plugin.
+    ctx.provide("directoryPicker", {
+      capability: () => ({ kind: "repository" }),
+    });
+
+    ctx.inject(["typert"], (typertCtx) =>
+      typertCtx.typert.register(repositoryWorkspaceHost),
+    );
 
     ctx.on("agent/session-start", ({ agent }) =>
       this.ensureRunning(agent, (challenge) =>
@@ -187,6 +212,21 @@ export class SandboxManager extends Service {
   /** Resolve the current foreground agent and return its live runner. */
   clientForCurrentAgent(): Promise<RunnerClient> {
     return this.ensureRunning(this.ctx.agents.requireInitiator());
+  }
+
+  /** Create and register the host Workspace selected by repository URL in Web. */
+  async createRepositoryWorkspace(repositoryUrl: string): Promise<string> {
+    const registry =
+      this.workspaceRegistry ??
+      (this.ctx.get("workspaceRegistry") as WorkspaceRegistryLike | undefined);
+    if (registry === undefined) {
+      throw new Error("repository workspaces require the dsh Web profile");
+    }
+    const anchor = await createRepositoryAnchor(
+      this.config.stateDir,
+      repositoryUrl,
+    );
+    return (await registry.create(anchor.path, anchor.title)).path;
   }
 
   async ensureRunning(
@@ -304,6 +344,10 @@ export class SandboxManager extends Service {
       record = undefined;
     }
 
+    const repositoryUrl =
+      record?.repositoryUrl ??
+      normalizeRepositoryUrl(await this.repositoryFor(agent));
+
     const cached = this.clients.get(sessionId);
     if (cached !== undefined && record?.state === "running") {
       try {
@@ -327,9 +371,6 @@ export class SandboxManager extends Service {
       record?.state === "running" &&
       !(await this.backend.health(record.reference));
 
-    const repositoryUrl =
-      record?.repositoryUrl ??
-      normalizeRepositoryUrl(await this.repositoryFor(agent));
     await this.broker.refresh();
     const credentials = await this.broker.gitCredentials(
       repositoryUrl,
@@ -422,8 +463,12 @@ export class SandboxManager extends Service {
   }
 
   private async repositoryFor(agent: Agent): Promise<string> {
-    if (this.config.repository !== undefined) return this.config.repository;
     const cwd = agent.session.header.cwd;
+    if (cwd !== undefined) {
+      const repository = await repositoryForAnchor(this.config.stateDir, cwd);
+      if (repository !== undefined) return repository;
+    }
+    if (this.config.repository !== undefined) return this.config.repository;
     if (cwd === undefined) {
       throw new Error(
         "sandbox repository is not configured and the dsh session has no cwd",

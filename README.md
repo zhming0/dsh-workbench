@@ -106,7 +106,7 @@ a complete working configuration:
 | `backend`      | `docker`                                                         |
 | `docker.image` | the runner image released with this package, pulled on first use |
 | `stateDir`     | `~/.dsh-sandbox`, with a signing key generated on first boot     |
-| `repository`   | unset, so the `origin` remote of the session's working directory |
+| `repository`   | unset; Web asks for a repository URL when adding a Workspace     |
 | `workspace`    | `/workspace` inside the sandbox                                  |
 
 **Kubernetes: this is not a laptop path.** A runner is only reachable
@@ -160,6 +160,10 @@ It turns off three host capability rows and inserts sandbox-backed replacements:
 It leaves every tool row alone, so the stock `standard` and `code` agent presets
 keep working and simply point at the sandbox.
 
+In Web, it also replaces host-directory picking with a repository URL dialog.
+The resulting Workspace is still owned by dsh; this package supplies a real,
+empty host anchor that dsh can use as the session's immutable `cwd`.
+
 One tool is turned off. `glob` and `grep` come from `tool-fs-search`, which
 spawns a ripgrep binary resolved from the dsh host's own `node_modules`. That
 path does not exist inside the sandbox, so the tools would fail on every call.
@@ -172,23 +176,28 @@ milestone does not have. The agent can still use `grep` and `find` through
 `dsh web` starts a server. It does not start a session.
 
 ```sh
-cd ~/code/your-repo     # only matters if you are relying on auto-detect
 dsh web
 ```
 
 It prints a `dsh web:` URL and opens your browser, unless you pass `--no-open`
-or are on an SSH connection. `--port` and `--host` are there too. Sessions are
-created from the browser, so open a new one there.
+or are on an SSH connection. `--port` and `--host` are there too.
+
+In the browser:
+
+1. Open **New session**, then **Add workspace…**.
+2. Enter a repository URL such as `https://github.com/owner/repository`.
+3. Choose the resulting Workspace and start the session.
 
 No sandbox exists until that point. The first session then pulls the runner
 image, starts a container, clones the repository into `/workspace`, and runs
 `.dsh/setup.sh` if the repository has one. Later sessions on a warm image start
 in a few seconds.
 
-If you are relying on auto-detect, the working directory a session resolves to
-is the workspace you picked in the UI, and otherwise the directory you launched
-dsh from. That directory decides which repository gets cloned. Setting
-`repository` skips this question entirely.
+The plugin stores the normalized URL in an owner-only host anchor beneath
+`~/.dsh-sandbox/workspace-anchors`. dsh puts that anchor in `SessionHeader.cwd`;
+the provider maps it back to the URL before provisioning the sandbox. Existing
+sessions created from ordinary host directories still fall back to the
+configured `repository`, then `git remote get-url origin` in that directory.
 
 Each dsh session gets its own sandbox. Two sessions never share files.
 

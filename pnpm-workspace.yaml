@@ -1,5 +1,8 @@
 packages:
   - provider
 
+overrides:
+  react-dom: 18.2.0
+
 allowBuilds:
   '@bufbuild/buf': true

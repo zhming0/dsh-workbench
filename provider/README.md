@@ -23,9 +23,15 @@ spawn a host ripgrep binary that does not exist inside the sandbox.
 Tool rows are left alone, so the stock agent presets keep working and point at
 the sandbox instead of the host.
 
-Turning off `fs-sandbox` also removes dsh's host-side permission model, since
-`workspace-write` and the approval prompts came from that row. The container is
-the boundary instead.
+In the Web profile, the package replaces directory picking with a repository
+URL dialog. It creates an owner-only host anchor, registers it as a dsh
+Workspace named `owner/repo`, and returns that path through dsh's normal picker
+contract. dsh therefore sets the immutable session `cwd` before creation and
+groups its history normally, while repository files remain inside the sandbox.
+
+The bundle also disables dsh's local shell permission presets. The remote shell
+uses one fixed container boundary and does not claim to enforce those
+per-command sandbox modes.
 
 The default backend uses Docker on the same machine as dsh. The Kubernetes
 backend uses Kubernetes SIG agent-sandbox and must run somewhere that can reach
@@ -47,12 +53,12 @@ Configuration is YAML in the profile's own layer,
 | Setting          | Default              | Meaning                                             |
 | ---------------- | -------------------- | --------------------------------------------------- |
 | `backend`        | `docker`             | `docker` or `kas`                                   |
-| `repository`     | session repository   | Repository cloned into the workspace                |
+| `repository`     | session repository   | Fallback repository for non-anchor sessions         |
 | `revision`       | repository default   | Optional branch, tag, or commit to check out        |
 | `workspace`      | `/workspace`         | Absolute path inside the sandbox                    |
 | `idleMs`         | 10 minutes           | Delay after a turn before hibernating               |
 | `expiresAfterMs` | 7 days               | How long a hibernated workspace is retained         |
-| `stateDir`       | `~/.dsh-sandbox`     | Provider keys, session records, and broker data     |
+| `stateDir`       | `~/.dsh-sandbox`     | Keys, records, broker data, and Workspace anchors   |
 | `githubClientId` | none                 | GitHub OAuth app client ID for private repositories |
 | `wipCommit`      | `false`              | Make a local safety commit before hibernating       |
 | `docker.image`   | matching release tag | Runner image used by Docker                         |
@@ -61,10 +67,15 @@ Configuration is YAML in the profile's own layer,
 | `kas.warmPool`   | `dsh-universal`      | Warm pool used for claims                           |
 | `kas.kubeconfig` | normal client lookup | Optional kubeconfig path                            |
 
-Set `repository` to any git URL to pin every session in the profile to one
-repository, which needs no local clone at all. Left unset, the provider runs
-`git remote get-url origin` in the session's working directory instead, which
-does need a local checkout there.
+For a Web Workspace created by this package, the repository URL stored in its
+anchor takes precedence. Other sessions use `repository` when set, then run
+`git remote get-url origin` in their host working directory. That fallback
+auto-detection needs a local checkout; repository Workspaces do not.
+
+Workspace anchors live beneath `stateDir/workspace-anchors`. Each contains only
+`repository.json`; file and command tools map the host anchor to `workspace`
+inside the sandbox. Anchors remain after sandbox expiry so historical dsh
+Workspace registrations do not become missing directories.
 
 Each release publishes a runner image tagged with the same version as this
 package, and the provider defaults to that exact tag, so `docker.image` only
