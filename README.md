@@ -42,13 +42,17 @@ versions in this repository are intentional.
 - [dsh](https://www.npmjs.com/package/@deepseek-ai/dsh) `0.1.1-rc.2`, and pnpm
   on your `PATH`, which is what dsh uses to install plugins.
 - Docker running on the same machine as dsh.
-- **A git checkout with an `origin` remote**, and you launch dsh from it. This
-  one is load-bearing, not a nicety: the provider runs `git remote get-url
-origin` in the session's working directory and clones the result into the
-  sandbox. A session started somewhere without an `origin` fails with
-  `cannot resolve a repository from <path>`, and the fix is to set `repository`
-  explicitly. Public repositories need nothing more; private ones need the
-  GitHub step below.
+- A repository for the sandbox to clone. There are two ways to name one, and
+  they suit different setups:
+
+|                 | How the repository is named                                                                                   | Needs a local clone?                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| **Name it**     | Set `repository` to any git URL                                                                               | No. The code only ever exists in the sandbox. |
+| **Auto-detect** | Leave `repository` unset and the provider runs `git remote get-url origin` in the session's working directory | Yes, and that directory must be the checkout  |
+
+Naming it suits one profile per project. Auto-detect suits one profile you use
+across many checkouts. Public repositories need nothing more; private ones need
+the GitHub step below.
 
 ### What a dsh profile is
 
@@ -90,7 +94,7 @@ which is why there is no configuration step here:
 | `backend`      | `docker`                                                         |
 | `docker.image` | the runner image released with this package, pulled on first use |
 | `stateDir`     | `~/.dsh-sandbox`, with a signing key generated on first boot     |
-| `repository`   | the `origin` remote of the session's working directory           |
+| `repository`   | unset, so the `origin` remote of the session's working directory |
 | `workspace`    | `/workspace` inside the sandbox                                  |
 
 **Kubernetes: this is not a laptop path.** A runner is only reachable in-cluster
@@ -121,20 +125,28 @@ Searching a remote filesystem needs a provider-side search backend that this
 milestone does not have. The agent can still use `grep` and `find` through
 `bash`.
 
-### 4. Start a session
+### 4. Run dsh and open a session
+
+`dsh web` starts a server. It does not start a session.
 
 ```sh
-cd ~/code/your-repo
+cd ~/code/your-repo     # only matters if you are relying on auto-detect
 dsh web
 ```
 
-The first session pulls the runner image, starts a container, clones the
-repository's `origin` into `/workspace`, and runs `.dsh/setup.sh` if the
-repository has one. Later sessions on a warm image start in a few seconds.
+It prints a `dsh web:` URL and opens your browser, unless you pass `--no-open`
+or are on an SSH connection. `--port` and `--host` are there too. Sessions are
+created from the browser, so open a new one there.
 
-A web session's working directory is the workspace you pick in the UI, and
-otherwise the directory you launched dsh from. That directory is what decides
-which repository the sandbox clones.
+No sandbox exists until that point. The first session then pulls the runner
+image, starts a container, clones the repository into `/workspace`, and runs
+`.dsh/setup.sh` if the repository has one. Later sessions on a warm image start
+in a few seconds.
+
+If you are relying on auto-detect, the working directory a session resolves to
+is the workspace you picked in the UI, and otherwise the directory you launched
+dsh from. That directory decides which repository gets cloned. Setting
+`repository` skips this question entirely.
 
 Each dsh session gets its own sandbox. Two sessions never share files.
 

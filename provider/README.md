@@ -61,8 +61,12 @@ Configuration is YAML in the profile's own layer,
 | `kas.warmPool`   | `dsh-universal`      | Warm pool used for claims                           |
 | `kas.kubeconfig` | normal client lookup | Optional kubeconfig path                            |
 
-`repository` defaults to the `origin` remote of the directory dsh was launched
-from. Each release publishes a runner image tagged with the same version as this
+Set `repository` to any git URL to pin every session in the profile to one
+repository, which needs no local clone at all. Left unset, the provider runs
+`git remote get-url origin` in the session's working directory instead, which
+does need a local checkout there.
+
+Each release publishes a runner image tagged with the same version as this
 package, and the provider defaults to that exact tag, so `docker.image` only
 matters when testing a locally built image.
 
