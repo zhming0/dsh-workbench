@@ -86,8 +86,20 @@ it to the profile's layer stack and the patch applies on the next boot.
 
 ### 2. Choose where sandboxes run
 
-**Docker: nothing to do.** The defaults are a complete working configuration,
-which is why there is no configuration step here:
+Every setting in this plugin is written to one file, your profile's own
+override layer. Create it if it does not exist:
+
+```text
+$DSH_HOME/profiles/web/cordis.patch.yml     # $DSH_HOME defaults to ~/.dsh
+```
+
+There is no settings screen for this. dsh's Web settings page has a Plugins
+tab, but a plugin appears there only if it both registers a settings namespace
+on the host and ships a hand-written browser card for it, and this plugin does
+neither.
+
+**Docker: leave the file empty, or skip creating it.** The defaults are already
+a complete working configuration:
 
 | Setting        | Resolves to                                                      |
 | -------------- | ---------------------------------------------------------------- |
@@ -97,12 +109,42 @@ which is why there is no configuration step here:
 | `repository`   | unset, so the `origin` remote of the session's working directory |
 | `workspace`    | `/workspace` inside the sandbox                                  |
 
-**Kubernetes: this is not a laptop path.** A runner is only reachable in-cluster
-at its Sandbox service name, so the dsh process itself has to run in or beside
-the cluster. It also needs agent-sandbox v0.5.4, a warm pool, and the provider's
-public key deployed before the first claim. Set `backend: kas` as shown under
-[Configuring the backend](#configuring-the-backend), and read
-[Pointing at a real cluster](#pointing-at-a-real-cluster) first.
+**Kubernetes: this is not a laptop path.** A runner is only reachable
+in-cluster at its Sandbox service name, so the dsh process itself has to run in
+or beside the cluster. It also needs agent-sandbox v0.5.4, a warm pool, and the
+provider's public key deployed before the first claim. Read
+[Pointing at a real cluster](#pointing-at-a-real-cluster) first, then write:
+
+```yaml
+- id: sandbox-manager
+  config:
+    backend: kas
+    kas:
+      namespace: dsh-sandbox
+      warmPool: dsh-universal
+```
+
+That file is a list of patches against the composed plugin tree. An entry is
+matched by row id, and `sandbox-manager` is the row this package's bundle patch
+inserted. A patch **replaces** that row's whole `config` rather than merging
+into it, so restate every field you want to keep:
+
+```yaml
+- id: sandbox-manager
+  config:
+    backend: kas
+    idleMs: 300000 # hibernate after 5 minutes instead of 10
+    kas:
+      namespace: dsh-sandbox
+      warmPool: dsh-universal
+```
+
+The file is watched, so a saved edit reaches the next session without
+restarting dsh. Run `dsh --profile web --dump-config` to print the composed
+tree and confirm your patch landed.
+
+Every setting, with its default, is in
+[`provider/README.md`](provider/README.md#settings).
 
 ### 3. What the install changed
 
@@ -150,37 +192,6 @@ dsh from. That directory decides which repository gets cloned. Setting
 
 Each dsh session gets its own sandbox. Two sessions never share files.
 
-## Configuring the backend
-
-Configuration is YAML, not a settings screen. dsh's Web settings page does have
-a Plugins tab, but a plugin appears there only if it both registers a settings
-namespace on the host and ships a hand-written browser card for it. This plugin
-does neither, so everything below goes in your profile's own layer:
-
-```text
-$DSH_HOME/profiles/<name>/cordis.patch.yml
-```
-
-An entry there is matched by row id and **replaces** that row's whole `config`,
-so restate the fields you want to keep. To switch to Kubernetes and shorten the
-idle timer:
-
-```yaml
-- id: sandbox-manager
-  config:
-    backend: kas
-    idleMs: 300000
-    kas:
-      namespace: dsh-sandbox
-      warmPool: dsh-universal
-```
-
-The file is watched, so a saved edit reaches the next session without a
-restart. Run `dsh --profile <name> --dump-config` to see the composed tree.
-
-Every setting, with its default, is in
-[`provider/README.md`](provider/README.md#settings).
-
 ## Credentials and secrets
 
 These never go in YAML, because a profile layer is a plain file and a chat
@@ -225,7 +236,8 @@ the prompt, as the thing standing between a repository and your machine.
 
 | Path                                                        | What                                                   |
 | ----------------------------------------------------------- | ------------------------------------------------------ |
-| `$DSH_HOME/profiles/<name>/`                                | installed plugins and your override layer              |
+| `$DSH_HOME/profiles/<name>/cordis.patch.yml`                | every setting you configure                            |
+| `$DSH_HOME/profiles/<name>/`                                | installed plugins and the profile's bundle list        |
 | `$DSH_HOME/profiles/<name>/node_modules/.bin/dsh-workbench` | the CLI                                                |
 | `~/.dsh-sandbox/`                                           | signing key, session records, broker store, owner-only |
 | `/workspace` inside the sandbox                             | the cloned repository                                  |
@@ -270,16 +282,8 @@ one is plugin configuration.
    addressable in-cluster at `status.serviceFQDN:8080`, which is not an ingress
    and not a public URL, so a laptop cannot use this backend over the internet.
 
-Then set the backend in your profile layer:
-
-```yaml
-- id: sandbox-manager
-  config:
-    backend: kas
-    kas:
-      namespace: dsh-sandbox
-      warmPool: dsh-universal
-```
+With all four in place, set `backend: kas` in your profile layer as shown in
+[step 2](#2-choose-where-sandboxes-run).
 
 The reference manifests use normal container isolation so they work in kind.
 Hostile workloads need a stronger runtime such as gVisor and a network policy
