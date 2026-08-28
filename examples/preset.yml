@@ -1,0 +1,4 @@
+name: Sandbox
+description:
+  Runs this session's file and command tools inside its own sandbox instead of
+  on the dsh host.

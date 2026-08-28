@@ -36,9 +36,15 @@
     "dsh-workbench": "./dist/cli.js"
   },
   "files": [
+    "cordis.patch.yml",
     "dist",
     "README.md"
   ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "engines": {
     "node": "^22.19.0 || >=24"
   },
