@@ -1,5 +1,80 @@
 # Repository guidance
 
+## Learn what dsh is before you change anything
+
+dsh is DeepSeek Harness, an agent harness that shipped in 2026 as a pre-1.0
+developer preview. It is almost certainly not in your training data, and there
+is little public documentation. Do not guess its API or its behavior. Every
+claim you make about dsh should come from a file you read.
+
+The authoritative documentation is each npm package's own README, and those
+READMEs are unusually detailed and precise. Read them directly:
+
+```sh
+cd "$(mktemp -d)"
+npm pack @deepseek-ai/dsh-base@0.1.1-rc.2
+tar xzf *.tgz
+# package/README.md is the spec. package/lib/*.js is the built source, which is
+# readable and worth grepping when a README leaves a detail open. A bundle also
+# carries package/cordis.patch.yml, the rows it contributes.
+```
+
+This repository pins `0.1.1-rc.2`. Match it, because the surface moves between
+release candidates.
+
+### The model
+
+dsh is a [Cordis](https://www.npmjs.com/package/@deepseek-ai/cordis) plugin
+tree, composed at boot. Plugins publish services under a name (`fs`, `shell`,
+`subprocess`, `agents`) and consume them with `static inject`. This package
+supplies its own implementations of three of those services, so dsh's built-in
+tools use a sandbox without knowing one exists.
+
+| Term              | What it means                                                                                                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Profile**       | One installed tree, at `$DSH_HOME/profiles/<name>/` (`$DSH_HOME` defaults to `~/.dsh`). Holds `package.json` with the ordered `dsh.profile.bundles` list, plus your `cordis.patch.yml`.                               |
+| **Bundle**        | An npm package declaring `dsh.bundle.patch`. Its patch file becomes a layer. This package is one.                                                                                                                     |
+| **Patch layer**   | A YAML list of `{id, name, config}` rows plus `insert:` and `disabled:`. Layers apply over an empty list: bundles in order, then the profile's `cordis.patch.yml`, then `$DSH_HOME/cordis.patch.yml`, then `--patch`. |
+| **Agent preset**  | A per-session composition at `$DSH_HOME/.agent-presets/<id>/agent.cordis.yml`, picked in the Web UI. Different from a profile.                                                                                        |
+| **Isolate realm** | `cordis:group` with `isolate:` gives a subtree its own copy of named services. A preset must use one for any service it publishes.                                                                                    |
+
+### Which package answers which question
+
+| Question                                          | Read                                                    |
+| ------------------------------------------------- | ------------------------------------------------------- |
+| Profiles, `dsh plugin`, launcher flags            | `@deepseek-ai/dsh`                                      |
+| Patch layer precedence, `$DSH_HOME`, boot         | `@deepseek-ai/dsh-app-boot`                             |
+| Which row ids exist, and their defaults           | `@deepseek-ai/dsh-base` (read `cordis.patch.yml`)       |
+| What each surface changes                         | `@deepseek-ai/dsh-web-app`, `@deepseek-ai/dsh-headless` |
+| Per-session compositions                          | `@deepseek-ai/dsh-agent-presets`                        |
+| User settings document and namespaces             | `@deepseek-ai/dsh-settings`                             |
+| The interfaces this repo implements               | `@deepseek-ai/dsh-fs`, `-shell`, `-subprocess`          |
+| How a Web session is created, including its `cwd` | `@deepseek-ai/dsh-host-apiproxy`                        |
+
+### Verified facts that contradict a reasonable guess
+
+Each of these was checked against the packages above. They are the ones most
+likely to mislead you.
+
+- `dsh plugin --profile <n> add <pkg>` is `pnpm add` in the profile directory
+  and nothing more. A package without `dsh.bundle.patch` installs as a plain
+  dependency and wires up nothing.
+- A patch entry **replaces** the matched row's whole `config`. It does not deep
+  merge, so an override must restate every field it keeps.
+- `dsh web` starts a server and prints a URL. It does not start a session;
+  sessions are created from the browser.
+- A session's working directory falls back through selected workspace, then
+  request payload, then `process.cwd()`. It is always set, and dsh creates the
+  directory if it is missing.
+- `shell` is built on top of `subprocess`, so `subprocess` is the seam that
+  decides where a command actually runs.
+- `tool-fs-search` (`glob`, `grep`) injects `subprocess`, not `fs`, and spawns a
+  ripgrep binary resolved from the dsh host's `node_modules`. It cannot work
+  against a remote filesystem.
+- A plugin appears in the Web Plugins settings tab only if it both registers a
+  settings namespace on the host and ships a hand-written browser card. A
+  namespace alone renders nothing.
+
 ## Write code people can maintain
 
 - Prefer plain English, direct names, and small functions with one clear job.
