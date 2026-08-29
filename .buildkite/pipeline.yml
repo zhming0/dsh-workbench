@@ -20,9 +20,14 @@ steps:
       queue: hosted-amd64-small
     command: .buildkite/steps/smoke-test
 
+  - label: ":docker: Host image"
+    agents:
+      queue: hosted-amd64-small
+    command: .buildkite/steps/check-host-image
+
   - block: ":rocket: Release"
     if: build.branch == "main"
-    prompt: "Publish the runner image and the npm package?"
+    prompt: "Publish the host and runner images?"
 
   - label: ":pipeline: Upload release pipeline"
     if: build.branch == "main"

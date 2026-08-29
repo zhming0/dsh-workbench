@@ -1,0 +1,9 @@
+# Your dsh-workbench settings. The image seeds this file once and never
+# overwrites it.
+#
+# An id-targeted patch replaces the named row's whole config, so restate every
+# field you keep. All settings and their defaults:
+# https://github.com/zhming0/dsh-workbench/blob/main/provider/README.md#settings
+- id: sandbox-manager
+  config:
+    backend: kas

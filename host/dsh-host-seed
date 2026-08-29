@@ -1,0 +1,28 @@
+#!/bin/sh
+# Seed or refresh the image-managed web profile in the home volume.
+#
+# The profile (package.json, node_modules, lockfile) belongs to the image and
+# is replaced whenever the image version changes. Everything else under $HOME
+# — the user's cordis.patch.yml, dsh sessions and storages, the provider's
+# ~/.dsh-sandbox state — is never touched.
+set -eu
+
+: "${HOME:?HOME must be set}"
+profile="$HOME/.dsh/profiles/web"
+marker="$profile/.dsh-host-image-version"
+version="$(cat /opt/dsh-host/version)"
+
+if [ ! -e "$marker" ] || [ "$(cat "$marker")" != "$version" ]; then
+  mkdir -p "$profile"
+  # Remove the image-owned entries before copying so a refresh cannot leave
+  # stale files from an older layout merged underneath the new one.
+  rm -rf "$profile/node_modules" "$profile/package.json" \
+    "$profile/pnpm-lock.yaml" "$profile/pnpm-workspace.yaml"
+  cp -a /opt/dsh-host/profile/. "$profile/"
+  printf '%s\n' "$version" >"$marker"
+fi
+
+# The starter settings are seeded once; after that the file is the user's.
+if [ ! -e "$profile/cordis.patch.yml" ]; then
+  cp /opt/dsh-host/cordis.patch.yml "$profile/cordis.patch.yml"
+fi

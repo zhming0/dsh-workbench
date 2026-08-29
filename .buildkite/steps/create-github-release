@@ -6,8 +6,8 @@ ensure_tools
 
 VERSION="$(buildkite-agent meta-data get release-version)"
 TAG="$VERSION"
-IMAGE="ghcr.io/zhming0/dsh-runner"
-PACKAGE="@zhming0/dsh-workbench"
+HOST_IMAGE="ghcr.io/zhming0/dsh-host"
+RUNNER_IMAGE="ghcr.io/zhming0/dsh-runner"
 
 echo "--- :git: Configuring HTTPS authentication"
 git config url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
@@ -17,18 +17,15 @@ git tag "$TAG"
 git push origin "$TAG"
 
 echo "+++ :github: Creating GitHub release"
-gh release create "$TAG" --title "$TAG" --generate-notes --notes "## Install
+gh release create "$TAG" --title "$TAG" --generate-notes --notes "## Images
 
 \`\`\`
-dsh plugin --profile <name> add ${PACKAGE}@${VERSION}
+docker pull ${HOST_IMAGE}:${VERSION}
+docker pull ${RUNNER_IMAGE}:${VERSION}
 \`\`\`
 
-## Runner image
-
-\`\`\`
-docker pull ${IMAGE}:${VERSION}
-\`\`\`
-
-Built for \`linux/amd64\` and \`linux/arm64\`. The provider defaults to the
-image tag matching its own version, so these two always ship together.
+Both built for \`linux/amd64\` and \`linux/arm64\`. The host image is the dsh
+distribution: dsh with the web profile and this provider assembled at the same
+version. The provider inside it defaults to the runner image tag above, so the
+pair always ships together.
 "

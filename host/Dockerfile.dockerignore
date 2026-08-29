@@ -1,0 +1,12 @@
+# The host image build needs the workspace manifests, provider/, and host/.
+**/node_modules
+**/dist
+.amp
+.buildkite
+.git
+deploy
+docs
+examples
+proto
+runner
+scripts

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One version string serves both the npm package and the runner image tag.
+# One version string serves the host and runner image tags and the version
+# stamped into the provider inside the host image.
 #
 # Layout is major.minor.patch = YEAR.MONTHDAY.1HHMMSS. Unlike a `-HHMMSS`
-# prerelease suffix this stays an ordinary release version, so npm caret ranges
+# prerelease suffix this stays an ordinary release version, so semver ranges
 # behave normally, and every component still compares numerically in order.
 YEAR="$(date -u +'%Y')"
 MONTH_DAY="$(date -u +'%-m%d')"
