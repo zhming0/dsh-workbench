@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "--- :docker: Building the host image"
+docker buildx bake host-dev --load
+
+# Seed a throwaway home and dump the composed tree. The grep proves the
+# sandbox-manager row from the bundle patch survives composition against this
+# image's dsh version.
+echo "+++ :mag: Checking the composed profile"
+docker run --rm --entrypoint sh dsh-host:dev -c \
+  'dsh-host-seed && dsh --profile web --dump-config' | grep -q "sandbox-manager"
+echo "sandbox-manager row composes"

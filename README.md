@@ -405,10 +405,14 @@ does not try to contact a local collector.
 
 ## Releasing
 
-Every release publishes two artifacts together: the `@zhming0/dsh-workbench`
-package on npm, and a `ghcr.io/zhming0/dsh-runner` image built for `linux/amd64`
-and `linux/arm64`. They share one version, and the provider defaults to the
-image tag matching its own version, so the pair cannot drift.
+Every release publishes two images together, both built for `linux/amd64` and
+`linux/arm64`: `ghcr.io/zhming0/dsh-host`, the dsh distribution with the web
+profile and this provider assembled, and `ghcr.io/zhming0/dsh-runner`. They
+share one calendar version. The host image build stamps that version into the
+provider and fails if the provider's default runner image tag would not match,
+so the pair cannot drift. The provider is no longer published to npm; the
+distribution images are the product, and a checkout install is the contributor
+path (see [`docs/plans/distribution.md`](docs/plans/distribution.md)).
 
 Buildkite runs [`.buildkite/pipeline.yml`](.buildkite/pipeline.yml) on every
 branch: provider checks and tests, runner tests, a check that the generated
@@ -416,10 +420,8 @@ protobuf code is current, and the Docker lifecycle smoke test.
 
 On `main` a manual block step unlocks
 [`.buildkite/pipeline.release.yml`](.buildkite/pipeline.release.yml), which picks
-a calendar version, pushes the multi-architecture runner image, publishes the npm
-package at the same version, and tags a GitHub release. The image is pushed
-before the package so a published provider never names a tag that does not exist
-yet.
+a calendar version, pushes both multi-architecture images, and tags a GitHub
+release.
 
 ## Milestone 1 boundaries
 

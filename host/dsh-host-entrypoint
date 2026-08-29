@@ -1,0 +1,7 @@
+#!/bin/sh
+# Boot the web profile. Extra container arguments are passed to the web app,
+# so a manifest can add flags such as --trusted-host.
+set -eu
+
+dsh-host-seed
+exec dsh --profile web --port "${DSH_WEB_PORT:-3000}" --no-open "$@"
