@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -29,7 +29,14 @@ import type {
   BackendReference,
   RunnerAuth,
   SandboxBackend,
+  SandboxSpec,
 } from "../src/types.js";
+import {
+  createRepositoryAnchor,
+  normalizeWorkspaceRepositoryUrl,
+  repositoryForAnchor,
+  repositoryTitle,
+} from "../src/workspace-anchor.js";
 
 describe("provider building blocks", () => {
   let directory: string;
@@ -95,6 +102,29 @@ describe("provider building blocks", () => {
     expect(normalizeRepositoryUrl("git@github.com:example/repo.git")).toBe(
       "https://github.com/example/repo.git",
     );
+    expect(
+      normalizeWorkspaceRepositoryUrl(" git@github.com:example/repo.git "),
+    ).toBe("https://github.com/example/repo");
+    expect(
+      normalizeWorkspaceRepositoryUrl("git@gitlab.com:example/repo.git"),
+    ).toBe("git@gitlab.com:example/repo");
+    expect(repositoryTitle("https://github.com/example/repo")).toBe(
+      "example/repo",
+    );
+    expect(() =>
+      normalizeWorkspaceRepositoryUrl("https://user:secret@example.com/repo"),
+    ).toThrow("password");
+    expect(() =>
+      normalizeWorkspaceRepositoryUrl("https://token@example.com/repo"),
+    ).toThrow("credentials");
+    expect(() =>
+      normalizeWorkspaceRepositoryUrl(
+        "git@example.com:owner/repo?token=secret",
+      ),
+    ).toThrow("query or fragment");
+    expect(() =>
+      normalizeWorkspaceRepositoryUrl("file:///home/user/repo"),
+    ).toThrow("HTTP, HTTPS, SSH, or Git");
     expect(dockerTesting.sandboxName("session one")).toMatch(
       /^dsh-[a-f0-9]{16}$/,
     );
@@ -357,7 +387,97 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     expect(backend.wakes).toBe(2);
     expect(backend.client.setups).toBe(3);
   });
+
+  it("creates one durable host anchor per repository", async () => {
+    const [first, second] = await Promise.all([
+      createRepositoryAnchor(
+        directory,
+        "https://github.com/example/public.git",
+      ),
+      createRepositoryAnchor(directory, "https://github.com/example/public"),
+    ]);
+    const different = await createRepositoryAnchor(
+      directory,
+      "https://github.com/example/other",
+    );
+
+    expect(second).toEqual(first);
+    expect(different.path).not.toBe(first.path);
+    expect(first.title).toBe("example/public");
+    expect(await repositoryForAnchor(directory, first.path)).toBe(
+      "https://github.com/example/public",
+    );
+    expect(await repositoryForAnchor(directory, directory)).toBeUndefined();
+    expect((await stat(first.path)).mode & 0o777).toBe(0o700);
+    expect((await stat(join(first.path, "repository.json"))).mode & 0o777).toBe(
+      0o600,
+    );
+  });
+
+  it("registers a repository anchor before a Web session is created", async () => {
+    const backend = new FakeBackend();
+    const workspaceRegistry = new FakeWorkspaceRegistry();
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
+      {
+        stateDir: directory,
+        repository: "https://github.com/example/fallback.git",
+      },
+      { backend, workspaceRegistry },
+    );
+    const anchor = await manager.createRepositoryWorkspace(
+      "https://github.com/example/public.git",
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: { cwd: anchor } },
+    } as unknown as Agent;
+
+    await manager.ensureRunning(agent);
+
+    expect(workspaceRegistry.creates).toEqual([
+      { path: anchor, title: "example/public" },
+    ]);
+    expect(backend.repositoryUrls).toEqual([
+      "https://github.com/example/public",
+    ]);
+    expect(
+      (
+        ctx.get("directoryPicker") as { capability(): { kind: string } }
+      ).capability().kind,
+    ).toBe("repository");
+  });
+
+  it("does not create repository anchors without the Web workspace service", async () => {
+    const manager = new SandboxManager(
+      new Context(),
+      {
+        stateDir: directory,
+        repository: "https://github.com/example/fallback",
+      },
+      { backend: new FakeBackend() },
+    );
+    await manager.ensureRunning({
+      id: "headless-session",
+      session: { header: {} },
+    } as unknown as Agent);
+
+    await expect(
+      manager.createRepositoryWorkspace("https://github.com/example/public"),
+    ).rejects.toThrow("Web profile");
+    await expect(stat(join(directory, "workspace-anchors"))).rejects.toThrow();
+  });
 });
+
+class FakeWorkspaceRegistry {
+  readonly creates: Array<{ path: string; title?: string }> = [];
+
+  async create(path: string, title?: string) {
+    this.creates.push(title === undefined ? { path } : { path, title });
+    return { path };
+  }
+}
 
 class FakeRunnerClient {
   setups = 0;
@@ -389,9 +509,11 @@ class FakeBackend implements SandboxBackend {
   wakes = 0;
   expiries = 0;
   running = false;
+  readonly repositoryUrls: string[] = [];
 
-  async provision() {
+  async provision(spec: SandboxSpec) {
     this.provisions += 1;
+    this.repositoryUrls.push(spec.repositoryUrl);
     this.running = true;
     return { sandboxId: "sandbox-one", reference: { id: "one" } };
   }

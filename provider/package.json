@@ -30,7 +30,12 @@
     "./subprocess": {
       "types": "./dist/subprocess.d.ts",
       "default": "./dist/subprocess.js"
-    }
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./package.json": "./package.json"
   },
   "bin": {
     "dsh-workbench": "./dist/cli.js"
@@ -43,17 +48,25 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-gateway",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ],
+      "platform": "web"
     }
   },
   "engines": {
     "node": "^22.19.0 || >=24"
   },
   "scripts": {
-    "prepack": "tsc -p tsconfig.build.json",
-    "build": "tsc -p tsconfig.build.json",
+    "prepack": "tsc -p tsconfig.build.json && tsdown",
+    "build": "tsc -p tsconfig.build.json && tsdown",
     "check": "tsc -p tsconfig.json --noEmit",
-    "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts' '*.md'",
-    "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts' '*.md'",
+    "format": "prettier --write 'src/**/*.{ts,tsx}' 'tests/**/*.ts' '*.ts' '*.md'",
+    "format:check": "prettier --check 'src/**/*.{ts,tsx}' 'tests/**/*.ts' '*.ts' '*.md'",
     "test": "vitest run"
   },
   "dependencies": {
@@ -67,14 +80,24 @@
     "@deepseek-ai/dsh-session": "0.1.1-rc.2",
     "@deepseek-ai/dsh-shell": "0.1.1-rc.2",
     "@deepseek-ai/dsh-subprocess": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.1-rc.2",
     "@deepseek-ai/schemastery": "3.18.1",
     "@kubernetes/client-node": "2.0.0",
     "@opentelemetry/api": "1.9.0",
     "jose": "6.2.10"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-api-remotes": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-runtime": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-workspace": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-typert-registry": "0.1.1-rc.2",
     "@types/node": "24.3.0",
+    "@types/react": "18.3.1",
     "prettier": "3.6.2",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "tsdown": "0.22.2",
     "typescript": "5.9.2",
     "vitest": "4.1.11"
   },
@@ -83,6 +106,7 @@
     "@deepseek-ai/dsh-agent": "^0.1.1-rc.2",
     "@deepseek-ai/dsh-fs": "^0.1.1-rc.2",
     "@deepseek-ai/dsh-shell": "^0.1.1-rc.2",
-    "@deepseek-ai/dsh-subprocess": "^0.1.1-rc.2"
+    "@deepseek-ai/dsh-subprocess": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "^0.1.1-rc.2"
   }
 }
