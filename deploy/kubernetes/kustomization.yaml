@@ -6,3 +6,4 @@ resources:
   - 20-sandbox-template.yaml
   - 30-warm-pool.yaml
   - 40-provider-rbac.yaml
+  - 50-host.yaml

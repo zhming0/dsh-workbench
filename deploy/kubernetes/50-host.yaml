@@ -1,0 +1,82 @@
+# The dsh host: one dsh web server whose sessions each run in their own
+# sandbox in this namespace. Everything durable — dsh sessions, the seeded
+# profile with your cordis.patch.yml, and the provider's signing key and
+# session records — lives on the dsh-host-data volume, mounted at the
+# container user's home directory.
+#
+# dsh binds loopback by design and ships no user authentication. Reach it with
+# `kubectl port-forward deploy/dsh-host 3000:3000 -n dsh-sandbox`, or apply
+# the deploy/oidc overlay, which adds an oauth2-proxy sidecar, a Service, and an
+# Ingress for real exposure.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dsh-host-data
+  namespace: dsh-sandbox
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dsh-host
+  namespace: dsh-sandbox
+  labels:
+    app.kubernetes.io/name: dsh-host
+spec:
+  replicas: 1
+  # The data volume is ReadWriteOnce and dsh is a stateful single process, so
+  # the old pod must release both before a new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dsh-host
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dsh-host
+    spec:
+      # The provider claims sandboxes with this ServiceAccount's automounted
+      # token; its Role is in 40-provider-rbac.yaml.
+      serviceAccountName: dsh-provider
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dsh-host
+          image: DSH_HOST_IMAGE_PLACEHOLDER
+          # The server binds 127.0.0.1:3000, so a TCP probe against the pod IP
+          # cannot reach it; probe over loopback from inside the container.
+          readinessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: dsh-host-data
