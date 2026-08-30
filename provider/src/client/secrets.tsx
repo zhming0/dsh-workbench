@@ -163,7 +163,12 @@ function SecretsModal({
       ) : null}
       <form
         onSubmit={submit}
-        style={{ display: "flex", gap: 8, marginTop: 12 }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          marginTop: 12,
+        }}
       >
         <Input
           aria-label="Secret name"
@@ -171,7 +176,7 @@ function SecretsModal({
           value={name}
           disabled={pending}
           onChange={(event) => setName(event.currentTarget.value)}
-          style={{ flex: 1 }}
+          style={{ width: "100%" }}
         />
         <Input
           aria-label="Secret value"
@@ -181,12 +186,13 @@ function SecretsModal({
           value={value}
           disabled={pending}
           onChange={(event) => setValue(event.currentTarget.value)}
-          style={{ flex: 2 }}
+          style={{ width: "100%" }}
         />
         <Button
           type="submit"
           variant="primary"
           disabled={pending || name.trim() === "" || value === ""}
+          style={{ alignSelf: "flex-end" }}
         >
           Save
         </Button>

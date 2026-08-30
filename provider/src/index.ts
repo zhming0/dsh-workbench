@@ -15,8 +15,7 @@ import { DockerBackend } from "./backends/docker.js";
 import { KasBackend } from "./backends/kas.js";
 import { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
 import { ProviderKeyStore } from "./key-store.js";
-import { repositoryWorkspaceHost } from "./repository-workspace-remote.js";
-import { sandboxSecretsHost } from "./secrets-remote.js";
+import { workbenchHost } from "./remote-contributions.js";
 import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { RunnerClient } from "./runner-client.js";
 import { SessionStore } from "./state-store.js";
@@ -172,8 +171,7 @@ export class SandboxManager extends TypertRemoteService {
     });
 
     ctx.inject(["typert"], (typertCtx) => {
-      typertCtx.typert.register(repositoryWorkspaceHost);
-      typertCtx.typert.register(sandboxSecretsHost);
+      typertCtx.typert.register(workbenchHost);
     });
 
     ctx.on("agent/session-start", ({ agent }) => this.ensureRunning(agent));

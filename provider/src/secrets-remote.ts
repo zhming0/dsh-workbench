@@ -1,31 +1,18 @@
-import type { TypertContribution } from "@deepseek-ai/dsh-typert-registry/types";
 import type {
   InvocationDescriptor,
   RemoteResult,
-  TypertRemoteContribution,
   TypertSchema,
 } from "@deepseek-ai/dsh-typert-protocol";
 
 /**
  * Browser CRUD surface for broker secrets. Values flow browser→host only;
  * every method answers with the updated name list, never a value.
+ * The namespace map declaration lives in remote-contributions.ts.
  */
-interface SandboxSecretsRemote {
+export interface SandboxSecretsRemote {
   listSecrets(): Promise<RemoteResult<string[]>>;
   setSecret(name: string, value: string): Promise<RemoteResult<string[]>>;
   deleteSecret(name: string): Promise<RemoteResult<string[]>>;
-}
-
-declare module "@deepseek-ai/dsh-typert-protocol" {
-  interface TypertRemoteNamespaceMap {
-    sandboxSecrets: SandboxSecretsRemote;
-  }
-
-  interface TypertRemoteMap {
-    "sandboxSecrets/listSecrets": SandboxSecretsRemote["listSecrets"];
-    "sandboxSecrets/setSecret": SandboxSecretsRemote["setSecret"];
-    "sandboxSecrets/deleteSecret": SandboxSecretsRemote["deleteSecret"];
-  }
 }
 
 const stringSchema: TypertSchema<string> = {
@@ -48,11 +35,13 @@ const namesSchema: TypertSchema<string[]> = {
 };
 
 function describe(method: string, parameters: string[]): InvocationDescriptor {
-  const id = `@zhming0/dsh-workbench#sandboxSecrets/${method}`;
+  const id = `@zhming0/dsh-workbench#sandboxManager/${method}`;
   return {
     id,
+    // The gateway accepts one wire namespace per host service, so the secret
+    // methods live in the manager's own namespace.
     service: "sandboxManager",
-    namespace: "sandboxSecrets",
+    namespace: "sandboxManager",
     method,
     invocation: { kind: "direct" },
     parameters: parameters.map((name) => ({
@@ -69,21 +58,8 @@ function describe(method: string, parameters: string[]): InvocationDescriptor {
   };
 }
 
-const descriptors = [
+export const sandboxSecretsDescriptors: InvocationDescriptor[] = [
   describe("listSecrets", []),
   describe("setSecret", ["name", "value"]),
   describe("deleteSecret", ["name"]),
 ];
-
-export const sandboxSecretsHost: TypertContribution = {
-  package: "@zhming0/dsh-workbench",
-  face: "host",
-  schemas: [],
-  invocations: descriptors,
-  model: { services: [], events: [], objects: [] },
-};
-
-export const sandboxSecretsRemote: TypertRemoteContribution = {
-  package: "@zhming0/dsh-workbench",
-  descriptors,
-};

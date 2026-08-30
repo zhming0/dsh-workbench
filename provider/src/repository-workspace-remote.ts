@@ -1,25 +1,14 @@
-import type { TypertContribution } from "@deepseek-ai/dsh-typert-registry/types";
 import type {
   InvocationDescriptor,
   RemoteResult,
-  TypertRemoteContribution,
   TypertSchema,
 } from "@deepseek-ai/dsh-typert-protocol";
 
-interface RepositoryWorkspaceRemote {
+/** The namespace map declaration lives in remote-contributions.ts. */
+export interface RepositoryWorkspaceRemote {
   createRepositoryWorkspace(
     repositoryUrl: string,
   ): Promise<RemoteResult<string>>;
-}
-
-declare module "@deepseek-ai/dsh-typert-protocol" {
-  interface TypertRemoteNamespaceMap {
-    sandboxManager: RepositoryWorkspaceRemote;
-  }
-
-  interface TypertRemoteMap {
-    "sandboxManager/createRepositoryWorkspace": RepositoryWorkspaceRemote["createRepositoryWorkspace"];
-  }
 }
 
 const stringSchema: TypertSchema<string> = {
@@ -56,15 +45,6 @@ const descriptor: InvocationDescriptor = {
   },
 };
 
-export const repositoryWorkspaceHost: TypertContribution = {
-  package: "@zhming0/dsh-workbench",
-  face: "host",
-  schemas: [],
-  invocations: [descriptor],
-  model: { services: [], events: [], objects: [] },
-};
-
-export const repositoryWorkspaceRemote: TypertRemoteContribution = {
-  package: "@zhming0/dsh-workbench",
-  descriptors: [descriptor],
-};
+export const repositoryWorkspaceDescriptors: InvocationDescriptor[] = [
+  descriptor,
+];

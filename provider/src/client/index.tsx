@@ -7,8 +7,7 @@ import type { RemoteResult } from "@deepseek-ai/dsh-typert-protocol";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { DirectoryFlowOwnerProps } from "@deepseek-ai/dsh-client-ui-workspace/client";
 
-import { repositoryWorkspaceRemote } from "../repository-workspace-remote.js";
-import { sandboxSecretsRemote } from "../secrets-remote.js";
+import { workbenchRemote } from "../remote-contributions.js";
 import { SecretsFooterAction } from "./secrets.js";
 
 interface RepositoryDirectoryFlowProps extends DirectoryFlowOwnerProps {
@@ -128,27 +127,31 @@ export const inject = ["remote", "slots"];
 /** Mount the Remote endpoints, replace folder picking with repository entry,
  * and add the Secrets manager beside Settings at the sidebar foot. */
 export async function apply(ctx: ClientContext) {
-  const disposeRemote = await ctx.remote.$mount(repositoryWorkspaceRemote);
-  const disposeSecretsRemote = await ctx.remote.$mount(sandboxSecretsRemote);
+  const disposeRemote = await ctx.remote.$mount(workbenchRemote);
 
-  ctx.inject(["remote.sandboxSecrets"], (remoteCtx) => {
+  ctx.inject(["remote.sandboxManager"], (remoteCtx) => {
     const unwrap = <T,>(result: RemoteResult<T>): T => {
       if (!result.ok) throw new Error(result.error.message);
       return result.value;
     };
     const injected = () => ({
       listSecrets: async () =>
-        unwrap(await remoteCtx.remote.sandboxSecrets.listSecrets()),
+        unwrap(await remoteCtx.remote.sandboxManager.listSecrets()),
       setSecret: async (name: string, value: string) =>
-        unwrap(await remoteCtx.remote.sandboxSecrets.setSecret(name, value)),
+        unwrap(await remoteCtx.remote.sandboxManager.setSecret(name, value)),
       deleteSecret: async (name: string) =>
-        unwrap(await remoteCtx.remote.sandboxSecrets.deleteSecret(name)),
+        unwrap(await remoteCtx.remote.sandboxManager.deleteSecret(name)),
     });
     remoteCtx.slots.inject(
       "sidebar.footer.action",
       function* registerSecrets() {
         yield remoteCtx.slots.register(
-          { name: "sidebar.footer.action", inject: injected },
+          // A list slot requires a stable per-entry id.
+          {
+            name: "sidebar.footer.action",
+            id: "dsh-workbench.secrets",
+            inject: injected,
+          },
           SecretsFooterAction,
         );
       },
@@ -191,6 +194,5 @@ export async function apply(ctx: ClientContext) {
 
   return () => {
     disposeRemote();
-    disposeSecretsRemote();
   };
 }
