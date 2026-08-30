@@ -86,8 +86,10 @@ Open the host in the browser (before exposure is wired up:
 2. Enter a repository URL such as `https://github.com/owner/repository`.
 3. Choose the resulting Workspace and start the session.
 
-The session claims a warm sandbox, clones the repository into `/workspace`,
-and runs `.dsh/setup.sh` if the repository has one. Every session gets its own
+The session claims a warm sandbox, clones the repository into
+`/workspace/repository`, and runs `.dsh/setup.sh` if the repository has one.
+The parent `/workspace` is the persistent volume root, so storage metadata such
+as `lost+found` remains outside the checkout. Every session gets its own
 sandbox; two sessions never share files.
 
 ## Credentials and secrets
@@ -140,13 +142,13 @@ Every setting, with its default, is in
 
 ## What changes for the agent
 
-|                                               | Before                    | After                       |
-| --------------------------------------------- | ------------------------- | --------------------------- |
-| `read`, `write`, `edit`, `str_replace_editor` | your disk                 | sandbox workspace           |
-| `bash`                                        | your machine              | sandbox                     |
-| `glob`, `grep`                                | ripgrep on your machine   | unavailable; use `bash`     |
-| Working directory                             | wherever you launched dsh | `/workspace` in the sandbox |
-| Session logs, attachments, spill files        | your disk                 | unchanged, still your disk  |
+|                                               | Before                    | After                                  |
+| --------------------------------------------- | ------------------------- | -------------------------------------- |
+| `read`, `write`, `edit`, `str_replace_editor` | your disk                 | sandbox workspace                      |
+| `bash`                                        | your machine              | sandbox                                |
+| `glob`, `grep`                                | ripgrep on your machine   | unavailable; use `bash`                |
+| Working directory                             | wherever you launched dsh | `/workspace/repository` in the sandbox |
+| Session logs, attachments, spill files        | your disk                 | unchanged, still your disk             |
 
 Replacing the filesystem row also turns off dsh's host-side permission model:
 `workspace-write` and the approval prompts came from that row. The container

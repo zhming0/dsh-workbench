@@ -96,3 +96,50 @@ func TestSetupRestoresGitCredentialHelperAfterWake(t *testing.T) {
 		t.Fatalf("credential helper was not restored: %s", config)
 	}
 }
+
+func TestSetupClonesBelowFilesystemRoot(t *testing.T) {
+	home := t.TempDir()
+	source := t.TempDir()
+	filesystemRoot := t.TempDir()
+	workspace := filepath.Join(filesystemRoot, "repository")
+	t.Setenv("HOME", home)
+
+	s := New("box")
+	commands := [][]string{
+		{"git", "init", "--initial-branch=main"},
+		{"git", "add", "README.md"},
+		{"git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "initial"},
+	}
+	if err := os.WriteFile(filepath.Join(source, "README.md"), []byte("cloned\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range commands {
+		if err := s.run(context.Background(), source, command...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(filesystemRoot, "lost+found"), 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	response, err := s.Setup(context.Background(), connect.NewRequest(&v1.SetupRequest{
+		RepositoryUrl: source,
+		Workspace:     workspace,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !response.Msg.Ran {
+		t.Fatal("setup did not run")
+	}
+	content, err := os.ReadFile(filepath.Join(workspace, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "cloned\n" {
+		t.Fatalf("cloned content = %q", content)
+	}
+	if _, err := os.Stat(filepath.Join(workspace, "lost+found")); !os.IsNotExist(err) {
+		t.Fatalf("lost+found entered the repository: %v", err)
+	}
+}

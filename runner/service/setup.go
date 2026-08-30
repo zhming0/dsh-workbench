@@ -38,7 +38,7 @@ func (s *Service) run(ctx context.Context, dir string, argv ...string) error {
 func (s *Service) Setup(ctx context.Context, request *connect.Request[v1.SetupRequest]) (*connect.Response[v1.SetupResponse], error) {
 	workspace := request.Msg.Workspace
 	if workspace == "" {
-		workspace = "/workspace"
+		workspace = defaultWorkspace
 	}
 	workspace, err := filepath.Abs(workspace)
 	if err != nil {

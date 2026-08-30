@@ -67,7 +67,7 @@ The cluster itself is the *operator's* responsibility, not a project deliverable
 - RPC surface (ConnectRPC): `Exec` (cmd, env, cwd, streamed stdout/stderr chunks, exit code), `ReadFile`, `WriteFile`, `Stat/List`, `Health`. PTY support can wait.
 - Auth: verify provider-signed short-lived tokens against the baked-in public key, plus own-identity check (D6). No per-sandbox secret distribution.
 - Git credential helper: runner registers itself as the in-sandbox `git credential` helper; on demand it fetches a short-lived token from the control-plane broker over its RPC channel (D4). No credential material on the PVC, ever.
-- Setup phase: on first connect, if `/workspace/.dsh-setup-done` absent, clone repo (auth via the credential helper), run `.dsh/setup.sh`, mark done. Idempotent — reruns after PVC-preserving resume are cheap no-ops.
+- Setup phase: on first connect, if `/workspace/repository/.dsh-setup-done` absent, clone repo there (auth via the credential helper), run `.dsh/setup.sh`, mark done. Idempotent — reruns after PVC-preserving resume are cheap no-ops.
 - Exit criteria: from a laptop, `grpcurl`-drive a warm sandbox through clone + build of a real repo.
 
 ### Phase 1.3 — dsh provider plugin (TS)

@@ -23,7 +23,10 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-const defaultReadLimit = int64(16 << 20)
+const (
+	defaultReadLimit = int64(16 << 20)
+	defaultWorkspace = "/workspace/repository"
+)
 
 var execDuration metric.Float64Histogram
 
@@ -92,7 +95,7 @@ func stat(path string, follow bool) (os.FileInfo, error) {
 }
 
 func (s *Service) Health(_ context.Context, _ *connect.Request[v1.HealthRequest]) (*connect.Response[v1.HealthResponse], error) {
-	_, err := os.Stat("/workspace/.dsh-setup-done")
+	_, err := os.Stat(filepath.Join(defaultWorkspace, ".dsh-setup-done"))
 	return connect.NewResponse(&v1.HealthResponse{SandboxId: s.sandboxID, SetupComplete: err == nil}), nil
 }
 
