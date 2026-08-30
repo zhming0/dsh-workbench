@@ -3,7 +3,9 @@
 A Kubernetes distribution of [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh)
 (dsh). You run one dsh host in your cluster. Each session claims its own
 sandbox from a warm pool, and dsh's stock file and command tools work inside
-that sandbox — never on the host.
+that sandbox — never on the host. The host also holds the secrets and Git
+credentials sandboxes need, so tokens live in one owner-only place instead of
+in repositories or chat.
 
 Running it takes three pieces of infrastructure, all yours to operate: a
 Kubernetes cluster you administer,
@@ -94,27 +96,29 @@ sandbox; two sessions never share files.
 
 ## Credentials and secrets
 
-Never put credentials in configuration: the configuration file is plain YAML,
-and chat transcripts are durable. Use the distribution's CLI inside the host
-pod:
+The host keeps a store of named secrets. Each one is injected into the
+environment of every sandbox command, and one name is special: `GITHUB_TOKEN`
+also serves as the Git credential for github.com, so cloning private
+repositories needs nothing else. A fine-grained personal access token scoped
+to the repositories you work on fits best; `gh auth token` works too.
+
+Manage secrets in the Web UI — **Secrets**, at the sidebar foot next to
+Settings — or with the CLI inside the host pod:
 
 ```sh
-kubectl -n dsh-sandbox exec -it deploy/dsh-host -- \
-  env DSH_SANDBOX_GITHUB_CLIENT_ID=your-oauth-app-client-id \
-  dsh-workbench auth github               # device-code flow, for private repos
-
-printf '%s' "$API_KEY" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
-  dsh-workbench secret set API_KEY
+printf '%s' "$GITHUB_TOKEN" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
+  dsh-workbench secret set GITHUB_TOKEN
 ```
 
-`DSH_SANDBOX_GITHUB_CLIENT_ID` is not preset anywhere: it is the client ID of
-a GitHub OAuth app you register yourself, with device flow enabled, and the
-CLI reads it only from its own environment. One authorization is enough — the
-granted user token persists in the provider's state directory.
+Changes reach every session before its next command, running sessions
+included. Never put secret values in the configuration file (plain YAML) or
+in chat (transcripts are durable); the UI and CLI exist so values never touch
+either.
 
-Alternatively, set `githubClientId` in the configuration (next section). Then,
-when a session needs GitHub authorization that the broker does not have, the
-provider puts the device-code challenge into the conversation and waits. The
+If you prefer not to mint tokens by hand, register a GitHub OAuth app with
+device flow enabled and set `githubClientId` in the configuration (next
+section): when a session needs GitHub access the host cannot supply, the
+provider puts a device-code challenge into the conversation and waits. The
 full CLI is in [`provider/README.md`](provider/README.md#cli).
 
 ## Configuration
@@ -171,8 +175,9 @@ routes are alternatives, and running both gives a session two sandboxes.
   private Unix socket, not from the workspace.
 - Secret values are added only to child-process environments. Repository code
   can read them by design, so only run repositories trusted with those values.
-- The accepted GitHub device-flow token is user-wide, not repository-scoped.
-  This suits one dsh user per provider instance, not shared hosting.
+- A GitHub token has whatever reach you grant it: a fine-grained PAT can be
+  repository-scoped, while a device-flow token is user-wide. Either way, one
+  provider instance suits one dsh user, not shared hosting.
 - The provider always starts connections. The runner never needs a route back to
   the dsh host. Short-lived signed tokens protect every runner call and include
   the expected sandbox identity.

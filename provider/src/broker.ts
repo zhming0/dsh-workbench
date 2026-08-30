@@ -82,13 +82,18 @@ export class CredentialBroker {
   ): Promise<Array<{ host: string; username: string; password: string }>> {
     const host = repositoryHost(repositoryUrl);
     if (host !== "github.com") return [];
-    if (this.state.githubToken === undefined) {
-      if (this.options.githubClientId === undefined) return [];
-      await this.authorizeGitHub(onChallenge);
-    }
-    return [
-      { host, username: "x-access-token", password: this.state.githubToken! },
-    ];
+    // A GITHUB_TOKEN secret doubles as the github.com credential, so pasting
+    // a token (fine-grained PAT or `gh auth token`) needs no OAuth app. A
+    // device-flow token wins when both exist; the device flow only starts
+    // when neither token is present and a client ID is configured.
+    const token =
+      this.state.githubToken ??
+      this.state.secrets["GITHUB_TOKEN"] ??
+      (this.options.githubClientId === undefined
+        ? undefined
+        : await this.authorizeGitHub(onChallenge));
+    if (token === undefined) return [];
+    return [{ host, username: "x-access-token", password: token }];
   }
 
   async authorizeGitHub(onChallenge?: ChallengeHandler): Promise<string> {

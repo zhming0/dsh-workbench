@@ -17,6 +17,7 @@ import { KasBackend } from "./backends/kas.js";
 import { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
 import { ProviderKeyStore } from "./key-store.js";
 import { repositoryWorkspaceHost } from "./repository-workspace-remote.js";
+import { sandboxSecretsHost } from "./secrets-remote.js";
 import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { RunnerClient } from "./runner-client.js";
 import { SessionStore } from "./state-store.js";
@@ -182,9 +183,10 @@ export class SandboxManager extends TypertRemoteService {
       capability: () => ({ kind: "repository" }),
     });
 
-    ctx.inject(["typert"], (typertCtx) =>
-      typertCtx.typert.register(repositoryWorkspaceHost),
-    );
+    ctx.inject(["typert"], (typertCtx) => {
+      typertCtx.typert.register(repositoryWorkspaceHost);
+      typertCtx.typert.register(sandboxSecretsHost);
+    });
 
     ctx.on("agent/session-start", ({ agent }) =>
       this.ensureRunning(agent, (challenge) =>
@@ -227,6 +229,26 @@ export class SandboxManager extends TypertRemoteService {
       repositoryUrl,
     );
     return (await registry.create(anchor.path, anchor.title)).path;
+  }
+
+  /** Secret names for the Web page; refresh first so CLI edits appear. */
+  async listSecrets(): Promise<string[]> {
+    await this.ready;
+    await this.broker.refresh();
+    return this.broker.secretNames();
+  }
+
+  /** Store one secret and answer the updated names. Values never flow back. */
+  async setSecret(name: string, value: string): Promise<string[]> {
+    await this.ready;
+    await this.broker.setSecret(name, value);
+    return this.broker.secretNames();
+  }
+
+  async deleteSecret(name: string): Promise<string[]> {
+    await this.ready;
+    await this.broker.deleteSecret(name);
+    return this.broker.secretNames();
   }
 
   async ensureRunning(

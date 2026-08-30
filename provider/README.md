@@ -32,6 +32,10 @@ Workspace named `owner/repo`, and returns that path through dsh's normal picker
 contract. dsh therefore sets the immutable session `cwd` before creation and
 groups its history normally, while repository files remain inside the sandbox.
 
+The Web profile also gains a **Secrets** manager at the sidebar foot, beside
+Settings. It edits the same broker store as the CLI: the browser sends names
+and values in and receives only names back, never a value.
+
 The bundle also disables dsh's local shell permission presets. The remote shell
 uses one fixed container boundary and does not claim to enforce those
 per-command sandbox modes.
@@ -108,15 +112,22 @@ It reads two environment variables and takes no flags:
 
 `secret set` refuses an interactive terminal so a value cannot end up in shell
 history by accident. The provider reloads the broker file before the next
-sandbox command, so CLI changes take effect without restarting dsh.
+sandbox command, so CLI changes take effect without restarting dsh. The Web
+UI's Secrets page edits the same store.
+
+A secret named `GITHUB_TOKEN` doubles as the Git credential for github.com, so
+`secret set GITHUB_TOKEN` with a fine-grained personal access token (or
+`gh auth token`) is the simplest way to reach private repositories — no OAuth
+app required.
 
 Sandbox code can read injected secrets, which is their purpose. The broker
 improves storage and cleanup, not confidentiality from the repository being run.
 
-GitHub's device flow produces a user token that can reach every repository the
-user granted to the OAuth app. It is not limited to the current repository. Use
-a dedicated account when that scope is too broad. Skip `auth github` entirely if
-you only work on public repositories.
+`auth github` is the alternative for operators who registered a GitHub OAuth
+app: its device flow produces a user token that can reach every repository the
+user granted to the app, not just the current one, and that token outranks
+`GITHUB_TOKEN` when both exist. Skip GitHub credentials entirely if you only
+work on public repositories.
 
 ## Credentials at rest
 

@@ -92,6 +92,57 @@ describe("provider building blocks", () => {
     );
   });
 
+  it("serves a GITHUB_TOKEN secret as the github.com git credential", async () => {
+    const broker = new CredentialBroker({
+      path: join(directory, "broker.json"),
+    });
+    await broker.initialize();
+
+    // No token from any source, no client ID: no credential and no device flow.
+    expect(
+      await broker.gitCredentials("https://github.com/example/repo.git"),
+    ).toEqual([]);
+
+    await broker.setSecret("GITHUB_TOKEN", "pat-value");
+    expect(
+      await broker.gitCredentials("https://github.com/example/repo.git"),
+    ).toEqual([
+      { host: "github.com", username: "x-access-token", password: "pat-value" },
+    ]);
+
+    // Only github.com is mapped.
+    expect(
+      await broker.gitCredentials("https://gitlab.com/example/repo.git"),
+    ).toEqual([]);
+
+    // A device-flow token outranks the secret.
+    const withDeviceToken = new CredentialBroker({
+      path: join(directory, "broker-device.json"),
+    });
+    await withDeviceToken.initialize();
+    await withDeviceToken.setSecret("GITHUB_TOKEN", "pat-value");
+    await writeFile(
+      join(directory, "broker-device.json"),
+      JSON.stringify({
+        version: 1,
+        secrets: { GITHUB_TOKEN: "pat-value" },
+        githubToken: "device-token",
+      }),
+    );
+    await withDeviceToken.refresh();
+    expect(
+      await withDeviceToken.gitCredentials(
+        "https://github.com/example/repo.git",
+      ),
+    ).toEqual([
+      {
+        host: "github.com",
+        username: "x-access-token",
+        password: "device-token",
+      },
+    ]);
+  });
+
   it("parses repository hosts and stable backend names", () => {
     expect(
       brokerTesting.repositoryHost("git@github.com:example/repo.git"),
