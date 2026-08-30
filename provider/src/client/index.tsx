@@ -1,3 +1,5 @@
+import "./crypto-compat.js";
+
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
