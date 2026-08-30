@@ -1,6 +1,7 @@
 {
   "name": "dsh-workbench-workspace",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": "^22.19.0 || >=24"
