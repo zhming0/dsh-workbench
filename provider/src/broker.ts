@@ -1,37 +1,18 @@
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import type { AuthChallenge, ChallengeHandler } from "./types.js";
-
 interface BrokerFile {
   version: 1;
   secrets: Record<string, string>;
-  githubToken?: string;
-}
-
-interface DeviceCodeResponse {
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  expires_in: number;
-  interval: number;
-}
-
-interface TokenResponse {
-  access_token?: string;
-  error?: string;
-  error_description?: string;
 }
 
 export interface BrokerOptions {
   path: string;
-  githubClientId?: string;
 }
 
 /** Durable authority stays on the host; only current values are pushed to a runner. */
 export class CredentialBroker {
   private state: BrokerFile = { version: 1, secrets: {} };
-  private authorization: Promise<string> | undefined;
   private writeChain: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: BrokerOptions) {}
@@ -43,7 +24,6 @@ export class CredentialBroker {
 
   /** Pick up changes made by the companion CLI before the next command runs. */
   async refresh(): Promise<void> {
-    if (this.authorization !== undefined) return;
     await this.writeChain;
     try {
       this.state = parseBrokerFile(
@@ -76,82 +56,18 @@ export class CredentialBroker {
     await this.persist();
   }
 
+  /**
+   * A GITHUB_TOKEN secret doubles as the github.com credential, so pasting a
+   * token (fine-grained PAT or `gh auth token`) is the whole GitHub setup.
+   */
   async gitCredentials(
     repositoryUrl: string,
-    onChallenge?: ChallengeHandler,
   ): Promise<Array<{ host: string; username: string; password: string }>> {
     const host = repositoryHost(repositoryUrl);
     if (host !== "github.com") return [];
-    // A GITHUB_TOKEN secret doubles as the github.com credential, so pasting
-    // a token (fine-grained PAT or `gh auth token`) needs no OAuth app. A
-    // device-flow token wins when both exist; the device flow only starts
-    // when neither token is present and a client ID is configured.
-    const token =
-      this.state.githubToken ??
-      this.state.secrets["GITHUB_TOKEN"] ??
-      (this.options.githubClientId === undefined
-        ? undefined
-        : await this.authorizeGitHub(onChallenge));
+    const token = this.state.secrets["GITHUB_TOKEN"];
     if (token === undefined) return [];
     return [{ host, username: "x-access-token", password: token }];
-  }
-
-  async authorizeGitHub(onChallenge?: ChallengeHandler): Promise<string> {
-    if (this.state.githubToken !== undefined) return this.state.githubToken;
-    this.authorization ??= this.runDeviceFlow(onChallenge).finally(() => {
-      this.authorization = undefined;
-    });
-    return this.authorization;
-  }
-
-  private async runDeviceFlow(onChallenge?: ChallengeHandler): Promise<string> {
-    const clientId = this.options.githubClientId;
-    if (clientId === undefined) {
-      throw new Error(
-        "GitHub authentication needs githubClientId in provider configuration",
-      );
-    }
-
-    const device = await postForm<DeviceCodeResponse>(
-      "https://github.com/login/device/code",
-      new URLSearchParams({ client_id: clientId, scope: "repo read:user" }),
-    );
-    const challenge: AuthChallenge = {
-      verificationUri: device.verification_uri,
-      userCode: device.user_code,
-      expiresInSeconds: device.expires_in,
-    };
-    onChallenge?.(challenge);
-
-    const deadline = Date.now() + device.expires_in * 1_000;
-    let intervalMs = Math.max(device.interval, 5) * 1_000;
-    while (Date.now() < deadline) {
-      await delay(intervalMs);
-      const token = await postForm<TokenResponse>(
-        "https://github.com/login/oauth/access_token",
-        new URLSearchParams({
-          client_id: clientId,
-          device_code: device.device_code,
-          grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-        }),
-      );
-      if (token.access_token !== undefined) {
-        this.state.githubToken = token.access_token;
-        await this.persist();
-        return token.access_token;
-      }
-      if (token.error === "authorization_pending") continue;
-      if (token.error === "slow_down") {
-        intervalMs += 5_000;
-        continue;
-      }
-      throw new Error(
-        token.error_description ?? token.error ?? "GitHub device flow failed",
-      );
-    }
-    throw new Error(
-      "GitHub device code expired before authorization completed",
-    );
   }
 
   private persist(): Promise<void> {
@@ -164,20 +80,6 @@ export class CredentialBroker {
     });
     return this.writeChain;
   }
-}
-
-async function postForm<T>(url: string, body: URLSearchParams): Promise<T> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/x-www-form-urlencoded",
-    },
-    body,
-  });
-  if (!response.ok)
-    throw new Error(`GitHub authentication returned HTTP ${response.status}`);
-  return (await response.json()) as T;
 }
 
 function repositoryHost(url: string): string | undefined {
@@ -219,11 +121,9 @@ function parseBrokerFile(value: unknown): BrokerFile {
   ) {
     throw new Error("credential broker file has an unsupported format");
   }
-  return value as BrokerFile;
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  // Keep only the known fields so retired ones (like the removed device-flow
+  // token) drop out of the file on the next write.
+  return { version: 1, secrets: value.secrets as Record<string, string> };
 }
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {

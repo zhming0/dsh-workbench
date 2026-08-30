@@ -5,7 +5,6 @@ import { promisify } from "node:util";
 
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import type { Session } from "@deepseek-ai/dsh-session";
 import type {} from "@deepseek-ai/dsh-typert-registry";
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
@@ -22,12 +21,7 @@ import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { RunnerClient } from "./runner-client.js";
 import { SessionStore } from "./state-store.js";
 import { SandboxNotFoundError } from "./types.js";
-import type {
-  AuthChallenge,
-  ChallengeHandler,
-  SandboxBackend,
-  SessionRecord,
-} from "./types.js";
+import type { SandboxBackend, SessionRecord } from "./types.js";
 import {
   createRepositoryAnchor,
   repositoryForAnchor,
@@ -52,7 +46,6 @@ export interface Config {
   workspace?: string;
   idleMs?: number;
   expiresAfterMs?: number;
-  githubClientId?: string;
   wipCommit?: boolean;
   docker?: {
     image?: string;
@@ -75,7 +68,6 @@ interface ResolvedConfig {
   workspace: string;
   idleMs: number;
   expiresAfterMs: number;
-  githubClientId?: string;
   wipCommit: boolean;
   docker: { image: string; binary?: string };
   kas: {
@@ -122,7 +114,6 @@ export class SandboxManager extends TypertRemoteService {
       .number()
       .min(1)
       .default(7 * 24 * 60 * 60_000),
-    githubClientId: z.string(),
     wipCommit: z.boolean().default(false),
     docker: z.object({
       image: z.string().default(DEFAULT_RUNNER_IMAGE),
@@ -168,9 +159,6 @@ export class SandboxManager extends TypertRemoteService {
       dependencies.broker ??
       new CredentialBroker({
         path: join(this.config.stateDir, "broker.json"),
-        ...(this.config.githubClientId === undefined
-          ? {}
-          : { githubClientId: this.config.githubClientId }),
       });
     this.backend = dependencies.backend ?? createBackend(this.config);
     this.workspaceRegistry = dependencies.workspaceRegistry;
@@ -188,15 +176,9 @@ export class SandboxManager extends TypertRemoteService {
       typertCtx.typert.register(sandboxSecretsHost);
     });
 
-    ctx.on("agent/session-start", ({ agent }) =>
-      this.ensureRunning(agent, (challenge) =>
-        injectChallenge(agent, challenge),
-      ),
-    );
+    ctx.on("agent/session-start", ({ agent }) => this.ensureRunning(agent));
     ctx.on("agent/pre-step", async ({ agent }, next) => {
-      await this.ensureRunning(agent, (challenge) =>
-        injectChallenge(agent, challenge),
-      );
+      await this.ensureRunning(agent);
       return next();
     });
     ctx.on("agent/status", ({ agent, status }) => {
@@ -251,17 +233,14 @@ export class SandboxManager extends TypertRemoteService {
     return this.broker.secretNames();
   }
 
-  async ensureRunning(
-    agent: Agent,
-    challenge?: ChallengeHandler,
-  ): Promise<RunnerClient> {
+  async ensureRunning(agent: Agent): Promise<RunnerClient> {
     await this.ready;
     const sessionId = String(agent.id);
     this.markActive(sessionId);
     return this.serialize(sessionId, () =>
       tracer.startActiveSpan("sandbox.ensure-running", async (span) => {
         try {
-          return await this.ensureRunningUnlocked(agent, challenge);
+          return await this.ensureRunningUnlocked(agent);
         } catch (error) {
           span.recordException(error as Error);
           span.setStatus({ code: 2, message: String(error) });
@@ -351,10 +330,7 @@ export class SandboxManager extends TypertRemoteService {
     }
   }
 
-  private async ensureRunningUnlocked(
-    agent: Agent,
-    challenge?: ChallengeHandler,
-  ): Promise<RunnerClient> {
+  private async ensureRunningUnlocked(agent: Agent): Promise<RunnerClient> {
     const sessionId = String(agent.id);
     let record = this.store.get(sessionId);
     if (
@@ -379,7 +355,6 @@ export class SandboxManager extends TypertRemoteService {
         await this.broker.refresh();
         const credentials = await this.broker.gitCredentials(
           record.repositoryUrl,
-          challenge,
         );
         await cached.setSecrets(this.broker.secrets());
         await cached.setGitCredentials(credentials);
@@ -394,10 +369,7 @@ export class SandboxManager extends TypertRemoteService {
       !(await this.backend.health(record.reference));
 
     await this.broker.refresh();
-    const credentials = await this.broker.gitCredentials(
-      repositoryUrl,
-      challenge,
-    );
+    const credentials = await this.broker.gitCredentials(repositoryUrl);
 
     if (
       record !== undefined &&
@@ -610,9 +582,6 @@ function resolveConfig(config: Config): ResolvedConfig {
     workspace: config.workspace ?? "/workspace/repository",
     idleMs: config.idleMs ?? 10 * 60_000,
     expiresAfterMs: config.expiresAfterMs ?? 7 * 24 * 60 * 60_000,
-    ...(config.githubClientId === undefined
-      ? {}
-      : { githubClientId: config.githubClientId }),
     wipCommit: config.wipCommit ?? false,
     docker: {
       image: config.docker?.image ?? DEFAULT_RUNNER_IMAGE,
@@ -646,20 +615,6 @@ function createBackend(config: ResolvedConfig): SandboxBackend {
   return config.backend === "docker"
     ? new DockerBackend(config.docker)
     : new KasBackend(config.kas);
-}
-
-function injectChallenge(agent: Agent, challenge: AuthChallenge): void {
-  agent.inject(
-    createUserMessage({
-      content: [
-        {
-          type: "text",
-          text: `GitHub authorization is needed. Visit ${challenge.verificationUri} and enter ${challenge.userCode}.`,
-        },
-      ],
-      source: { kind: "plugin", plugin: "dsh-workbench" },
-    }),
-  );
 }
 
 function delay(milliseconds: number): Promise<void> {

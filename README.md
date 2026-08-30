@@ -113,13 +113,7 @@ printf '%s' "$GITHUB_TOKEN" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- 
 Changes reach every session before its next command, running sessions
 included. Never put secret values in the configuration file (plain YAML) or
 in chat (transcripts are durable); the UI and CLI exist so values never touch
-either.
-
-If you prefer not to mint tokens by hand, register a GitHub OAuth app with
-device flow enabled and set `githubClientId` in the configuration (next
-section): when a session needs GitHub access the host cannot supply, the
-provider puts a device-code challenge into the conversation and waits. The
-full CLI is in [`provider/README.md`](provider/README.md#cli).
+either. The full CLI is in [`provider/README.md`](provider/README.md#cli).
 
 ## Configuration
 
@@ -175,9 +169,9 @@ routes are alternatives, and running both gives a session two sandboxes.
   private Unix socket, not from the workspace.
 - Secret values are added only to child-process environments. Repository code
   can read them by design, so only run repositories trusted with those values.
-- A GitHub token has whatever reach you grant it: a fine-grained PAT can be
-  repository-scoped, while a device-flow token is user-wide. Either way, one
-  provider instance suits one dsh user, not shared hosting.
+- A GitHub token has whatever reach you grant it, so prefer a fine-grained
+  PAT scoped to the repositories you work on. One provider instance suits one
+  dsh user, not shared hosting.
 - The provider always starts connections. The runner never needs a route back to
   the dsh host. Short-lived signed tokens protect every runner call and include
   the expected sandbox identity.
