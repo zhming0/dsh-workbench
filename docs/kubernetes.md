@@ -284,8 +284,11 @@ closed if a future controller changes it.
 
 ## OpenTelemetry
 
-Add standard `OTEL_EXPORTER_OTLP_*`, `OTEL_TRACES_EXPORTER`, or
-`OTEL_METRICS_EXPORTER` variables to the runner container in the template to
-send traces and command-duration metrics to a collector. Their endpoint must
-also be allowed by the egress policy. No exporter is started when none of these
+The provider records claim time, resume time, lifecycle changes, and command
+time through the dsh host's OpenTelemetry setup.
+
+For the runner, add standard `OTEL_EXPORTER_OTLP_*`, `OTEL_TRACES_EXPORTER`,
+or `OTEL_METRICS_EXPORTER` variables to its container in the template to send
+traces and command-duration metrics to a collector. Their endpoint must also
+be allowed by the egress policy. No exporter is started when none of these
 variables is set.
