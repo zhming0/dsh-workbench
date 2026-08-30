@@ -1,0 +1,77 @@
+# The distribution fronts dsh with oauth2-proxy: dsh ships no user
+# authentication and binds pod loopback, so the proxy port (4180) is the thing
+# you expose — with a Service, Ingress, LoadBalancer, or Gateway of your own.
+#
+# This kustomize patch adds the proxy next to dsh, forwarding to it over
+# pod-local loopback, and hands dsh the external hostname as `--trusted-host`:
+# the proxy passes the browser's Host header through, and dsh's request fence
+# rejects any /api request whose Host is neither loopback nor an explicitly
+# trusted authority (its defense against DNS rebinding). The entry is a bare
+# host, no scheme.
+#
+# Replace dsh.example.com with your hostname (twice below), then create the
+# credentials the proxy reads:
+#
+#   kubectl -n dsh-sandbox create secret generic dsh-host-oidc \
+#     --from-literal=OAUTH2_PROXY_OIDC_ISSUER_URL=https://your-idp/realm \
+#     --from-literal=OAUTH2_PROXY_CLIENT_ID=dsh-host \
+#     --from-literal=OAUTH2_PROXY_CLIENT_SECRET=… \
+#     --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')"
+#
+# Until that Secret exists, the pod runs but never becomes Ready: dsh itself
+# still works over `kubectl port-forward` while the proxy container waits for
+# its credentials.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dsh-host
+  namespace: dsh-sandbox
+spec:
+  template:
+    spec:
+      containers:
+        - name: dsh-host
+          args:
+            - --trusted-host
+            - dsh.example.com
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.4
+          env:
+            - name: OAUTH2_PROXY_HTTP_ADDRESS
+              value: 0.0.0.0:4180
+            - name: OAUTH2_PROXY_UPSTREAMS
+              value: http://127.0.0.1:3000
+            - name: OAUTH2_PROXY_PROVIDER
+              value: oidc
+            - name: OAUTH2_PROXY_REDIRECT_URL
+              value: https://dsh.example.com/oauth2/callback
+            # Accept any email the issuer authenticates. Restrict this to your
+            # domain, or use OAUTH2_PROXY_AUTHENTICATED_EMAILS_FILE, before
+            # trusting the issuer's whole user base with your dsh host.
+            - name: OAUTH2_PROXY_EMAIL_DOMAINS
+              value: '*'
+            - name: OAUTH2_PROXY_COOKIE_SECURE
+              value: 'true'
+          envFrom:
+            - secretRef:
+                name: dsh-host-oidc
+          ports:
+            - name: http
+              containerPort: 4180
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi

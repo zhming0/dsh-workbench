@@ -1,0 +1,6 @@
+#!/bin/sh
+# The provider's CLI, installed inside the seeded web profile. This wrapper
+# puts it on PATH so `kubectl exec deploy/dsh-host -- dsh-workbench …` works
+# without knowing the profile layout. It shares the provider's state
+# directory, so `key public` prints the same key sessions are signed with.
+exec "$HOME/.dsh/profiles/web/node_modules/.bin/dsh-workbench" "$@"

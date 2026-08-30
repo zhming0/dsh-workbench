@@ -90,10 +90,17 @@ authentication are the manifest's job (below), not the image's.
    builds the image and checks the composed tree, release pipeline drops the
    npm publish and pushes both images, dsh-version uniformity test.
 2. **Kubernetes manifests**: a `dsh-host` Deployment in `deploy/kubernetes/`
-   — `/data` PVC, ServiceAccount bound to the existing `dsh-provider` Role,
-   oauth2-proxy sidecar (native sidecar container) terminating OIDC and
-   upstreaming to loopback, `--trusted-host` for the external hostname,
-   Service + example Ingress. Verify WebSocket/SSE pass-through and the trust
+   — `/data` PVC, ServiceAccount bound to the existing `dsh-provider` Role —
+   with an oauth2-proxy container terminating OIDC and upstreaming to
+   loopback, and `--trusted-host` for the external hostname. The proxy is
+   part of the distribution, applied by the kustomization as a patch
+   (`host-oidc.yaml`) over the raw Deployment; the dev-cluster script applies
+   the raw manifests and skips it, so kind runs need no identity provider.
+   No Service or Ingress ships: the manifests stop at the proxy's pod port
+   and exposure is the operator's choice (an ingress-nginx example with
+   WebSocket/body-size headroom lives in docs/kubernetes.md). The proxy is an
+   ordinary container, not a native sidecar: the two servers have no
+   startup-order dependency. Verify WebSocket/SSE pass-through and the trust
    fence behind the proxy against the dsh-web-app source. Document
    `kubectl exec`-based `dsh-workbench auth github` / `secret set` flows.
 3. **README restructure**: distribution-first getting started (apply
