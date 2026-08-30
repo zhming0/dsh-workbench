@@ -17,5 +17,5 @@ go = "1.26.7"
 "go:connectrpc.com/connect/cmd/protoc-gen-connect-go" = "1.19.1"
 
 # Only the release pipeline needs the GitHub CLI. The aqua registry entry for it
-# fails attestation verification, so this uses the ubi backend instead.
-"ubi:cli/cli" = { version = "2.87.2", exe = "gh" }
+# fails attestation verification, so install it directly from GitHub instead.
+"github:cli/cli" = "2.87.2"
