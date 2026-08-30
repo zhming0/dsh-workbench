@@ -1,17 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One version string serves the host and runner image tags and the version
-# stamped into the provider inside the host image.
-#
-# Layout is major.minor.patch = YEAR.MONTHDAY.1HHMMSS. Unlike a `-HHMMSS`
-# prerelease suffix this stays an ordinary release version, so semver ranges
-# behave normally, and every component still compares numerically in order.
 YEAR="$(date -u +'%Y')"
-MONTH_DAY="$(date -u +'%-m%d')"
-# Prefixed with 1 to keep a fixed width without a leading zero.
+MONTH="$(date -u +'%-m')"
+DAY="$(date -u +'%-d')"
+# Prefix with 1 to avoid leading zeros (semver forbids them) while keeping fixed width for lexical sorting
 TIME="1$(date -u +'%H%M%S')"
-VERSION="${YEAR}.${MONTH_DAY}.${TIME}"
-
+VERSION="${YEAR}.${MONTH}.${DAY}-${TIME}"
 echo "Version: $VERSION"
 buildkite-agent meta-data set "release-version" "$VERSION"
