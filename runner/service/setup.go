@@ -35,50 +35,10 @@ func (s *Service) run(ctx context.Context, dir string, argv ...string) error {
 	}
 }
 
-func (s *Service) cloneRepository(ctx context.Context, repositoryURL, workspace string, preserveFilesystemRoot bool) error {
-	if !preserveFilesystemRoot {
-		return s.run(ctx, filepath.Dir(workspace), "git", "clone", repositoryURL, workspace)
-	}
-
-	// A freshly formatted persistent volume can contain lost+found. Git will
-	// not clone into that non-empty root, so stage the checkout on the same
-	// volume and move it into place without removing filesystem metadata.
-	staging, err := os.MkdirTemp(workspace, ".dsh-clone-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(staging)
-	if err := s.run(ctx, workspace, "git", "clone", repositoryURL, staging); err != nil {
-		return err
-	}
-	entries, err := os.ReadDir(staging)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		_, err := os.Lstat(filepath.Join(workspace, entry.Name()))
-		if err == nil {
-			return errors.New("repository contains a path reserved by workspace filesystem")
-		}
-		if !os.IsNotExist(err) {
-			return err
-		}
-	}
-	for _, entry := range entries {
-		if entry.Name() == ".git" {
-			continue
-		}
-		if err := os.Rename(filepath.Join(staging, entry.Name()), filepath.Join(workspace, entry.Name())); err != nil {
-			return err
-		}
-	}
-	return os.Rename(filepath.Join(staging, ".git"), filepath.Join(workspace, ".git"))
-}
-
 func (s *Service) Setup(ctx context.Context, request *connect.Request[v1.SetupRequest]) (*connect.Response[v1.SetupResponse], error) {
 	workspace := request.Msg.Workspace
 	if workspace == "" {
-		workspace = "/workspace"
+		workspace = defaultWorkspace
 	}
 	workspace, err := filepath.Abs(workspace)
 	if err != nil {
@@ -109,14 +69,13 @@ func (s *Service) Setup(ctx context.Context, request *connect.Request[v1.SetupRe
 		if readError != nil {
 			return nil, cerr(connect.CodeInternal, readError)
 		}
-		preserveFilesystemRoot := len(entries) == 1 && entries[0].Name() == "lost+found" && entries[0].IsDir()
-		if len(entries) != 0 && !preserveFilesystemRoot {
+		if len(entries) != 0 {
 			return nil, cerr(connect.CodeFailedPrecondition, errors.New("workspace is not empty"))
 		}
 		if request.Msg.RepositoryUrl == "" {
 			return nil, cerr(connect.CodeInvalidArgument, errors.New("repository_url required"))
 		}
-		if err := s.cloneRepository(ctx, request.Msg.RepositoryUrl, workspace, preserveFilesystemRoot); err != nil {
+		if err := s.run(ctx, filepath.Dir(workspace), "git", "clone", request.Msg.RepositoryUrl, workspace); err != nil {
 			return nil, cerr(connect.CodeInternal, err)
 		}
 	}

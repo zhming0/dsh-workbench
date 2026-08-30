@@ -302,25 +302,25 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
 
   it("maps dsh workspace paths into the sandbox workspace", () => {
     const sessionWorkspace = "/home/user/project";
-    const sandboxWorkspace = "/workspace";
+    const sandboxWorkspace = "/workspace/repository";
 
     expect(
       pathInSandbox(sessionWorkspace, sessionWorkspace, sandboxWorkspace),
-    ).toBe("/workspace");
+    ).toBe("/workspace/repository");
     expect(
       pathInSandbox(
         "/home/user/project/packages/api",
         sessionWorkspace,
         sandboxWorkspace,
       ),
-    ).toBe("/workspace/packages/api");
+    ).toBe("/workspace/repository/packages/api");
     expect(
       pathInSandbox(
-        "/workspace/packages/web",
+        "/workspace/repository/packages/web",
         sessionWorkspace,
         sandboxWorkspace,
       ),
-    ).toBe("/workspace/packages/web");
+    ).toBe("/workspace/repository/packages/web");
     expect(
       pathInSandbox(
         "/home/user/another-project",
@@ -358,6 +358,7 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
       session: { header: {} },
     } as unknown as Agent;
 
+    expect(manager.workspace).toBe("/workspace/repository");
     await manager.ensureRunning(agent);
     await manager.ensureRunning(agent);
     expect(backend.provisions).toBe(1);

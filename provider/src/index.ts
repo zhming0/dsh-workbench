@@ -112,7 +112,7 @@ export class SandboxManager extends TypertRemoteService {
     stateDir: z.string(),
     repository: z.string(),
     revision: z.string().default(""),
-    workspace: z.string().default("/workspace"),
+    workspace: z.string().default("/workspace/repository"),
     idleMs: z
       .number()
       .min(1)
@@ -585,7 +585,7 @@ function resolveConfig(config: Config): ResolvedConfig {
       ? {}
       : { repository: config.repository }),
     revision: config.revision ?? "",
-    workspace: config.workspace ?? "/workspace",
+    workspace: config.workspace ?? "/workspace/repository",
     idleMs: config.idleMs ?? 10 * 60_000,
     expiresAfterMs: config.expiresAfterMs ?? 7 * 24 * 60 * 60_000,
     ...(config.githubClientId === undefined

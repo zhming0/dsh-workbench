@@ -8,6 +8,7 @@ import { DockerBackend } from "../provider/dist/backends/docker.js";
 import { ProviderKeyStore } from "../provider/dist/key-store.js";
 
 const image = process.env.DSH_RUNNER_IMAGE ?? "dsh-runner:dev";
+const workspace = "/workspace/repository";
 const stateDir = await mkdtemp(join(tmpdir(), "dsh-docker-smoke-"));
 const keys = new ProviderKeyStore(join(stateDir, "provider-key.pem"));
 const backend = new DockerBackend({ image });
@@ -29,19 +30,19 @@ try {
     'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version',
   ]);
 
-  await run(client, ["mkdir", "-p", "/workspace/.git", "/workspace/.dsh"]);
+  await run(client, ["mkdir", "-p", `${workspace}/.git`, `${workspace}/.dsh`]);
   await client.writeFile({
-    path: "/workspace/.dsh/setup.sh",
+    path: `${workspace}/.dsh/setup.sh`,
     content: new TextEncoder().encode(
-      "#!/bin/sh\nset -eu\nprintf 'workspace survived' > /workspace/sentinel\n",
+      `#!/bin/sh\nset -eu\nprintf 'workspace survived' > ${workspace}/sentinel\n`,
     ),
     guard: { case: "createIfAbsent", value: true },
   });
-  await run(client, ["chmod", "+x", "/workspace/.dsh/setup.sh"]);
+  await run(client, ["chmod", "+x", `${workspace}/.dsh/setup.sh`]);
   const firstSetup = await client.setup({
     repositoryUrl: "https://github.com/example/unused.git",
     revision: "",
-    workspace: "/workspace",
+    workspace,
   });
   if (!firstSetup.ran) throw new Error("first setup did not run");
 
@@ -51,11 +52,11 @@ try {
   const secondSetup = await client.setup({
     repositoryUrl: "https://github.com/example/unused.git",
     revision: "",
-    workspace: "/workspace",
+    workspace,
   });
   if (secondSetup.ran) throw new Error("setup marker did not survive hibernation");
   const sentinel = await client.readFile({
-    path: "/workspace/sentinel",
+    path: `${workspace}/sentinel`,
     maxBytes: 1024n,
   });
   if (new TextDecoder().decode(sentinel.content) !== "workspace survived") {

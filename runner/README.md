@@ -12,13 +12,13 @@ overrides; they do not inherit the runner environment. Git obtains credentials
 from a mode-0600 Unix socket at `CREDENTIAL_SOCKET` (default
 `/run/dsh/credentials.sock`) through `dsh-runner git-credential`.
 
-Setup defaults to `/workspace`, preserves an already initialized workspace, and
-uses `.dsh-setup-done` as its durable completion marker. A filesystem-created
-`lost+found` directory at the root of a fresh persistent volume is preserved and
-does not prevent the initial clone; other unexpected contents still do. The file
-APIs operate with the container user's permissions; they are not a filesystem
-sandbox. Run the image as its non-root `sandbox` user and isolate its
-filesystem/network at the container platform boundary.
+Setup defaults to `/workspace/repository`, preserves an already initialized
+workspace, and uses `.dsh-setup-done` as its durable completion marker. Keeping
+the checkout beneath the persistent volume root prevents filesystem metadata
+such as `lost+found` from entering the repository. The file APIs operate with
+the container user's permissions; they are not a filesystem sandbox. Run the
+image as its non-root `sandbox` user and isolate its filesystem/network at the
+container platform boundary.
 
 `GET /health` is an unauthenticated process-readiness probe. It does not expose
 sandbox data. ConnectRPC health and all capability calls still require a valid

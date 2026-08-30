@@ -97,10 +97,11 @@ func TestSetupRestoresGitCredentialHelperAfterWake(t *testing.T) {
 	}
 }
 
-func TestSetupClonesIntoFilesystemRoot(t *testing.T) {
+func TestSetupClonesBelowFilesystemRoot(t *testing.T) {
 	home := t.TempDir()
 	source := t.TempDir()
-	workspace := t.TempDir()
+	filesystemRoot := t.TempDir()
+	workspace := filepath.Join(filesystemRoot, "repository")
 	t.Setenv("HOME", home)
 
 	s := New("box")
@@ -117,7 +118,7 @@ func TestSetupClonesIntoFilesystemRoot(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.Mkdir(filepath.Join(workspace, "lost+found"), 0700); err != nil {
+	if err := os.Mkdir(filepath.Join(filesystemRoot, "lost+found"), 0700); err != nil {
 		t.Fatal(err)
 	}
 
@@ -138,7 +139,7 @@ func TestSetupClonesIntoFilesystemRoot(t *testing.T) {
 	if string(content) != "cloned\n" {
 		t.Fatalf("cloned content = %q", content)
 	}
-	if info, err := os.Stat(filepath.Join(workspace, "lost+found")); err != nil || !info.IsDir() {
-		t.Fatalf("lost+found was not preserved: %v", err)
+	if _, err := os.Stat(filepath.Join(workspace, "lost+found")); !os.IsNotExist(err) {
+		t.Fatalf("lost+found entered the repository: %v", err)
 	}
 }
