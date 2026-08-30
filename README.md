@@ -105,9 +105,15 @@ printf '%s' "$API_KEY" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
   dsh-workbench secret set API_KEY
 ```
 
-If GitHub authorization is missing when a session needs it, the provider puts
-the device-code challenge into the conversation and waits. The full CLI is in
-[`provider/README.md`](provider/README.md#cli).
+`DSH_SANDBOX_GITHUB_CLIENT_ID` is not preset anywhere: it is the client ID of
+a GitHub OAuth app you register yourself, with device flow enabled, and the
+CLI reads it only from its own environment. One authorization is enough — the
+granted user token persists in the provider's state directory.
+
+Alternatively, set `githubClientId` in the configuration (next section). Then,
+when a session needs GitHub authorization that the broker does not have, the
+provider puts the device-code challenge into the conversation and waits. The
+full CLI is in [`provider/README.md`](provider/README.md#cli).
 
 ## Configuration
 
