@@ -1,9 +1,9 @@
 # dsh-workbench
 
 A Kubernetes distribution of [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh)
-(dsh). One dsh host runs in your cluster; every session claims its own sandbox
-from a warm pool, and the stock dsh file and command tools operate inside that
-sandbox, not on the host.
+(dsh). You run one dsh host in your cluster. Each session claims its own
+sandbox from a warm pool, and dsh's stock file and command tools work inside
+that sandbox — never on the host.
 
 **Who this is for.** Running it takes three pieces of infrastructure, all
 yours to operate:
@@ -11,8 +11,8 @@ yours to operate:
 - a Kubernetes cluster you administer — installing means applying CRDs and a
   controller;
 - [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox), pinned to
-  **v0.5.4** and its `v1beta1` APIs, which the install steps below apply.
-  Both dsh and agent-sandbox are pre-release, so the pinned versions in this
+  **v0.5.4** and its `v1beta1` APIs; the install steps below apply it. Both
+  dsh and agent-sandbox are pre-release, so the pinned versions in this
   repository are intentional;
 - an OIDC identity provider. dsh ships no user authentication, so the
   distribution fronts it with oauth2-proxy and you supply the OIDC client.
@@ -20,11 +20,11 @@ yours to operate:
 If that is not your situation, this project is not a turnkey tool. A
 Docker-backend mode exists for running sessions in containers on one machine,
 but it is the development path, not the product — see
-[Development environment](#development-environment-laptop--docker).
+[docs/development.md](docs/development.md).
 
-The supported dsh surface is `dsh web`. Headless mode is a one-shot — fresh
-agent, one task, exit — which never reaches the idle lifecycle, so it is out
-of scope.
+The supported dsh surface is `dsh web`. Headless mode runs a fresh agent on
+one task and exits, so it never reaches the idle lifecycle and is out of
+scope.
 
 Each session's sandbox goes through this lifecycle:
 
@@ -38,10 +38,11 @@ follow-up <- wake with the same files <- hibernate after idle
                                       delete after expiry
 ```
 
-The warm-pool Sandbox is claimed at session start, its pod is removed while
-idle, and its workspace volume survives until expiry. In this repository,
-"sandbox" always means one such provisioned environment — the term used by
-the protobuf contract, the Go module, and the Kubernetes manifests.
+A sandbox is claimed from the warm pool when the session starts. While the
+session idles, the sandbox's pod is removed; its workspace volume survives
+until expiry. In this repository, "sandbox" always means one such provisioned
+environment — the term the protobuf contract, the Go module, and the
+Kubernetes manifests all use.
 
 ## Getting started
 
@@ -95,8 +96,8 @@ trust domain: everyone the issuer admits shares the same sessions,
 credentials, and sandboxes.
 
 Then publish the host's signing key. The host generates it on first boot, and
-warm runner pods read the trusted public key at start, so it must be published
-before the first claim — the exact commands are in
+warm runner pods read the trusted public key when they start, so publish it
+before the first claim. The exact commands are in
 [docs/kubernetes.md](docs/kubernetes.md#the-in-cluster-dsh-host).
 
 ### Start a session
@@ -117,9 +118,9 @@ share files.
 
 ## Credentials and secrets
 
-Credentials go through the distribution's CLI inside the host pod, never
-through YAML — configuration is a plain file, and chat transcripts are
-durable:
+Never put credentials in configuration: the configuration file is plain YAML,
+and chat transcripts are durable. Credentials go through the distribution's
+CLI inside the host pod instead:
 
 ```sh
 kubectl -n dsh-sandbox exec -it deploy/dsh-host -- \
@@ -131,13 +132,10 @@ printf '%s' "$API_KEY" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
 kubectl -n dsh-sandbox exec deploy/dsh-host -- dsh-workbench secret list
 ```
 
-On a development machine the same CLI is at
-`~/.dsh/profiles/web/node_modules/.bin/dsh-workbench`, and it shares the
-provider's state directory (`~/.dsh-sandbox` unless `stateDir` is configured;
-set `DSH_SANDBOX_STATE_DIR` to match if so).
-
 If GitHub authorization is missing when a session needs it, the provider puts
 the device-code challenge into the conversation and waits.
+([docs/development.md](docs/development.md) has the CLI's location on a
+development machine.)
 
 ## Configuration
 
@@ -179,10 +177,10 @@ Two settings worth knowing about up front:
   warm pool. On a development machine the defaults select `docker` instead — a
   complete working configuration by itself.
 - `repository` is normally unset: the Web UI asks for a repository URL when a
-  Workspace is added. Setting it pins a fallback for sessions not created that
-  way; leaving it unset also lets the provider auto-detect from
-  `git remote get-url origin` in a session's host working directory, which
-  only makes sense where dsh runs next to a checkout.
+  Workspace is added. Setting it pins a fallback for sessions created some
+  other way. When it is unset, the provider can also auto-detect the URL from
+  `git remote get-url origin` in a session's host working directory — useful
+  only where dsh runs next to a checkout.
 
 Every setting, with its default, is in
 [`provider/README.md`](provider/README.md#settings).
@@ -201,21 +199,21 @@ It turns off three host capability rows and inserts sandbox-backed replacements:
 It leaves every tool row alone, so the stock `standard` and `code` agent presets
 keep working and simply point at the sandbox.
 
-In Web, it also replaces host-directory picking with a repository URL dialog.
-The resulting Workspace is still owned by dsh; this package supplies a real,
-empty host anchor that dsh can use as the session's immutable `cwd`. The
-normalized URL lives in an owner-only anchor beneath the provider's state
-directory; dsh puts the anchor path in `SessionHeader.cwd`, and the provider
-maps it back to the URL before provisioning the sandbox. Sessions created from
-ordinary host directories still fall back to the configured `repository`, then
-`git remote get-url origin` in that directory.
+In Web, the patch also replaces host-directory picking with a repository URL
+dialog. dsh still owns the resulting Workspace; this package gives it a real,
+empty host directory to use as the session's immutable `cwd` — an owner-only
+anchor beneath the provider's state directory that records the normalized URL.
+dsh stores the anchor path in `SessionHeader.cwd`, and the provider maps that
+path back to the repository URL before provisioning the sandbox. Sessions
+created from ordinary host directories still fall back to the configured
+`repository`, then to `git remote get-url origin` in that directory.
 
 One tool is turned off. `glob` and `grep` come from `tool-fs-search`, which
-spawns a ripgrep binary resolved from the dsh host's own `node_modules`. That
-path does not exist inside the sandbox, so the tools would fail on every call.
-Searching a remote filesystem needs a provider-side search backend that this
-milestone does not have. The agent can still use `grep` and `find` through
-`bash`.
+spawns a ripgrep binary resolved from the dsh host's own `node_modules` — a
+path that does not exist inside the sandbox, so the tools would fail on every
+call. Searching a remote filesystem needs a provider-side search backend that
+this milestone does not have. The agent can still use `grep` and `find`
+through `bash`.
 
 ## What changes for the agent
 
@@ -247,8 +245,7 @@ volume:
 | `/workspace` inside each sandbox            | the cloned repository                                  |
 
 On a development machine the same layout sits under `$DSH_HOME` (default
-`~/.dsh`) and `~/.dsh-sandbox`, and the CLI is at
-`$DSH_HOME/profiles/web/node_modules/.bin/dsh-workbench`.
+`~/.dsh`) and `~/.dsh-sandbox`.
 
 ## Per-session sandboxes instead of profile-wide
 
@@ -278,108 +275,19 @@ alternatives; running both gives a session two sandboxes.
   the dsh host. Short-lived signed tokens protect every runner call and include
   the expected sandbox identity.
 
-## Repository layout
-
-| Path                 | Purpose                                                                            |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| `provider/`          | TypeScript dsh plugin, bundle patch, lifecycle policy, backends, credential broker |
-| `runner/`            | Go server that runs inside each sandbox                                            |
-| `proto/`             | Single ConnectRPC contract used by provider and runner                             |
-| `deploy/kubernetes/` | Warm pool, template, network policy, RBAC, host Deployment, oauth2-proxy patch    |
-| `scripts/kas/`       | Disposable kind cluster and lifecycle smoke test                                   |
-| `examples/`          | Agent preset for the per-session route                                             |
-
-## Build and test
-
-[`mise.toml`](mise.toml) pins Node, Go, and the protobuf plugins, and CI
-installs from the same file, so a build and a laptop agree by construction.
-Install [mise](https://mise.jdx.dev), then:
-
-```sh
-mise install
-corepack enable pnpm
-```
-
-pnpm is pinned by the `packageManager` field in `package.json` rather than by
-`mise.toml`, and corepack reads it. Buf arrives with `pnpm install`. Docker is
-needed for the end-to-end local test. `docker buildx bake dev` builds the runner
-image for the current machine; the release build covers `linux/amd64` and
-`linux/arm64`.
-
-```sh
-pnpm install
-pnpm check
-pnpm test
-pnpm build
-
-(cd runner && go test -race ./... && go vet ./... && go build ./cmd/dsh-runner)
-docker buildx bake dev --load
-pnpm test:docker
-```
-
-The Docker smoke test checks signed access, secret injection, Git/Jujutsu/mise,
-first-run setup, and file survival across stop/start.
-
-To regenerate code after editing the protobuf file:
-
-```sh
-pnpm proto:generate
-```
-
-For the Kubernetes lifecycle, `scripts/kas/dev-cluster.sh` creates a disposable
-kind cluster with both dev images and `scripts/kas/smoke-test.sh` checks warm
-claim, suspend, resume, volume persistence, and expiry against it. The exact
-commands are at the top of [docs/kubernetes.md](docs/kubernetes.md).
-
-### Development environment (laptop + Docker)
-
-Instead of the images, a checkout installs into a dsh you run yourself. This
-needs `@deepseek-ai/dsh` 0.1.1-rc.2 on your PATH. Build first, then install
-the provider directory:
-
-```sh
-docker buildx bake dev --load
-pnpm install && pnpm build
-dsh plugin --profile web add "$PWD/provider"
-```
-
-With no `backend` configured the provider selects Docker, so point the manager
-at the locally built runner image in your profile layer and run `dsh web`:
-
-```yaml
-- id: sandbox-manager
-  config:
-    docker:
-      image: dsh-runner:dev
-```
-
 ## Observability
 
-The provider records OpenTelemetry claim time, resume time, lifecycle changes,
-and command time through the dsh host's OpenTelemetry setup. The runner exports
-HTTP traces and command-duration metrics when standard `OTEL_*` exporter or
-collector environment variables are present. With no telemetry configuration, it
-does not try to contact a local collector.
+The provider records claim time, resume time, lifecycle changes, and command
+time through the dsh host's OpenTelemetry setup. The runner exports HTTP
+traces and command-duration metrics when the standard `OTEL_*` exporter or
+collector environment variables are set; without them, it does not try to
+contact a local collector.
 
-## Releasing
+## Development
 
-Every release publishes two images together, both built for `linux/amd64` and
-`linux/arm64`: `ghcr.io/zhming0/dsh-host`, the dsh distribution with the web
-profile and this provider assembled, and `ghcr.io/zhming0/dsh-runner`. They
-share one calendar version. The host image build stamps that version into the
-provider and fails if the provider's default runner image tag would not match,
-so the pair cannot drift. The provider is no longer published to npm; the
-distribution images are the product, and a checkout install is the contributor
-path (see [`docs/plans/distribution.md`](docs/plans/distribution.md)).
-
-Buildkite runs [`.buildkite/pipeline.yml`](.buildkite/pipeline.yml) on every
-branch: provider checks and tests, runner tests, a check that the generated
-protobuf code is current, and the Docker lifecycle smoke test.
-
-On `main` a manual block step unlocks
-[`.buildkite/pipeline.release.yml`](.buildkite/pipeline.release.yml), which picks
-a calendar version, pushes both multi-architecture images, and tags a GitHub
-release.
+[`docs/development.md`](docs/development.md) covers the repository layout,
+building and testing, running from a checkout against a dsh on your own
+machine, and how releases are cut.
 
 ## Milestone 1 boundaries
 
