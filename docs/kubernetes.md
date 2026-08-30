@@ -29,8 +29,10 @@ scripts/kas/teardown.sh
 ```
 
 With `--host-image`, the dsh host itself runs in the cluster and the script
-reads the runner public key from its pod. To run dsh outside the cluster
-instead, omit it and pass the external provider's key:
+reads the runner public key from its pod. The script applies the raw
+manifests, so the dev host runs without the OIDC proxy and is reached over
+`kubectl port-forward` — no identity provider needed. To run dsh outside the
+cluster instead, omit it and pass the external provider's key:
 
 ```sh
 node provider/dist/cli.js key public > /tmp/dsh-provider.pub
@@ -49,8 +51,11 @@ for its CRDs and controllers, and applies `deploy/kubernetes`. It is
 noninteractive. Use `--name NAME` on both cluster scripts to choose another
 kind cluster name.
 
-For an existing cluster, install the pinned controller and apply the manifests
-after replacing both image placeholders with released tags:
+For an existing cluster, install the pinned controller, create the OIDC
+Secret the proxy container reads (see
+[`host-oidc.yaml`](../deploy/kubernetes/host-oidc.yaml) — without it the host
+pod never becomes Ready), and apply the manifests after replacing both image
+placeholders with released tags and `dsh.example.com` with your hostname:
 
 ```sh
 kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v0.5.4/sandbox-with-extensions.yaml
@@ -61,7 +66,15 @@ kubectl wait --for=condition=Established \
   crd/sandboxwarmpools.extensions.agents.x-k8s.io --timeout=120s
 kubectl -n agent-sandbox-system wait --for=condition=Available deployment --all --timeout=180s
 
-# Edit DSH_RUNNER_IMAGE_PLACEHOLDER and DSH_HOST_IMAGE_PLACEHOLDER first.
+kubectl create namespace dsh-sandbox
+kubectl -n dsh-sandbox create secret generic dsh-host-oidc \
+  --from-literal=OAUTH2_PROXY_OIDC_ISSUER_URL=https://your-idp/realm \
+  --from-literal=OAUTH2_PROXY_CLIENT_ID=dsh-host \
+  --from-literal=OAUTH2_PROXY_CLIENT_SECRET=… \
+  --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')"
+
+# Edit DSH_RUNNER_IMAGE_PLACEHOLDER, DSH_HOST_IMAGE_PLACEHOLDER, and
+# dsh.example.com in host-oidc.yaml first.
 kubectl apply -k deploy/kubernetes
 kubectl -n dsh-sandbox rollout status deployment/dsh-host --timeout=300s
 
@@ -136,7 +149,66 @@ printf '%s' "$API_KEY" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
 ```
 
 **Reaching the UI.** dsh binds pod loopback by design and has no user
-authentication, so there is no direct Service to it. For yourself:
+authentication of its own, so the distribution fronts it with
+[oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/): the
+[`host-oidc.yaml`](../deploy/kubernetes/host-oidc.yaml) patch runs the proxy
+next to dsh, terminating OIDC and forwarding over pod-local loopback. The
+manifests deliberately stop at the proxy's pod port, 4180 — how to expose it
+is your cluster's business. A ClusterIP Service plus an ingress-nginx Ingress
+looks like this:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: dsh-host
+  namespace: dsh-sandbox
+spec:
+  selector:
+    app.kubernetes.io/name: dsh-host
+  ports:
+    - name: http
+      port: 80
+      targetPort: 4180
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dsh-host
+  namespace: dsh-sandbox
+  annotations:
+    # dsh's browser transport holds WebSockets open at /api/events.* and can
+    # carry large RPC bodies (attachments); nginx's defaults for read timeout
+    # and body size are both too small.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-body-size: 300m
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: dsh.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dsh-host
+                port:
+                  name: http
+  tls:
+    - hosts: [dsh.example.com]
+      secretName: dsh-host-tls
+```
+
+One dsh-side detail is already handled by the patch: dsh's browser-trust
+fence rejects any `/api` request whose `Host` header is neither loopback nor
+explicitly trusted — its defense against DNS rebinding. The proxy passes the
+browser's Host through, so the external hostname is handed to dsh as
+`--trusted-host`. If you change the hostname, change it there too.
+
+For yourself, a port-forward always works, with or without the proxy
+configured:
 
 ```sh
 kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
@@ -144,27 +216,6 @@ kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
 
 then open `http://localhost:3000`. Loopback is trusted, so no extra flags are
 needed.
-
-**Exposing it beyond port-forward** is the
-[`deploy/oidc` overlay](../deploy/oidc/kustomization.yaml)'s job. It adds
-an [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) sidecar that
-terminates OIDC and forwards to dsh over pod-local loopback, a Service to the
-proxy port, and an example Ingress. Copy the overlay, replace
-`dsh.example.com` with your hostname, create the `dsh-host-oidc` Secret
-described in
-[`deployment-oauth2-proxy.yaml`](../deploy/oidc/deployment-oauth2-proxy.yaml),
-and apply it with `kubectl apply -k`.
-
-Two details make the proxied setup work, both already in the overlay:
-
-- dsh's browser-trust fence rejects any `/api` request whose `Host` header is
-  neither loopback nor explicitly trusted — its defense against DNS rebinding.
-  The proxy passes the browser's Host through, so the external hostname is
-  handed to dsh as `--trusted-host`.
-- The browser transport holds WebSockets open at `/api/events.*` and can carry
-  large RPC bodies. oauth2-proxy streams both, but the example Ingress raises
-  ingress-nginx's read timeout and body-size limits, which are too small by
-  default.
 
 The proxy authenticates users; it does not isolate them from each other. One
 dsh host is one trust domain — everyone the issuer lets through shares the

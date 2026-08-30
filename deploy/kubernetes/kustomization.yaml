@@ -7,3 +7,8 @@ resources:
   - 30-warm-pool.yaml
   - 40-provider-rbac.yaml
   - 50-host.yaml
+# host-oidc.yaml needs a hostname and a Secret filled in first; see its
+# comments. The raw manifests above work without it (port-forward access),
+# which is what scripts/kas/dev-cluster.sh applies.
+patches:
+  - path: host-oidc.yaml

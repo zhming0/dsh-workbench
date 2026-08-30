@@ -57,6 +57,10 @@ cannot drift:
 - A cluster you can install CRDs into, with a default StorageClass. The
   manifests install agent-sandbox v0.5.4 alongside this project's namespace,
   sandbox template, warm pool, RBAC, and the dsh host Deployment.
+- An OIDC client at your identity provider. dsh itself ships no user
+  authentication, so the distribution fronts it with
+  [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/); you supply the
+  issuer URL, client ID, and client secret.
 - A repository for sandboxes to clone. A session is created from a repository
   URL in the Web UI; the code only ever exists in the sandbox. Public
   repositories need nothing more; private ones need the GitHub step below.
@@ -69,26 +73,37 @@ including what each manifest does and the isolation model. The short form:
 ```sh
 kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v0.5.4/sandbox-with-extensions.yaml
 
+kubectl create namespace dsh-sandbox
+kubectl -n dsh-sandbox create secret generic dsh-host-oidc \
+  --from-literal=OAUTH2_PROXY_OIDC_ISSUER_URL=https://your-idp/realm \
+  --from-literal=OAUTH2_PROXY_CLIENT_ID=dsh-host \
+  --from-literal=OAUTH2_PROXY_CLIENT_SECRET=… \
+  --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')"
+
 # Replace DSH_HOST_IMAGE_PLACEHOLDER and DSH_RUNNER_IMAGE_PLACEHOLDER with
-# released tags first.
+# released tags, and dsh.example.com in host-oidc.yaml with your hostname.
 kubectl apply -k deploy/kubernetes
 ```
+
+The manifests deliberately stop at the proxy's pod port, 4180: put a Service
+and an Ingress, LoadBalancer, or Gateway of your choosing in front of it
+([docs/kubernetes.md](docs/kubernetes.md#the-in-cluster-dsh-host) has an
+ingress-nginx example with the WebSocket and body-size headroom dsh needs).
+The proxy authenticates users; it does not isolate them. One dsh host is one
+trust domain: everyone the issuer admits shares the same sessions,
+credentials, and sandboxes.
 
 Then publish the host's signing key. The host generates it on first boot, and
 warm runner pods read the trusted public key at start, so it must be published
 before the first claim — the exact commands are in
 [docs/kubernetes.md](docs/kubernetes.md#the-in-cluster-dsh-host).
 
-### Open dsh and start a session
+### Start a session
 
-dsh binds pod loopback by design and ships no user authentication, so reach it
-directly with a port-forward:
-
-```sh
-kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
-```
-
-Open `http://localhost:3000`. In the browser:
+Open the host at your hostname (or, before exposure is wired up,
+`kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000` and
+`http://localhost:3000` — dsh answers on pod loopback even while the proxy
+container still waits for its Secret). In the browser:
 
 1. Open **New session**, then **Add workspace…**.
 2. Enter a repository URL such as `https://github.com/owner/repository`.
@@ -98,16 +113,6 @@ No sandbox exists until that point. The first session claims a warm sandbox,
 clones the repository into `/workspace`, and runs `.dsh/setup.sh` if the
 repository has one. Each dsh session gets its own sandbox; two sessions never
 share files.
-
-### Expose it with OIDC
-
-To share the host beyond a port-forward, apply the
-[`deploy/oidc` overlay](deploy/oidc/kustomization.yaml). It adds an
-[oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) sidecar that
-terminates OIDC in front of dsh, a Service to the proxy, and an example
-Ingress. The proxy authenticates users; it does not isolate them. One dsh host
-is one trust domain: everyone the issuer admits shares the same sessions,
-credentials, and sandboxes.
 
 ## Credentials and secrets
 
@@ -281,8 +286,7 @@ alternatives; running both gives a session two sandboxes.
 | `provider/`          | TypeScript dsh plugin, bundle patch, lifecycle policy, backends, credential broker |
 | `runner/`            | Go server that runs inside each sandbox                                            |
 | `proto/`             | Single ConnectRPC contract used by provider and runner                             |
-| `deploy/kubernetes/` | Reference warm pool, template, network policy, RBAC, and host Deployment          |
-| `deploy/oidc/`       | Overlay exposing the host behind oauth2-proxy                                      |
+| `deploy/kubernetes/` | Warm pool, template, network policy, RBAC, host Deployment, oauth2-proxy patch    |
 | `scripts/kas/`       | Disposable kind cluster and lifecycle smoke test                                   |
 | `examples/`          | Agent preset for the per-session route                                             |
 

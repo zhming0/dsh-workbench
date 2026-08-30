@@ -4,10 +4,11 @@
 # session records — lives on the dsh-host-data volume, mounted at the
 # container user's home directory.
 #
-# dsh binds loopback by design and ships no user authentication. Reach it with
-# `kubectl port-forward deploy/dsh-host 3000:3000 -n dsh-sandbox`, or apply
-# the deploy/oidc overlay, which adds an oauth2-proxy sidecar, a Service, and an
-# Ingress for real exposure.
+# dsh binds loopback by design and ships no user authentication. For yourself,
+# reach it with `kubectl port-forward deploy/dsh-host 3000:3000 -n dsh-sandbox`.
+# For real exposure, the kustomization applies host-oidc.yaml, which puts an
+# oauth2-proxy in front of dsh; expose the proxy's port however suits your
+# cluster.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
