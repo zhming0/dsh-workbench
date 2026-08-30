@@ -11,19 +11,6 @@ const stateDir =
 
 async function main(arguments_: string[]): Promise<void> {
   const [command, subcommand, name] = arguments_;
-  if (command === "auth" && subcommand === "github") {
-    const broker = await openBroker();
-    await broker.authorizeGitHub((challenge) => {
-      process.stdout.write(
-        `Open ${challenge.verificationUri} and enter code ${challenge.userCode}.\nWaiting for approval…\n`,
-      );
-    });
-    process.stdout.write(
-      "GitHub authorization saved in the provider's local store.\n",
-    );
-    return;
-  }
-
   if (command === "secret" && subcommand === "list") {
     const broker = await openBroker();
     for (const secretName of broker.secretNames())
@@ -60,7 +47,6 @@ async function main(arguments_: string[]): Promise<void> {
   }
 
   process.stdout.write(`Usage:
-  dsh-workbench auth github
   dsh-workbench secret list
   printf '%s' VALUE | dsh-workbench secret set NAME
   dsh-workbench secret delete NAME
@@ -70,10 +56,8 @@ async function main(arguments_: string[]): Promise<void> {
 }
 
 async function openBroker(): Promise<CredentialBroker> {
-  const clientId = process.env.DSH_SANDBOX_GITHUB_CLIENT_ID;
   const broker = new CredentialBroker({
     path: join(stateDir, "broker.json"),
-    ...(clientId === undefined ? {} : { githubClientId: clientId }),
   });
   await broker.initialize();
   return broker;

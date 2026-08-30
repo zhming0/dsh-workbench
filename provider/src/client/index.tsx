@@ -3,10 +3,12 @@ import "./crypto-compat.js";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { RemoteResult } from "@deepseek-ai/dsh-typert-protocol";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { DirectoryFlowOwnerProps } from "@deepseek-ai/dsh-client-ui-workspace/client";
 
-import { repositoryWorkspaceRemote } from "../repository-workspace-remote.js";
+import { workbenchRemote } from "../remote-contributions.js";
+import { SecretsFooterAction } from "./secrets.js";
 
 interface RepositoryDirectoryFlowProps extends DirectoryFlowOwnerProps {
   createWorkspaceAnchor(repositoryUrl: string): Promise<string>;
@@ -122,9 +124,40 @@ export function RepositoryDirectoryFlow({
 
 export const inject = ["remote", "slots"];
 
-/** Mount the Remote endpoint and replace folder picking with repository entry. */
+/** Mount the Remote endpoints, replace folder picking with repository entry,
+ * and add the Secrets manager beside Settings at the sidebar foot. */
 export async function apply(ctx: ClientContext) {
-  const disposeRemote = await ctx.remote.$mount(repositoryWorkspaceRemote);
+  const disposeRemote = await ctx.remote.$mount(workbenchRemote);
+
+  ctx.inject(["remote.sandboxManager"], (remoteCtx) => {
+    const unwrap = <T,>(result: RemoteResult<T>): T => {
+      if (!result.ok) throw new Error(result.error.message);
+      return result.value;
+    };
+    const injected = () => ({
+      listSecrets: async () =>
+        unwrap(await remoteCtx.remote.sandboxManager.listSecrets()),
+      setSecret: async (name: string, value: string) =>
+        unwrap(await remoteCtx.remote.sandboxManager.setSecret(name, value)),
+      deleteSecret: async (name: string) =>
+        unwrap(await remoteCtx.remote.sandboxManager.deleteSecret(name)),
+    });
+    remoteCtx.slots.inject(
+      "sidebar.footer.action",
+      function* registerSecrets() {
+        yield remoteCtx.slots.register(
+          // A list slot requires a stable per-entry id.
+          {
+            name: "sidebar.footer.action",
+            id: "dsh-workbench.secrets",
+            inject: injected,
+          },
+          SecretsFooterAction,
+        );
+      },
+    );
+  });
+
   ctx.inject(["remote.sandboxManager"], (remoteCtx) => {
     const createWorkspaceAnchor = async (repositoryUrl: string) => {
       const result =
@@ -159,5 +192,7 @@ export async function apply(ctx: ClientContext) {
     );
   });
 
-  return disposeRemote;
+  return () => {
+    disposeRemote();
+  };
 }

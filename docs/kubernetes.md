@@ -138,12 +138,13 @@ kubectl -n dsh-sandbox delete sandbox --all
 
 The pool recreates them with the updated ConfigMap.
 
-**Credentials and secrets** go through the same CLI, never through YAML:
+**Credentials and secrets** go through the Web UI's Secrets page or the same
+CLI, never through YAML. A secret named `GITHUB_TOKEN` also serves as the Git
+credential for github.com:
 
 ```sh
-kubectl -n dsh-sandbox exec -it deploy/dsh-host -- \
-  env DSH_SANDBOX_GITHUB_CLIENT_ID=your-oauth-app-client-id \
-  dsh-workbench auth github
+printf '%s' "$GITHUB_TOKEN" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
+  dsh-workbench secret set GITHUB_TOKEN
 printf '%s' "$API_KEY" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
   dsh-workbench secret set API_KEY
 ```

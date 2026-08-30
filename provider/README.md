@@ -32,6 +32,10 @@ Workspace named `owner/repo`, and returns that path through dsh's normal picker
 contract. dsh therefore sets the immutable session `cwd` before creation and
 groups its history normally, while repository files remain inside the sandbox.
 
+The Web profile also gains a **Secrets** manager at the sidebar foot, beside
+Settings. It edits the same broker store as the CLI: the browser sends names
+and values in and receives only names back, never a value.
+
 The bundle also disables dsh's local shell permission presets. The remote shell
 uses one fixed container boundary and does not claim to enforce those
 per-command sandbox modes.
@@ -53,22 +57,21 @@ Configuration is YAML in the profile's own layer,
     idleMs: 300000
 ```
 
-| Setting          | Default                 | Meaning                                             |
-| ---------------- | ----------------------- | --------------------------------------------------- |
-| `backend`        | `docker`                | `docker` or `kas`                                   |
-| `repository`     | session repository      | Fallback repository for non-anchor sessions         |
-| `revision`       | repository default      | Optional branch, tag, or commit to check out        |
-| `workspace`      | `/workspace/repository` | Repository checkout and working directory           |
-| `idleMs`         | 10 minutes              | Delay after a turn before hibernating               |
-| `expiresAfterMs` | 7 days                  | How long a hibernated workspace is retained         |
-| `stateDir`       | `~/.dsh-sandbox`        | Keys, records, broker data, and Workspace anchors   |
-| `githubClientId` | none                    | GitHub OAuth app client ID for private repositories |
-| `wipCommit`      | `false`                 | Make a local safety commit before hibernating       |
-| `docker.image`   | matching release tag    | Runner image used by Docker                         |
-| `docker.binary`  | `docker`                | Docker-compatible command                           |
-| `kas.namespace`  | `dsh-sandbox`           | Namespace containing claims and warm sandboxes      |
-| `kas.warmPool`   | `dsh-universal`         | Warm pool used for claims                           |
-| `kas.kubeconfig` | normal client lookup    | Optional kubeconfig path                            |
+| Setting          | Default                 | Meaning                                           |
+| ---------------- | ----------------------- | ------------------------------------------------- |
+| `backend`        | `docker`                | `docker` or `kas`                                 |
+| `repository`     | session repository      | Fallback repository for non-anchor sessions       |
+| `revision`       | repository default      | Optional branch, tag, or commit to check out      |
+| `workspace`      | `/workspace/repository` | Repository checkout and working directory         |
+| `idleMs`         | 10 minutes              | Delay after a turn before hibernating             |
+| `expiresAfterMs` | 7 days                  | How long a hibernated workspace is retained       |
+| `stateDir`       | `~/.dsh-sandbox`        | Keys, records, broker data, and Workspace anchors |
+| `wipCommit`      | `false`                 | Make a local safety commit before hibernating     |
+| `docker.image`   | matching release tag    | Runner image used by Docker                       |
+| `docker.binary`  | `docker`                | Docker-compatible command                         |
+| `kas.namespace`  | `dsh-sandbox`           | Namespace containing claims and warm sandboxes    |
+| `kas.warmPool`   | `dsh-universal`         | Warm pool used for claims                         |
+| `kas.kubeconfig` | normal client lookup    | Optional kubeconfig path                          |
 
 For a Web Workspace created by this package, the repository URL stored in its
 anchor takes precedence. Other sessions use `repository` when set, then run
@@ -92,31 +95,31 @@ a chat transcript is durable. They go through this package's CLI, which
 `$DSH_HOME/profiles/<name>/node_modules/.bin/dsh-workbench`.
 
 ```sh
-dsh-workbench auth github
 dsh-workbench secret list
 printf '%s' VALUE | dsh-workbench secret set NAME
 dsh-workbench secret delete NAME
 dsh-workbench key public
 ```
 
-It reads two environment variables and takes no flags:
+It reads one environment variable and takes no flags:
 
-| Variable                       | Default          | Meaning                               |
-| ------------------------------ | ---------------- | ------------------------------------- |
-| `DSH_SANDBOX_STATE_DIR`        | `~/.dsh-sandbox` | Must match the `stateDir` setting     |
-| `DSH_SANDBOX_GITHUB_CLIENT_ID` | none             | GitHub OAuth app client ID for `auth` |
+| Variable                | Default          | Meaning                           |
+| ----------------------- | ---------------- | --------------------------------- |
+| `DSH_SANDBOX_STATE_DIR` | `~/.dsh-sandbox` | Must match the `stateDir` setting |
 
 `secret set` refuses an interactive terminal so a value cannot end up in shell
 history by accident. The provider reloads the broker file before the next
-sandbox command, so CLI changes take effect without restarting dsh.
+sandbox command, so CLI changes take effect without restarting dsh. The Web
+UI's Secrets page edits the same store.
+
+A secret named `GITHUB_TOKEN` doubles as the Git credential for github.com, so
+`secret set GITHUB_TOKEN` with a fine-grained personal access token (or
+`gh auth token`) is the simplest way to reach private repositories — no OAuth
+app required.
 
 Sandbox code can read injected secrets, which is their purpose. The broker
 improves storage and cleanup, not confidentiality from the repository being run.
-
-GitHub's device flow produces a user token that can reach every repository the
-user granted to the OAuth app. It is not limited to the current repository. Use
-a dedicated account when that scope is too broad. Skip `auth github` entirely if
-you only work on public repositories.
+Skip `GITHUB_TOKEN` entirely if you only work on public repositories.
 
 ## Credentials at rest
 

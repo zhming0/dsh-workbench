@@ -53,11 +53,3 @@ export interface SessionRecord {
   expiresAt?: string;
   updatedAt: string;
 }
-
-export interface AuthChallenge {
-  verificationUri: string;
-  userCode: string;
-  expiresInSeconds: number;
-}
-
-export type ChallengeHandler = (challenge: AuthChallenge) => void;

@@ -92,6 +92,34 @@ describe("provider building blocks", () => {
     );
   });
 
+  it("serves a GITHUB_TOKEN secret as the github.com git credential", async () => {
+    const broker = new CredentialBroker({
+      path: join(directory, "broker.json"),
+    });
+    await broker.initialize();
+
+    // No GITHUB_TOKEN secret: no credential.
+    expect(
+      await broker.gitCredentials("https://github.com/example/repo.git"),
+    ).toEqual([]);
+
+    await broker.setSecret("GITHUB_TOKEN", "pat-value");
+    expect(
+      await broker.gitCredentials("https://github.com/example/repo.git"),
+    ).toEqual([
+      {
+        host: "github.com",
+        username: "x-access-token",
+        password: "pat-value",
+      },
+    ]);
+
+    // Only github.com is mapped.
+    expect(
+      await broker.gitCredentials("https://gitlab.com/example/repo.git"),
+    ).toEqual([]);
+  });
+
   it("parses repository hosts and stable backend names", () => {
     expect(
       brokerTesting.repositoryHost("git@github.com:example/repo.git"),
