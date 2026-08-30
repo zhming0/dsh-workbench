@@ -4,11 +4,14 @@ This package connects DeepSeek Harness sessions to isolated environments. It
 owns the sandbox lifecycle and supplies remote filesystem, shell, and subprocess
 implementations to the normal dsh tools.
 
+It ships pre-installed in the `ghcr.io/zhming0/dsh-host` image and is not
+published to npm. For development, install a checkout:
+
 ```sh
-dsh plugin --profile web add @zhming0/dsh-workbench
+dsh plugin --profile web add "$PWD/provider"
 ```
 
-The [repository README](https://github.com/zhming0/dsh-sandbox#getting-started)
+The [repository README](https://github.com/zhming0/dsh-workbench#getting-started)
 covers the whole setup. This page is the reference: what the bundle patch does,
 every setting, and the CLI.
 

@@ -1,18 +1,32 @@
 # dsh-workbench
 
-`dsh-workbench` gives each DeepSeek Harness session its own working
-environment. The normal dsh file and command tools use that environment, so the
-agent reads, edits, and runs things inside a container instead of on your
-machine.
+A Kubernetes distribution of [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh)
+(dsh). One dsh host runs in your cluster; every session claims its own sandbox
+from a warm pool, and the stock dsh file and command tools operate inside that
+sandbox, not on the host.
 
-The name avoids dsh's own two meanings of "sandbox" (same-world process
-confinement, per `@deepseek-ai/dsh-sandbox`) and "workspace" (the Web UI's
-registry of local directories, and the `workspace-write` permission root).
-Inside this repository, "sandbox" still means one provisioned environment: it is
-the term used by the protobuf contract, the Go module, and the Kubernetes
-manifests.
+**Who this is for.** Running it takes three pieces of infrastructure, all
+yours to operate:
 
-Milestone 1 implements the complete environment lifecycle:
+- a Kubernetes cluster you administer — installing means applying CRDs and a
+  controller;
+- [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox), pinned to
+  **v0.5.4** and its `v1beta1` APIs, which the install steps below apply.
+  Both dsh and agent-sandbox are pre-release, so the pinned versions in this
+  repository are intentional;
+- an OIDC identity provider. dsh ships no user authentication, so the
+  distribution fronts it with oauth2-proxy and you supply the OIDC client.
+
+If that is not your situation, this project is not a turnkey tool. A
+Docker-backend mode exists for running sessions in containers on one machine,
+but it is the development path, not the product — see
+[Development environment](#development-environment-laptop--docker).
+
+The supported dsh surface is `dsh web`. Headless mode is a one-shot — fresh
+agent, one task, exit — which never reaches the idle lifecycle, so it is out
+of scope.
+
+Each session's sandbox goes through this lifecycle:
 
 ```text
 new session -> start sandbox -> clone and set up repository -> run tools
@@ -24,25 +38,12 @@ follow-up <- wake with the same files <- hibernate after idle
                                       delete after expiry
 ```
 
-The project ships as a **dsh distribution**: container images that run one dsh
-host in a Kubernetes cluster, where every session claims its own sandbox from a
-warm pool. Internally the provider is an ordinary dsh plugin, and two backends
-can provision sandboxes:
+The warm-pool Sandbox is claimed at session start, its pod is removed while
+idle, and its workspace volume survives until expiry. In this repository,
+"sandbox" always means one such provisioned environment — the term used by
+the protobuf contract, the Go module, and the Kubernetes manifests.
 
-- **Kubernetes agent-sandbox** is the product path. It claims a warm Sandbox,
-  removes the pod while idle, and keeps the workspace volume until expiry.
-- **Docker** is the development substrate. Hibernation stops a container and
-  waking starts the same container on the machine dsh runs on.
-
-The supported dsh surface is `dsh web`. Headless is a strict one-shot — fresh
-agent, one task, exit — so it defeats session continuity and exits before the
-idle lifecycle can run; it is out of scope.
-
-The Kubernetes integration is pinned to agent-sandbox **v0.5.4** and its
-`v1beta1` APIs. Both agent-sandbox and dsh are pre-release dependencies, so the
-versions in this repository are intentional.
-
-## Getting started on Kubernetes
+## Getting started
 
 The distribution is two images, released together under one version so they
 cannot drift:
@@ -54,16 +55,16 @@ cannot drift:
 
 ### Before you start
 
-- A cluster you can install CRDs into, with a default StorageClass. The
-  manifests install agent-sandbox v0.5.4 alongside this project's namespace,
-  sandbox template, warm pool, RBAC, and the dsh host Deployment.
-- An OIDC client at your identity provider. dsh itself ships no user
-  authentication, so the distribution fronts it with
-  [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/); you supply the
+- The cluster needs a default StorageClass. The manifests install
+  agent-sandbox v0.5.4 alongside this project's namespace, sandbox template,
+  warm pool, RBAC, and the dsh host Deployment.
+- Register an OIDC client at your identity provider for
+  [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/): you need the
   issuer URL, client ID, and client secret.
-- A repository for sandboxes to clone. A session is created from a repository
-  URL in the Web UI; the code only ever exists in the sandbox. Public
-  repositories need nothing more; private ones need the GitHub step below.
+- Pick a repository for sandboxes to clone. A session is created from a
+  repository URL in the Web UI; the code only ever exists in the sandbox.
+  Public repositories need nothing more; private ones need the GitHub step
+  below.
 
 ### Install
 
@@ -116,9 +117,9 @@ share files.
 
 ## Credentials and secrets
 
-These never go in YAML, because configuration is a plain file and a chat
-transcript is durable. They go through the distribution's CLI, inside the host
-pod:
+Credentials go through the distribution's CLI inside the host pod, never
+through YAML — configuration is a plain file, and chat transcripts are
+durable:
 
 ```sh
 kubectl -n dsh-sandbox exec -it deploy/dsh-host -- \
@@ -151,10 +152,9 @@ file in the profile that belongs to you is its override layer:
 $DSH_HOME/profiles/web/cordis.patch.yml     # development machine; $DSH_HOME defaults to ~/.dsh
 ```
 
-There is no settings screen for this. dsh's Web settings page has a Plugins
-tab, but a plugin appears there only if it both registers a settings namespace
-on the host and ships a hand-written browser card for it, and this plugin does
-neither.
+There is no settings screen for this: a plugin appears in dsh's Web Plugins
+tab only if it registers a settings namespace and ships a browser card, and
+this plugin does neither.
 
 The file is a list of patches against the composed plugin tree. An entry is
 matched by row id, and `sandbox-manager` is the row this package's bundle patch
@@ -228,11 +228,10 @@ milestone does not have. The agent can still use `grep` and `find` through
 | Session logs, attachments, spill files        | your disk                 | unchanged, still your disk  |
 
 Turning off `fs-sandbox` also turns off dsh's host-side permission model:
-`workspace-write` and the approval prompts came from that row. This is
-deliberate. The container is the boundary now, and asking permission to write a
-file inside a disposable container is noise. It does mean the agent can do
-anything it likes inside the sandbox without asking, so treat the sandbox, not
-the prompt, as the thing standing between a repository and your machine.
+`workspace-write` and the approval prompts came from that row. The container
+is the boundary instead, and the agent acts inside it without asking — treat
+the sandbox, not the prompt, as what stands between a repository and your
+machine.
 
 ## Where files live
 
