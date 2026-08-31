@@ -1,4 +1,4 @@
-# Kubernetes reference environment (Milestone 1)
+# Kubernetes deployment
 
 This reference runs one universal DSH runner behind Kubernetes SIG
 agent-sandbox. It is intentionally pinned to **agent-sandbox v0.5.4** and its

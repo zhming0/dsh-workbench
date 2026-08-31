@@ -176,14 +176,6 @@ routes are alternatives, and running both gives a session two sandboxes.
   the dsh host. Short-lived signed tokens protect every runner call and include
   the expected sandbox identity.
 
-## Milestone 1 boundaries
-
-No interactive terminals, live streaming stdin, service supervision, public
-service URLs, cross-sandbox child agents, or sandbox-side `glob` and `grep`.
-One-shot stdin, streamed output, command cancellation, bounded background
-output, idle hibernation, wake, and final cleanup all work. Details are in
-[`provider/README.md`](provider/README.md#milestone-1-limits).
-
 ## Documentation
 
 | Page                                           | Covers                                                            |
