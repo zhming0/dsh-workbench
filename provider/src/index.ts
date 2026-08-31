@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
+import { createUserMessage, type Message } from "@deepseek-ai/dsh-llm";
 import type { Session } from "@deepseek-ai/dsh-session";
 import type {} from "@deepseek-ai/dsh-typert-registry";
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
@@ -14,6 +15,11 @@ import { metrics, trace } from "@opentelemetry/api";
 import { DockerBackend } from "./backends/docker.js";
 import { KasBackend } from "./backends/kas.js";
 import { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
+import { InstructionStore } from "./instruction-store.js";
+import type {
+  InstructionSettingsView,
+  InstructionWorkspaceView,
+} from "./instructions-remote.js";
 import { ProviderKeyStore } from "./key-store.js";
 import { workbenchHost } from "./remote-contributions.js";
 import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
@@ -23,6 +29,7 @@ import { SandboxNotFoundError } from "./types.js";
 import type { SandboxBackend, SessionRecord } from "./types.js";
 import {
   createRepositoryAnchor,
+  normalizeWorkspaceRepositoryUrl,
   repositoryForAnchor,
 } from "./workspace-anchor.js";
 
@@ -36,6 +43,9 @@ const resumeLatency = meter.createHistogram("dsh.sandbox.resume.duration", {
   unit: "ms",
 });
 const transitions = meter.createCounter("dsh.sandbox.lifecycle.transitions");
+const MANAGED_INSTRUCTIONS_SOURCE = "@zhming0/dsh-workbench:instructions";
+const CLEARED_INSTRUCTIONS =
+  "<system-reminder>\nUI-managed AGENTS.md instructions were cleared. Earlier UI-managed AGENTS.md instruction baselines no longer apply. Checked-in AGENTS.md instructions remain active.\n</system-reminder>";
 
 export interface Config {
   backend?: "docker" | "kas";
@@ -82,12 +92,14 @@ export interface ManagerDependencies {
   backend?: SandboxBackend;
   store?: SessionStore;
   broker?: CredentialBroker;
+  instructions?: InstructionStore;
   keys?: ProviderKeyStore;
   workspaceRegistry?: WorkspaceRegistryLike;
 }
 
 interface WorkspaceRegistryLike {
   create(path: string, title?: string): Promise<{ path: string }>;
+  list(): Array<{ path: string; title: string }>;
 }
 
 declare module "@deepseek-ai/cordis" {
@@ -132,6 +144,7 @@ export class SandboxManager extends TypertRemoteService {
   private readonly backend: SandboxBackend;
   private readonly store: SessionStore;
   private readonly broker: CredentialBroker;
+  private readonly instructions: InstructionStore;
   private readonly keys: ProviderKeyStore;
   private readonly workspaceRegistry: WorkspaceRegistryLike | undefined;
   private readonly ready: Promise<void>;
@@ -159,6 +172,9 @@ export class SandboxManager extends TypertRemoteService {
       new CredentialBroker({
         path: join(this.config.stateDir, "broker.json"),
       });
+    this.instructions =
+      dependencies.instructions ??
+      new InstructionStore(join(this.config.stateDir, "instructions.json"));
     this.backend = dependencies.backend ?? createBackend(this.config);
     this.workspaceRegistry = dependencies.workspaceRegistry;
     this.ready = this.initialize();
@@ -175,9 +191,31 @@ export class SandboxManager extends TypertRemoteService {
     });
 
     ctx.on("agent/session-start", ({ agent }) => this.ensureRunning(agent));
-    ctx.on("agent/pre-step", async ({ agent }, next) => {
+    ctx.on("agent/pre-step", async ({ agent, messages, step }, next) => {
       await this.ensureRunning(agent);
-      return next();
+      const decision = await next();
+      if (
+        decision.kind === "reject" ||
+        (step === 1 && decision.messages.length === 0)
+      ) {
+        return decision;
+      }
+      const rendered = this.instructionsFor(agent);
+      const previous = latestManagedInstructions(agent);
+      if (rendered === "" && previous === undefined) return decision;
+      const text = rendered === "" ? CLEARED_INSTRUCTIONS : rendered;
+      if (previous === text) return decision;
+      const lastClaimedIndex = decision.messages.findLastIndex((message) =>
+        messages.includes(message),
+      );
+      return {
+        kind: "enter" as const,
+        messages: decision.messages.toSpliced(
+          lastClaimedIndex + 1,
+          0,
+          managedInstructionMessage(text),
+        ),
+      };
     });
     ctx.on("agent/status", ({ agent, status }) => {
       if (status === "running") this.markActive(String(agent.id));
@@ -229,6 +267,41 @@ export class SandboxManager extends TypertRemoteService {
     await this.ready;
     await this.broker.deleteSecret(name);
     return this.broker.secretNames();
+  }
+
+  async getInstructions(): Promise<InstructionSettingsView> {
+    await this.ready;
+    return this.instructionSettingsView();
+  }
+
+  async setGlobalInstructions(
+    content: string,
+  ): Promise<InstructionSettingsView> {
+    await this.ready;
+    await this.instructions.setGlobal(content);
+    return this.instructionSettingsView();
+  }
+
+  async setWorkspaceInstructions(
+    repositoryUrl: string,
+    content: string,
+  ): Promise<InstructionSettingsView> {
+    await this.ready;
+    const normalized = normalizeWorkspaceRepositoryUrl(repositoryUrl);
+    const workspaces = await this.instructionWorkspaces();
+    if (
+      !workspaces.some((workspace) => workspace.repositoryUrl === normalized)
+    ) {
+      throw new Error(`workspace is not registered: ${normalized}`);
+    }
+    await this.instructions.setWorkspace(normalized, content);
+    return this.instructionSettingsView(
+      workspaces.map((workspace) =>
+        workspace.repositoryUrl === normalized
+          ? { ...workspace, content: this.instructions.workspace(normalized) }
+          : workspace,
+      ),
+    );
   }
 
   async ensureRunning(agent: Agent): Promise<RunnerClient> {
@@ -300,6 +373,7 @@ export class SandboxManager extends TypertRemoteService {
       this.keys.initialize(),
       this.store.initialize(),
       this.broker.initialize(),
+      this.instructions.initialize(),
     ]);
     for (const record of this.store.values()) {
       if (record.state === "running") {
@@ -487,6 +561,50 @@ export class SandboxManager extends TypertRemoteService {
     }
   }
 
+  private instructionsFor(agent: Agent): string {
+    const repositoryUrl = this.store.get(String(agent.id))?.repositoryUrl;
+    return renderManagedInstructions(
+      this.instructions.global(),
+      repositoryUrl === undefined
+        ? ""
+        : this.instructions.workspace(repositoryUrl),
+      repositoryUrl,
+    );
+  }
+
+  private async instructionSettingsView(
+    workspaces?: InstructionWorkspaceView[],
+  ): Promise<InstructionSettingsView> {
+    const current = workspaces ?? (await this.instructionWorkspaces());
+    return { global: this.instructions.global(), workspaces: current };
+  }
+
+  private async instructionWorkspaces(): Promise<InstructionWorkspaceView[]> {
+    const registry =
+      this.workspaceRegistry ??
+      (this.ctx.get("workspaceRegistry") as WorkspaceRegistryLike | undefined);
+    if (registry === undefined) return [];
+    const workspaces = await Promise.all(
+      registry.list().map(async (workspace) => {
+        const repositoryUrl = await repositoryForAnchor(
+          this.config.stateDir,
+          workspace.path,
+        );
+        return repositoryUrl === undefined
+          ? undefined
+          : {
+              repositoryUrl,
+              title: workspace.title,
+              content: this.instructions.workspace(repositoryUrl),
+            };
+      }),
+    );
+    return workspaces.filter(
+      (workspace): workspace is InstructionWorkspaceView =>
+        workspace !== undefined,
+    );
+  }
+
   private scheduleIdle(session: Session | string): void {
     const sessionId =
       typeof session === "string" ? session : String(session.id);
@@ -619,6 +737,65 @@ function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function managedInstructionMessage(text: string) {
+  return createUserMessage({
+    content: [{ type: "text" as const, text }],
+    source: {
+      kind: "plugin" as const,
+      plugin: MANAGED_INSTRUCTIONS_SOURCE,
+      form: "instructions" as const,
+    },
+  });
+}
+
+function latestManagedInstructions(agent: Agent): string | undefined {
+  for (const sequence of agent.session.surface.nodes.toReversed()) {
+    const event = agent.session.events[sequence];
+    if (event?.type !== "user/message") continue;
+    const text = managedInstructionText(event.data);
+    if (text !== undefined) return text;
+  }
+}
+
+function managedInstructionText(message: Message): string | undefined {
+  if (
+    message.source.kind !== "plugin" ||
+    message.source.plugin !== MANAGED_INSTRUCTIONS_SOURCE
+  ) {
+    return undefined;
+  }
+  const [block] = message.content;
+  return message.content.length === 1 && block?.type === "text"
+    ? block.text
+    : undefined;
+}
+
+function renderManagedInstructions(
+  global: string,
+  workspace: string,
+  repositoryUrl?: string,
+): string {
+  if (global === "" && workspace === "") return "";
+  const sections: string[] = [];
+  if (global !== "") {
+    sections.push(
+      `Instructions from: Settings → AGENTS.md (Global)\n\n${global}`,
+    );
+  }
+  if (workspace !== "") {
+    sections.push(
+      `Instructions from: Settings → AGENTS.md (Workspace: ${repositoryUrl ?? "current"})\n\n${workspace}`,
+    );
+  }
+  const body = [
+    "This complete UI-managed AGENTS.md instruction baseline supersedes earlier UI-managed baselines. Use these instructions as guidance when applicable. Workspace instructions take precedence over global instructions. Checked-in AGENTS.md instructions remain active, and more specific nested instructions take precedence. These instructions do not override system, developer, or direct user instructions.",
+    ...sections,
+  ]
+    .join("\n\n")
+    .replaceAll("</system-reminder>", "<\\/system-reminder>");
+  return `<system-reminder>\n${body}\n</system-reminder>`;
+}
+
 export { DockerBackend } from "./backends/docker.js";
 export { KasBackend } from "./backends/kas.js";
 export { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
@@ -626,4 +803,4 @@ export { SandboxNotFoundError } from "./types.js";
 export type { SandboxBackend } from "./types.js";
 export default SandboxManager;
 
-export const testing = { resolveConfig };
+export const testing = { renderManagedInstructions, resolveConfig };
