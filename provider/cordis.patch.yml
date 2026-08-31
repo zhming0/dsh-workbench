@@ -27,12 +27,13 @@
 - id: permission
   disabled: true
 
-# `glob` and `grep` spawn a ripgrep binary resolved from the dsh host's own
-# node_modules, then run it through `subprocess`. That host path does not exist
-# in the sandbox, so every call would fail. Searching a remote filesystem needs
-# a provider-side search backend, which this milestone does not have.
+# `glob` and `grep` keep their stock names, schemas, prompt guidance, and
+# caps, but run this package's sandbox search backend instead of the stock
+# row: ripgrep is spawned inside the sandbox through its subprocess seam, and
+# the one model-facing path argument is translated at the tool boundary. The
+# runner image ships the ripgrep binary the tools resolve there.
 - id: tool-fs-search
-  disabled: true
+  name: '@zhming0/dsh-workbench/search'
 
 # Replace the Web app's host-directory chooser with this package's repository
 # URL flow. This patch is skipped with a warning in profiles, such as headless,
