@@ -40,6 +40,12 @@ The bundle also disables dsh's local shell permission presets. The remote shell
 uses one fixed container boundary and does not claim to enforce those
 per-command sandbox modes.
 
+Every session also gets a `sandbox:boundary` context note naming the
+sandbox-visible workspace (`/workspace/repository`) and the container boundary.
+dsh's stock file-policy line renders the session cwd verbatim — the host-side
+anchor path, which does not exist inside the sandbox — so the note is where the
+agent learns where its workspace actually is.
+
 The default backend uses Docker on the same machine as dsh. The Kubernetes
 backend uses Kubernetes SIG agent-sandbox and must run somewhere that can reach
 in-cluster Sandbox service names.

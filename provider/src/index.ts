@@ -18,6 +18,7 @@ import { ProviderKeyStore } from "./key-store.js";
 import { workbenchHost } from "./remote-contributions.js";
 import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { RunnerClient } from "./runner-client.js";
+import { sandboxBoundaryText } from "./sandbox-context.js";
 import { SessionStore } from "./state-store.js";
 import { SandboxNotFoundError } from "./types.js";
 import type { SandboxBackend, SessionRecord } from "./types.js";
@@ -172,6 +173,23 @@ export class SandboxManager extends TypertRemoteService {
 
     ctx.inject(["typert"], (typertCtx) => {
       typertCtx.typert.register(workbenchHost);
+    });
+
+    // dsh's file-policy line renders the session cwd verbatim, which is this
+    // provider's host-side anchor path and does not exist inside the sandbox.
+    // Name the sandbox-visible workspace right after it so the agent can
+    // resolve the workspace it actually operates in.
+    ctx.inject(["systemPrompt"], (scope) => {
+      scope.systemPrompt.context({
+        name: "sandbox:boundary",
+        order: 111,
+        text: (context) => {
+          const session = context.agent?.session;
+          return session === undefined
+            ? ""
+            : sandboxBoundaryText(this.config.workspace, session.header.cwd);
+        },
+      });
     });
 
     ctx.on("agent/session-start", ({ agent }) => this.ensureRunning(agent));
