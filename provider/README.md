@@ -17,8 +17,8 @@ every setting, and the CLI.
 
 ## What installing it changes
 
-The package declares a bundle patch, so `dsh plugin add` appends it to the
-profile's layer stack and it applies on the next boot. The patch replaces three
+The package declares a bundle patch. Once the package is installed in a
+profile, dsh includes that patch in the layer stack on boot. It replaces three
 host capability rows (`fs-sandbox`, `bash-sandbox`, `subprocess`) with
 sandbox-backed ones, and turns off `tool-fs-search` because `glob` and `grep`
 spawn a host ripgrep binary that does not exist inside the sandbox.
@@ -139,9 +139,9 @@ dsh-workbench key public > /tmp/dsh-provider.pub
 ```
 
 The private key never goes into Kubernetes. See
-[`docs/kubernetes.md`](https://github.com/zhming0/dsh-sandbox/blob/main/docs/kubernetes.md).
+[`docs/kubernetes.md`](https://github.com/zhming0/dsh-workbench/blob/main/docs/kubernetes.md).
 
-## Milestone 1 limits
+## Limits
 
 - `glob` and `grep` are turned off. Searching a remote filesystem needs a
   provider-side search backend, which does not exist yet.

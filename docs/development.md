@@ -95,8 +95,7 @@ provider and fails if the provider's default runner image tag would not match,
 so the pair cannot drift.
 
 The provider is not published to npm. The distribution images are the product,
-and a checkout install is the contributor path (see
-[plans/distribution.md](plans/distribution.md)).
+and a checkout install is the contributor path.
 
 Buildkite runs [`.buildkite/pipeline.yml`](../.buildkite/pipeline.yml) on
 every branch: provider checks and tests, runner tests, a check that the

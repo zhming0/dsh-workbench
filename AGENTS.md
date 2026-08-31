@@ -97,6 +97,22 @@ likely to mislead you.
 - Preserve lifecycle meaning: hibernation keeps workspace data, wake reuses it,
   and expiry removes it.
 
+## Preserve the supported product
+
+- The product is the Kubernetes distribution: the host and runner images are
+  released together. Docker and checkout installs are development paths.
+- Only `dsh web` is supported. Headless mode exits before the idle lifecycle can
+  run.
+- One dsh host is one trust domain. Its sessions, credentials, and sandboxes are
+  not isolated from other users admitted to that host.
+- Secrets are global to the host and are pushed to a runner before commands.
+  `GITHUB_TOKEN` also supplies Git credentials for github.com. There is no
+  GitHub device flow or per-repository secret scoping.
+- Sandbox code can read injected secrets by design. Keep credentials in the
+  provider store, never in pod configuration or workspace files.
+- The Kubernetes backend uses one cluster-owned template and warm pool. Do not
+  let repositories select pod privileges or arbitrary templates.
+
 ## Protect credentials and generated code
 
 - Never write tokens or secret values into a workspace, log, test fixture, or
