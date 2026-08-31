@@ -25,10 +25,10 @@ sandbox data. ConnectRPC health and all capability calls still require a valid
 token.
 
 The reference Dockerfile builds `linux/amd64` and `linux/arm64`. It selects the
-`jj` and `mise` archives from `TARGETARCH` and verifies a pinned checksum per
-architecture, so adding another one means adding both the archive name and its
-checksum. The Go stage cross-compiles from the builder's own architecture rather
-than running the toolchain under emulation.
+`jj`, `mise`, and `ripgrep` archives from `TARGETARCH` and verifies a pinned
+checksum per architecture, so adding another one means adding both the archive
+name and its checksum. The Go stage cross-compiles from the builder's own
+architecture rather than running the toolchain under emulation.
 
 Releases are published to `ghcr.io/zhming0/dsh-runner`, tagged with the same
 version as the `@zhming0/dsh-workbench` package that expects them.

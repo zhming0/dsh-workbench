@@ -144,7 +144,7 @@ Every setting, with its default, is in
 | --------------------------------------------- | ------------------------- | -------------------------------------- |
 | `read`, `write`, `edit`, `str_replace_editor` | your disk                 | sandbox workspace                      |
 | `bash`                                        | your machine              | sandbox                                |
-| `glob`, `grep`                                | ripgrep on your machine   | unavailable; use `bash`                |
+| `glob`, `grep`                                | ripgrep on your machine   | sandbox workspace, ripgrep in the sandbox |
 | Working directory                             | wherever you launched dsh | `/workspace/repository` in the sandbox |
 | Session logs, attachments, spill files        | your disk                 | unchanged, still your disk             |
 
@@ -154,8 +154,9 @@ is the boundary instead, and the agent acts inside it without asking — treat
 the sandbox, not the prompt, as what stands between a repository and your
 machine.
 
-How the bundle patch does this — which rows it replaces, why `glob` and `grep`
-are off, and how a repository URL becomes a dsh Workspace — is in
+How the bundle patch does this — which rows it replaces, how `glob` and `grep`
+come to run ripgrep inside the sandbox, and how a repository URL becomes a dsh
+Workspace — is in
 [`provider/README.md`](provider/README.md#what-installing-it-changes). To
 sandbox only some sessions, use the agent preset in
 [`examples/`](examples/agent.cordis.yml) instead of the bundle patch; the two

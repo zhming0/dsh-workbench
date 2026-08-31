@@ -20,11 +20,17 @@ every setting, and the CLI.
 The package declares a bundle patch. Once the package is installed in a
 profile, dsh includes that patch in the layer stack on boot. It replaces three
 host capability rows (`fs-sandbox`, `bash-sandbox`, `subprocess`) with
-sandbox-backed ones, and turns off `tool-fs-search` because `glob` and `grep`
-spawn a host ripgrep binary that does not exist inside the sandbox.
+sandbox-backed ones, and replaces the stock `tool-fs-search` row with this
+package's search backend, so `glob` and `grep` spawn ripgrep inside the sandbox
+through its subprocess seam. The stock row resolves a ripgrep binary on the dsh
+host, and no such path exists in a sandbox. Tool names, schemas, prompt
+guidance, and caps are the stock ones; the search root is translated from the
+session workspace to the sandbox workspace at the tool boundary.
 
-Tool rows are left alone, so the stock agent presets keep working and point at
-the sandbox instead of the host.
+The other tool rows are left alone, so the stock agent presets keep working and
+point at the sandbox instead of the host. A preset that lists its own tool rows
+gets `glob` and `grep` by loading the same row, `@zhming0/dsh-workbench/search`;
+[`examples/`](../examples/agent.cordis.yml) shows it in place.
 
 In the Web profile, the package replaces directory picking with a repository
 URL dialog. It creates an owner-only host anchor, registers it as a dsh
@@ -87,6 +93,30 @@ Each release publishes a runner image tagged with the same version as this
 package, and the provider defaults to that exact tag, so `docker.image` only
 matters when testing a locally built image.
 
+### Search
+
+The `tool-fs-search` row comes from this package and configures the sandbox
+`glob` and `grep` tools. It overrides by row id like any other:
+
+```yaml
+- id: tool-fs-search
+  config:
+    globMaxResults: 200
+```
+
+| Setting             | Default    | Meaning                                        |
+| ------------------- | ---------- | ---------------------------------------------- |
+| `globMaxResults`    | `100`      | Paths one `glob` call shows inline             |
+| `grepMaxMatches`    | `250`      | Matches one `grep` call shows inline           |
+| `grepMaxLineBytes`  | `2000`     | Byte cap per matched-line preview              |
+| `rawOutputMaxBytes` | `20000000` | Complete raw `rg` stdout one search will parse |
+| `timeoutMs`         | `30000`    | Cooperative budget for one search call         |
+| `graceMs`           | `3000`     | Terminate-escalation grace after `timeoutMs`   |
+| `stderrMaxBytes`    | `65536`    | Diagnostic tail retained from `rg` stderr      |
+
+A result past its inline cap is truncated with a note; the complete result is
+not saved to a spill file.
+
 ## CLI
 
 Secrets and tokens never go in YAML, because a profile layer is a plain file and
@@ -143,8 +173,9 @@ The private key never goes into Kubernetes. See
 
 ## Limits
 
-- `glob` and `grep` are turned off. Searching a remote filesystem needs a
-  provider-side search backend, which does not exist yet.
+- `glob` and `grep` run ripgrep inside the sandbox through this package's
+  search backend. A result past its inline cap is truncated with a note; the
+  complete result is not copied to a spill file.
 - Interactive terminals and streaming subprocess input are not implemented.
   One-shot stdin, streamed stdout/stderr, cancellation, and background process
   handles are supported.

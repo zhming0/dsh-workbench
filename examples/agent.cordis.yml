@@ -64,5 +64,11 @@
     - id: filesystem-tools
       name: '@deepseek-ai/dsh-tool-fs'
 
+    # The sandbox search backend for `glob` and `grep`. The stock
+    # tool-fs-search row resolves a host ripgrep path, so presets that want
+    # the search tools load this package's row instead.
+    - id: sandbox-fs-search
+      name: '@zhming0/dsh-workbench/search'
+
     - id: bash-tool
       name: '@deepseek-ai/dsh-tool-bash'

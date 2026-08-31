@@ -17,10 +17,15 @@ ARG JJ_SHA256_arm64=60d42fa2a9abaa445eff10cd2087458562aaad5a54b90309e5a3787ecc98
 ARG MISE_VERSION=2026.8.12
 ARG MISE_SHA256_amd64=28027bc9b245b7c2e669cbfbc61cdfa1b8d4ecdd103d09070c75c8a85304d3be
 ARG MISE_SHA256_arm64=ca536cb34d746a1caa1ad43d37c548e0f45c1d4192b2eaac38dc400d23940c7d
+# ripgrep backs the session's `glob` and `grep` search tools; the provider
+# resolves it on the runner's PATH.
+ARG RIPGREP_VERSION=15.2.0
+ARG RIPGREP_SHA256_amd64=33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c
+ARG RIPGREP_SHA256_arm64=800b1e7206afe799dfb5a6901f23147cfaabe0e52210538100f61e86e1740915
 RUN set -eux; \
     case "${TARGETARCH}" in \
-      amd64) jj_arch=x86_64-unknown-linux-musl;  mise_arch=linux-x64-musl;   jj_sha="${JJ_SHA256_amd64}"; mise_sha="${MISE_SHA256_amd64}" ;; \
-      arm64) jj_arch=aarch64-unknown-linux-musl; mise_arch=linux-arm64-musl; jj_sha="${JJ_SHA256_arm64}"; mise_sha="${MISE_SHA256_arm64}" ;; \
+      amd64) jj_arch=x86_64-unknown-linux-musl;  mise_arch=linux-x64-musl;   jj_sha="${JJ_SHA256_amd64}"; mise_sha="${MISE_SHA256_amd64}"; rg_arch=x86_64-unknown-linux-musl;  rg_sha="${RIPGREP_SHA256_amd64}" ;; \
+      arm64) jj_arch=aarch64-unknown-linux-musl; mise_arch=linux-arm64-musl; jj_sha="${JJ_SHA256_arm64}"; mise_sha="${MISE_SHA256_arm64}"; rg_arch=aarch64-unknown-linux-musl; rg_sha="${RIPGREP_SHA256_arm64}" ;; \
       *) echo "unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     apt-get update; \
@@ -32,7 +37,10 @@ RUN set -eux; \
     curl -fsSL "https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/mise-v${MISE_VERSION}-${mise_arch}.tar.gz" -o /tmp/mise.tar.gz; \
     echo "${mise_sha}  /tmp/mise.tar.gz" | sha256sum -c -; \
     tar -xzf /tmp/mise.tar.gz -C /usr/local/bin --strip-components=2 mise/bin/mise; \
-    rm /tmp/jj.tar.gz /tmp/mise.tar.gz; \
+    curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/ripgrep-${RIPGREP_VERSION}-${rg_arch}.tar.gz" -o /tmp/rg.tar.gz; \
+    echo "${rg_sha}  /tmp/rg.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/rg.tar.gz -C /usr/local/bin --strip-components=1 "ripgrep-${RIPGREP_VERSION}-${rg_arch}/rg"; \
+    rm /tmp/jj.tar.gz /tmp/mise.tar.gz /tmp/rg.tar.gz; \
     useradd --create-home --uid 1000 sandbox; \
     mkdir -p /workspace /run/dsh; \
     chown sandbox:sandbox /workspace /run/dsh
