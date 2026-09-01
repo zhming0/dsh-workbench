@@ -1,13 +1,17 @@
 import type { TypertContribution } from "@deepseek-ai/dsh-typert-registry/types";
 import type { TypertRemoteContribution } from "@deepseek-ai/dsh-typert-protocol";
 
+import type { SandboxInstructionsRemote } from "./instructions-remote.js";
+import { sandboxInstructionsDescriptors } from "./instructions-remote.js";
 import type { RepositoryWorkspaceRemote } from "./repository-workspace-remote.js";
 import { repositoryWorkspaceDescriptors } from "./repository-workspace-remote.js";
 import type { SandboxSecretsRemote } from "./secrets-remote.js";
 import { sandboxSecretsDescriptors } from "./secrets-remote.js";
 
 /** Everything the sandboxManager service exposes to the browser. */
-type SandboxManagerRemote = RepositoryWorkspaceRemote & SandboxSecretsRemote;
+type SandboxManagerRemote = RepositoryWorkspaceRemote &
+  SandboxSecretsRemote &
+  SandboxInstructionsRemote;
 
 declare module "@deepseek-ai/dsh-typert-protocol" {
   interface TypertRemoteNamespaceMap {
@@ -19,6 +23,9 @@ declare module "@deepseek-ai/dsh-typert-protocol" {
     "sandboxManager/listSecrets": SandboxManagerRemote["listSecrets"];
     "sandboxManager/setSecret": SandboxManagerRemote["setSecret"];
     "sandboxManager/deleteSecret": SandboxManagerRemote["deleteSecret"];
+    "sandboxManager/getInstructions": SandboxManagerRemote["getInstructions"];
+    "sandboxManager/setGlobalInstructions": SandboxManagerRemote["setGlobalInstructions"];
+    "sandboxManager/setWorkspaceInstructions": SandboxManagerRemote["setWorkspaceInstructions"];
   }
 }
 
@@ -28,6 +35,7 @@ declare module "@deepseek-ai/dsh-typert-protocol" {
 const descriptors = [
   ...repositoryWorkspaceDescriptors,
   ...sandboxSecretsDescriptors,
+  ...sandboxInstructionsDescriptors,
 ];
 
 export const workbenchHost: TypertContribution = {

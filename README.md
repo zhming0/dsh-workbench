@@ -98,6 +98,22 @@ The parent `/workspace` is the persistent volume root, so storage metadata such
 as `lost+found` remains outside the checkout. Every session gets its own
 sandbox; two sessions never share files.
 
+### AGENTS.md instructions
+
+Open **Settings → Instructions** to add AGENTS.md-style guidance without
+changing a repository. Choose **Global** for every session or select a
+repository Workspace for guidance that applies only to that repository.
+Workspace instructions take precedence over the global layer. Checked-in
+`AGENTS.md` files remain active, including more-specific files in nested
+directories.
+
+Saved changes apply to the next model request, usually after the next user
+message or tool call, including in an existing session. They do not alter a
+request already in flight. The host stores these UI-managed layers in
+`stateDir/instructions.json`; it does not write into a checkout. Empty a scope
+and save to clear it. The global and effective workspace layers may total at
+most 65,536 UTF-8 bytes.
+
 ## Credentials and secrets
 
 The host keeps a store of named secrets. Each one is injected into the
@@ -125,7 +141,8 @@ dsh composes a plugin tree at boot; a **profile** is one installed copy of
 such a tree, and the host image seeds the `web` profile with this provider on
 first boot. Your settings live in one file, the profile's override layer:
 `/data/.dsh/profiles/web/cordis.patch.yml` in the host pod. There is no
-settings screen; the file is the interface.
+UI for these deployment settings; the file is the interface. The Instructions
+page described above manages only model guidance.
 
 An entry replaces the **whole** `config` of the row it names rather than
 merging into it, so restate every field you want to keep:
@@ -184,8 +201,8 @@ routes are alternatives, and running both gives a session two sandboxes.
 
 ## Documentation
 
-| Page                                           | Covers                                                            |
-| ---------------------------------------------- | ----------------------------------------------------------------- |
-| [`docs/kubernetes.md`](docs/kubernetes.md)     | full install walkthrough, host operations, isolation, smoke test |
-| [`provider/README.md`](provider/README.md)     | what the bundle patch changes, every setting, the CLI            |
-| [`docs/development.md`](docs/development.md)   | repository layout, build and test, checkout installs, releasing  |
+| Page                                         | Covers                                                           |
+| -------------------------------------------- | ---------------------------------------------------------------- |
+| [`docs/kubernetes.md`](docs/kubernetes.md)   | full install walkthrough, host operations, isolation, smoke test |
+| [`provider/README.md`](provider/README.md)   | what the bundle patch changes, every setting, the CLI            |
+| [`docs/development.md`](docs/development.md) | repository layout, build and test, checkout installs, releasing  |

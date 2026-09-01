@@ -6,7 +6,8 @@ import { join } from "node:path";
 
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { Context } from "@deepseek-ai/cordis";
-import type { Agent } from "@deepseek-ai/dsh-agent";
+import { agentEvents, type Agent } from "@deepseek-ai/dsh-agent";
+import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import type { CustomObjectsApi } from "@kubernetes/client-node";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -510,12 +511,46 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     const anchor = await manager.createRepositoryWorkspace(
       "https://github.com/example/public.git",
     );
+    await manager.setGlobalInstructions("Use concise answers.");
+    await manager.setWorkspaceInstructions(
+      "https://github.com/example/public.git",
+      "Run the repository tests.",
+    );
     const agent = {
       id: "session-one",
-      session: { header: { cwd: anchor } },
+      session: {
+        header: { cwd: anchor },
+        events: [],
+        surface: { nodes: [] },
+      },
     } as unknown as Agent;
 
     await manager.ensureRunning(agent);
+
+    const emptyDecision = await agentEvents(ctx, agent).waterfall(
+      "agent/pre-step",
+      {
+        messages: [],
+        turn: 1,
+        step: 1,
+        signal: new AbortController().signal,
+      },
+      () => Promise.resolve({ kind: "enter", messages: [] }),
+    );
+    const prompt = createUserMessage({
+      content: [{ type: "text", text: "What instructions apply?" }],
+      source: { kind: "user" },
+    });
+    const decision = await agentEvents(ctx, agent).waterfall(
+      "agent/pre-step",
+      {
+        messages: [prompt],
+        turn: 1,
+        step: 1,
+        signal: new AbortController().signal,
+      },
+      () => Promise.resolve({ kind: "enter", messages: [prompt] }),
+    );
 
     expect(workspaceRegistry.creates).toEqual([
       { path: anchor, title: "example/public" },
@@ -523,6 +558,44 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     expect(backend.repositoryUrls).toEqual([
       "https://github.com/example/public",
     ]);
+    expect(emptyDecision).toEqual({ kind: "enter", messages: [] });
+    expect(await manager.getInstructions()).toEqual({
+      global: "Use concise answers.",
+      workspaces: [
+        {
+          repositoryUrl: "https://github.com/example/public",
+          title: "example/public",
+          content: "Run the repository tests.",
+        },
+      ],
+    });
+    expect(decision).toMatchObject({
+      kind: "enter",
+      messages: [
+        prompt,
+        {
+          content: [
+            {
+              type: "text",
+              text: expect.stringMatching(
+                /Use concise answers[\s\S]*Run the repository tests/,
+              ),
+            },
+          ],
+          source: {
+            kind: "plugin",
+            plugin: "@zhming0/dsh-workbench:instructions",
+            form: "instructions",
+          },
+        },
+      ],
+    });
+    await expect(
+      manager.setWorkspaceInstructions(
+        "https://github.com/example/unknown",
+        "Do not save this.",
+      ),
+    ).rejects.toThrow("not registered");
     expect(
       (
         ctx.get("directoryPicker") as { capability(): { kind: string } }
@@ -560,6 +633,13 @@ class FakeWorkspaceRegistry {
   async create(path: string, title?: string) {
     this.creates.push(title === undefined ? { path } : { path, title });
     return { path };
+  }
+
+  list() {
+    return this.creates.map(({ path, title }) => ({
+      path,
+      title: title ?? path,
+    }));
   }
 }
 
