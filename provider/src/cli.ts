@@ -4,7 +4,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { CredentialBroker } from "./broker.js";
-import { ProviderKeyStore } from "./key-store.js";
 
 const stateDir =
   process.env.DSH_SANDBOX_STATE_DIR ?? join(homedir(), ".dsh-sandbox");
@@ -39,18 +38,10 @@ async function main(arguments_: string[]): Promise<void> {
     return;
   }
 
-  if (command === "key" && subcommand === "public") {
-    const keys = new ProviderKeyStore(join(stateDir, "provider-key.pem"));
-    await keys.initialize();
-    process.stdout.write(keys.publicKeyPem);
-    return;
-  }
-
   process.stdout.write(`Usage:
   dsh-workbench secret list
   printf '%s' VALUE | dsh-workbench secret set NAME
   dsh-workbench secret delete NAME
-  dsh-workbench key public
 `);
   if (command !== undefined) process.exitCode = 2;
 }

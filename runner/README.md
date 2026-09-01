@@ -1,10 +1,13 @@
 # dsh-runner
 
-`dsh-runner` is the in-sandbox ConnectRPC server. It listens on `ADDR` (default
-`:8080`) over h2c. Set `SANDBOX_ID` and provide an Ed25519 public key in PEM form
-with `PROVIDER_PUBLIC_KEY` or `PROVIDER_PUBLIC_KEY_FILE`. Every call requires a
-provider-signed EdDSA bearer JWT whose `sandbox_id` matches and whose `exp` has
-not passed.
+`dsh-runner` is the in-sandbox ConnectRPC server. It dials the host rather
+than accepting inbound connections: `HOST_URL` names the host's tunnel
+listener (`tcp://host:port`, or `tls://host:port` to dial over TLS), and the
+runner registers with `SANDBOX_ID` plus the shared secret in
+`REGISTRATION_TOKEN` (or a file named by `REGISTRATION_TOKEN_FILE`). After a
+registration is accepted, the runner serves its RPCs over that same
+connection with HTTP/2 roles reversed, and redials with backoff whenever the
+tunnel drops. RPCs are reachable only over tunnels the runner itself opened.
 
 Secrets and Git credentials exist only in process memory. Child processes get a
 small allowlisted base environment, the current secrets, and RPC-supplied
@@ -20,9 +23,9 @@ the container user's permissions; they are not a filesystem sandbox. Run the
 image as its non-root `sandbox` user and isolate its filesystem/network at the
 container platform boundary.
 
-`GET /health` is an unauthenticated process-readiness probe. It does not expose
-sandbox data. ConnectRPC health and all capability calls still require a valid
-token.
+`GET /health` on `ADDR` (default `:8080`) is an unauthenticated
+process-readiness probe for the kubelet; it is the only listener the runner
+opens and does not expose sandbox data or RPCs.
 
 The reference Dockerfile builds `linux/amd64` and `linux/arm64`. It selects the
 `jj`, `mise`, and `ripgrep` archives from `TARGETARCH` and verifies a pinned

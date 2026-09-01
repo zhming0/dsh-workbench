@@ -1,28 +1,33 @@
 #!/usr/bin/env node
 
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 
 import { DockerBackend } from "../provider/dist/backends/docker.js";
-import { ProviderKeyStore } from "../provider/dist/key-store.js";
+import { TunnelServer } from "../provider/dist/tunnel.js";
 
 const image = process.env.DSH_RUNNER_IMAGE ?? "dsh-runner:dev";
 const workspace = "/workspace/repository";
-const stateDir = await mkdtemp(join(tmpdir(), "dsh-docker-smoke-"));
-const keys = new ProviderKeyStore(join(stateDir, "provider-key.pem"));
-const backend = new DockerBackend({ image });
+const registrationToken = randomBytes(32).toString("hex");
+const tunnel = new TunnelServer({
+  port: 0,
+  tokens: [registrationToken],
+  log: (message) => process.stdout.write(`${message}\n`),
+});
+await tunnel.listen();
+const backend = new DockerBackend({
+  image,
+  hostUrl: `tcp://host.docker.internal:${tunnel.port()}`,
+  registrationToken,
+});
 let handle;
 
 try {
-  await keys.initialize();
   handle = await backend.provision({
     sessionId: `smoke-${Date.now()}`,
     repositoryUrl: "https://github.com/example/unused.git",
-    publicKeyPem: keys.publicKeyPem,
   });
 
-  let client = await waitForRunner(backend, handle.reference, keys);
+  let client = await waitForRunner(tunnel, handle.sandboxId);
   await client.setSecrets({ SMOKE_VALUE: "present" });
   await run(client, [
     "/bin/bash",
@@ -46,9 +51,11 @@ try {
   });
   if (!firstSetup.ran) throw new Error("first setup did not run");
 
+  // Hibernation kills the tunnel socket; on wake the runner dials back in.
   await backend.hibernate(handle.reference);
+  tunnel.drop(handle.sandboxId);
   handle = await backend.wake(handle.reference);
-  client = await waitForRunner(backend, handle.reference, keys);
+  client = await waitForRunner(tunnel, handle.sandboxId);
   const secondSetup = await client.setup({
     repositoryUrl: "https://github.com/example/unused.git",
     revision: "",
@@ -63,22 +70,26 @@ try {
     throw new Error("workspace content did not survive hibernation");
   }
 
-  process.stdout.write("PASS: Docker runner auth, tools, setup, and hibernate/wake\n");
+  process.stdout.write("PASS: Docker runner registration, tools, setup, and hibernate/wake\n");
 } finally {
   if (handle !== undefined) await backend.destroy(handle.reference).catch(() => {});
-  await rm(stateDir, { recursive: true, force: true });
+  await tunnel.close();
 }
 
-async function waitForRunner(backend, reference, auth) {
+async function waitForRunner(tunnel, sandboxId) {
   const deadline = Date.now() + 30_000;
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const client = await backend.connect(reference, auth);
-      await client.health({ timeoutMs: 2_000 });
+      const client = await tunnel.waitFor(sandboxId, deadline - Date.now());
+      const health = await client.health({ timeoutMs: 2_000 });
+      if (health.sandboxId !== sandboxId) {
+        throw new Error(`runner identity mismatch: got ${health.sandboxId}`);
+      }
       return client;
     } catch (error) {
       lastError = error;
+      tunnel.drop(sandboxId);
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }

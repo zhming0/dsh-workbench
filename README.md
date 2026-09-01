@@ -63,6 +63,10 @@ kubectl -n dsh-sandbox create secret generic dsh-host-oidc \
   --from-literal=OAUTH2_PROXY_CLIENT_SECRET=… \
   --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')"
 
+# The shared registration token every runner presents when it dials the host.
+kubectl -n dsh-sandbox create secret generic dsh-registration-token \
+  --from-literal=token="$(openssl rand -hex 32)"
+
 # Replace DSH_HOST_IMAGE_PLACEHOLDER and DSH_RUNNER_IMAGE_PLACEHOLDER with
 # released tags, and dsh.example.com in host-oidc.yaml with your hostname.
 kubectl apply -k deploy/kubernetes
@@ -74,9 +78,9 @@ authenticates users; it does not isolate them. One dsh host is one trust
 domain: everyone the issuer admits shares the same sessions, credentials, and
 sandboxes.
 
-Then publish the host's signing key. Warm runner pods read the trusted public
-key when they start, so it must be published before the first claim — the
-exact commands are in
+Runners dial out to the host's tunnel Service and authenticate with that
+registration token, so no route into a sandbox is ever needed — rotation and
+details are in
 [docs/kubernetes.md](docs/kubernetes.md#the-in-cluster-dsh-host).
 
 ### Start a session
@@ -181,8 +185,8 @@ routes are alternatives, and running both gives a session two sandboxes.
 
 ## Trust boundaries
 
-- The provider's signing key, GitHub token, and configured secrets stay in an
-  owner-only directory on the dsh host.
+- The GitHub token and configured secrets stay in an owner-only directory on
+  the dsh host.
 - A runner keeps pushed credentials in memory. Its Git helper reads them from a
   private Unix socket, not from the workspace.
 - Secret values are added only to child-process environments. Repository code
@@ -190,9 +194,10 @@ routes are alternatives, and running both gives a session two sandboxes.
 - A GitHub token has whatever reach you grant it, so prefer a fine-grained
   PAT scoped to the repositories you work on. One provider instance suits one
   dsh user, not shared hosting.
-- The provider always starts connections. The runner never needs a route back to
-  the dsh host. Short-lived signed tokens protect every runner call and include
-  the expected sandbox identity.
+- The runner dials out to the host and authenticates with a shared
+  registration token; nothing ever connects into a sandbox. All RPCs flow
+  host→runner over that runner-initiated tunnel, and the provider verifies the
+  runner's sandbox identity before using it.
 
 ## Documentation
 

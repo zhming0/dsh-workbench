@@ -4,20 +4,26 @@ metadata:
   name: dsh-universal
   namespace: dsh-sandbox
 spec:
-  service: true
+  # Runners dial the host tunnel, so a per-sandbox Service is unnecessary and
+  # no ingress is allowed at all.
+  service: false
   envVarsInjectionPolicy: Disallowed
   volumeClaimTemplatesPolicy: Disallowed
   networkPolicyManagement: Managed
   networkPolicy:
-    ingress:
-      - from:
+    ingress: []
+    egress:
+      # The runner-initiated tunnel to the host; all RPCs flow over it.
+      - to:
           - namespaceSelector:
               matchLabels:
                 kubernetes.io/metadata.name: dsh-sandbox
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: dsh-host
         ports:
           - protocol: TCP
-            port: 8080
-    egress:
+            port: 8081
       # DNS is the only cluster service this reference policy explicitly permits.
       - to:
           - namespaceSelector:
@@ -61,14 +67,24 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             # agent-sandbox v0.5.4 normally names the backing pod after its
-            # Sandbox. The provider signs this same assigned Sandbox name.
+            # Sandbox. The provider expects this same assigned Sandbox name
+            # in the tunnel handshake and in Health responses.
             - name: SANDBOX_ID
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: PROVIDER_PUBLIC_KEY_FILE
-              value: /etc/dsh/keys/public-key.pem
+            - name: HOST_URL
+              value: tcp://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081
+            # Create this Secret before the warm pool:
+            #   kubectl -n dsh-sandbox create secret generic \
+            #     dsh-registration-token --from-literal=token=$(openssl rand -hex 32)
+            - name: REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dsh-registration-token
+                  key: token
           ports:
+            # The plain health listener; only the kubelet probe uses it.
             - name: http
               containerPort: 8080
               protocol: TCP
@@ -85,10 +101,3 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
-            - name: runner-public-key
-              mountPath: /etc/dsh/keys
-              readOnly: true
-      volumes:
-        - name: runner-public-key
-          configMap:
-            name: dsh-runner-public-key

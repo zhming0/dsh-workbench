@@ -2,11 +2,9 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { connectToRunner, type RunnerClient } from "../runner-client.js";
 import { SandboxNotFoundError } from "../types.js";
 import type {
   BackendReference,
-  RunnerAuth,
   SandboxBackend,
   SandboxHandle,
   SandboxSpec,
@@ -22,6 +20,9 @@ interface DockerReference extends BackendReference {
 export interface DockerBackendOptions {
   image: string;
   binary?: string;
+  /** The tunnel endpoint runners dial, such as tcp://host.docker.internal:8081. */
+  hostUrl: string;
+  registrationToken: string;
 }
 
 export class DockerBackend implements SandboxBackend {
@@ -44,12 +45,16 @@ export class DockerBackend implements SandboxBackend {
         sandboxId,
         "--label",
         `dsh.session=${spec.sessionId}`,
+        // The runner dials the host tunnel; host-gateway resolves the host's
+        // address from inside the container on every Docker platform.
+        "--add-host",
+        "host.docker.internal:host-gateway",
         "--env",
         `SANDBOX_ID=${sandboxId}`,
         "--env",
-        `PROVIDER_PUBLIC_KEY=${spec.publicKeyPem}`,
-        "--publish",
-        "127.0.0.1::8080",
+        `HOST_URL=${this.options.hostUrl}`,
+        "--env",
+        `REGISTRATION_TOKEN=${this.options.registrationToken}`,
         this.options.image,
       ]);
       return {
@@ -154,23 +159,6 @@ export class DockerBackend implements SandboxBackend {
       if (isMissingContainer(error)) return false;
       throw error;
     }
-  }
-
-  async connect(
-    reference: BackendReference,
-    auth: RunnerAuth,
-  ): Promise<RunnerClient> {
-    const ref = dockerReference(reference);
-    const { stdout } = await this.command([
-      "inspect",
-      "--format",
-      '{{(index (index .NetworkSettings.Ports "8080/tcp") 0).HostPort}}',
-      ref.containerId,
-    ]);
-    const port = Number.parseInt(stdout.trim(), 10);
-    if (!Number.isInteger(port))
-      throw new Error("Docker did not publish the runner port");
-    return connectToRunner(`http://127.0.0.1:${port}`, ref.sandboxId, auth);
   }
 
   private command(arguments_: string[]) {

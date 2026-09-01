@@ -1,8 +1,6 @@
-import {
-  createClient,
-  type Client,
-  type Interceptor,
-} from "@connectrpc/connect";
+import type { Duplex } from "node:stream";
+
+import { createClient, type Client } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-node";
 
 import {
@@ -17,7 +15,6 @@ import {
   type StatRequest,
   type WriteFileRequest,
 } from "./gen/dsh/sandbox/v1/runner_pb.js";
-import type { RunnerAuth } from "./types.js";
 
 type GeneratedClient = Client<typeof RunnerService>;
 type CallOptions = { signal?: AbortSignal; timeoutMs?: number };
@@ -86,26 +83,32 @@ export class RunnerClient {
   }
 }
 
-export function connectToRunner(
-  baseUrl: string,
-  sandboxId: string,
-  auth: RunnerAuth,
-): RunnerClient {
-  const authorization: Interceptor = (next) => async (request) => {
-    request.header.set(
-      "authorization",
-      `Bearer ${await auth.createToken(sandboxId)}`,
-    );
-    return next(request);
-  };
-
+/**
+ * Build a client speaking plain HTTP/2 over one runner-initiated tunnel
+ * socket. The socket carries exactly one HTTP/2 session: when it closes, the
+ * client is dead and the runner must register again.
+ */
+export function runnerClientForSocket(socket: Duplex): RunnerClient {
+  let used = false;
   const transport = createConnectTransport({
-    baseUrl,
+    // The runner ignores the authority; requests never leave this socket.
+    baseUrl: "http://dsh-runner.invalid",
     httpVersion: "2",
-    interceptors: [authorization],
+    nodeOptions: {
+      createConnection: () => {
+        if (used) throw new Error("runner tunnel is closed");
+        used = true;
+        return socket;
+      },
+    },
     pingIntervalMs: 30_000,
     pingIdleConnection: true,
     pingTimeoutMs: 10_000,
+    // The default closes idle sessions after 15 minutes. This tunnel is
+    // one-to-one with a registered runner and pings already detect a dead
+    // path, so closing an idle-but-healthy tunnel would only force a
+    // pointless re-registration. The cap is setTimeout's maximum delay.
+    idleConnectionTimeoutMs: 2 ** 31 - 1,
   });
 
   return new RunnerClient(createClient(RunnerService, transport));
