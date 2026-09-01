@@ -14,7 +14,10 @@ import { metrics, trace } from "@opentelemetry/api";
 import { DockerBackend } from "./backends/docker.js";
 import { KasBackend } from "./backends/kas.js";
 import { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
+import { InstructionStore } from "./instruction-store.js";
+import type { InstructionSettingsView } from "./instructions-remote.js";
 import { ProviderKeyStore } from "./key-store.js";
+import { ManagedInstructions } from "./managed-instructions.js";
 import { workbenchHost } from "./remote-contributions.js";
 import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { RunnerClient } from "./runner-client.js";
@@ -82,12 +85,14 @@ export interface ManagerDependencies {
   backend?: SandboxBackend;
   store?: SessionStore;
   broker?: CredentialBroker;
+  instructions?: InstructionStore;
   keys?: ProviderKeyStore;
   workspaceRegistry?: WorkspaceRegistryLike;
 }
 
 interface WorkspaceRegistryLike {
   create(path: string, title?: string): Promise<{ path: string }>;
+  list(): Array<{ path: string; title: string }>;
 }
 
 declare module "@deepseek-ai/cordis" {
@@ -132,6 +137,7 @@ export class SandboxManager extends TypertRemoteService {
   private readonly backend: SandboxBackend;
   private readonly store: SessionStore;
   private readonly broker: CredentialBroker;
+  private readonly instructions: ManagedInstructions;
   private readonly keys: ProviderKeyStore;
   private readonly workspaceRegistry: WorkspaceRegistryLike | undefined;
   private readonly ready: Promise<void>;
@@ -161,6 +167,20 @@ export class SandboxManager extends TypertRemoteService {
       });
     this.backend = dependencies.backend ?? createBackend(this.config);
     this.workspaceRegistry = dependencies.workspaceRegistry;
+    this.instructions = new ManagedInstructions(ctx, {
+      store:
+        dependencies.instructions ??
+        new InstructionStore(join(this.config.stateDir, "instructions.json")),
+      stateDir: this.config.stateDir,
+      ensureRunning: (agent) => this.ensureRunning(agent),
+      repositoryForSession: (sessionId) =>
+        this.store.get(sessionId)?.repositoryUrl,
+      workspaceRegistry: () =>
+        this.workspaceRegistry ??
+        (this.ctx.get("workspaceRegistry") as
+          | WorkspaceRegistryLike
+          | undefined),
+    });
     this.ready = this.initialize();
 
     // The Web API requires a directory-picker capability. This package owns
@@ -175,10 +195,7 @@ export class SandboxManager extends TypertRemoteService {
     });
 
     ctx.on("agent/session-start", ({ agent }) => this.ensureRunning(agent));
-    ctx.on("agent/pre-step", async ({ agent }, next) => {
-      await this.ensureRunning(agent);
-      return next();
-    });
+    this.instructions.install();
     ctx.on("agent/status", ({ agent, status }) => {
       if (status === "running") this.markActive(String(agent.id));
     });
@@ -229,6 +246,26 @@ export class SandboxManager extends TypertRemoteService {
     await this.ready;
     await this.broker.deleteSecret(name);
     return this.broker.secretNames();
+  }
+
+  async getInstructions(): Promise<InstructionSettingsView> {
+    await this.ready;
+    return this.instructions.getSettings();
+  }
+
+  async setGlobalInstructions(
+    content: string,
+  ): Promise<InstructionSettingsView> {
+    await this.ready;
+    return this.instructions.setGlobal(content);
+  }
+
+  async setWorkspaceInstructions(
+    repositoryUrl: string,
+    content: string,
+  ): Promise<InstructionSettingsView> {
+    await this.ready;
+    return this.instructions.setWorkspace(repositoryUrl, content);
   }
 
   async ensureRunning(agent: Agent): Promise<RunnerClient> {
@@ -300,6 +337,7 @@ export class SandboxManager extends TypertRemoteService {
       this.keys.initialize(),
       this.store.initialize(),
       this.broker.initialize(),
+      this.instructions.initialize(),
     ]);
     for (const record of this.store.values()) {
       if (record.state === "running") {

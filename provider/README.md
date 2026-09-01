@@ -42,6 +42,10 @@ The Web profile also gains a **Secrets** manager at the sidebar foot, beside
 Settings. It edits the same broker store as the CLI: the browser sends names
 and values in and receives only names back, never a value.
 
+The **Settings → Instructions** page manages AGENTS.md-style guidance at two
+scopes: one global layer and one layer for each repository Workspace. These
+layers live in host state rather than in repository checkouts.
+
 The bundle also disables dsh's local shell permission presets. The remote shell
 uses one fixed container boundary and does not claim to enforce those
 per-command sandbox modes.
@@ -63,21 +67,21 @@ Configuration is YAML in the profile's own layer,
     idleMs: 300000
 ```
 
-| Setting          | Default                 | Meaning                                           |
-| ---------------- | ----------------------- | ------------------------------------------------- |
-| `backend`        | `docker`                | `docker` or `kas`                                 |
-| `repository`     | session repository      | Fallback repository for non-anchor sessions       |
-| `revision`       | repository default      | Optional branch, tag, or commit to check out      |
-| `workspace`      | `/workspace/repository` | Repository checkout and working directory         |
-| `idleMs`         | 10 minutes              | Delay after a turn before hibernating             |
-| `expiresAfterMs` | 7 days                  | How long a hibernated workspace is retained       |
-| `stateDir`       | `~/.dsh-sandbox`        | Keys, records, broker data, and Workspace anchors |
-| `wipCommit`      | `false`                 | Make a local safety commit before hibernating     |
-| `docker.image`   | matching release tag    | Runner image used by Docker                       |
-| `docker.binary`  | `docker`                | Docker-compatible command                         |
-| `kas.namespace`  | `dsh-sandbox`           | Namespace containing claims and warm sandboxes    |
-| `kas.warmPool`   | `dsh-universal`         | Warm pool used for claims                         |
-| `kas.kubeconfig` | normal client lookup    | Optional kubeconfig path                          |
+| Setting          | Default                 | Meaning                                            |
+| ---------------- | ----------------------- | -------------------------------------------------- |
+| `backend`        | `docker`                | `docker` or `kas`                                  |
+| `repository`     | session repository      | Fallback repository for non-anchor sessions        |
+| `revision`       | repository default      | Optional branch, tag, or commit to check out       |
+| `workspace`      | `/workspace/repository` | Repository checkout and working directory          |
+| `idleMs`         | 10 minutes              | Delay after a turn before hibernating              |
+| `expiresAfterMs` | 7 days                  | How long a hibernated workspace is retained        |
+| `stateDir`       | `~/.dsh-sandbox`        | Keys, records, instructions, and Workspace anchors |
+| `wipCommit`      | `false`                 | Make a local safety commit before hibernating      |
+| `docker.image`   | matching release tag    | Runner image used by Docker                        |
+| `docker.binary`  | `docker`                | Docker-compatible command                          |
+| `kas.namespace`  | `dsh-sandbox`           | Namespace containing claims and warm sandboxes     |
+| `kas.warmPool`   | `dsh-universal`         | Warm pool used for claims                          |
+| `kas.kubeconfig` | normal client lookup    | Optional kubeconfig path                           |
 
 For a Web Workspace created by this package, the repository URL stored in its
 anchor takes precedence. Other sessions use `repository` when set, then run
@@ -116,6 +120,29 @@ The `tool-fs-search` row comes from this package and configures the sandbox
 
 A result past its inline cap is truncated with a note; the complete result is
 not saved to a spill file.
+
+### AGENTS.md instructions
+
+The Web UI's **Settings → Instructions** page stores model guidance without
+modifying a repository:
+
+- **Global · All workspaces** applies to every session managed by this host.
+- **Workspace · owner/repo** adds guidance only when that repository Workspace
+  is selected. Workspace guidance takes precedence over the global layer.
+- Checked-in `AGENTS.md` files still load normally. More-specific nested files
+  take precedence when the agent works below their directory.
+
+The current complete UI-managed baseline is added to durable model context on
+the next model request, usually after the next user message or tool call. It
+does not alter a request already in flight. If a setting changes, the new
+baseline explicitly supersedes the previous one; clearing the last active
+layer adds a corresponding removal notice. Literal `</system-reminder>` text
+is escaped inside the provider-owned frame.
+
+State is stored in the owner-only `stateDir/instructions.json` file, not in a
+checkout. Global plus workspace content is limited to 65,536 UTF-8 bytes for
+each effective workspace. Removing and later re-adding a Workspace with the
+same normalized repository URL restores its saved layer.
 
 ## CLI
 

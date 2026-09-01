@@ -8,6 +8,7 @@ import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { DirectoryFlowOwnerProps } from "@deepseek-ai/dsh-client-ui-workspace/client";
 
 import { workbenchRemote } from "../remote-contributions.js";
+import { InstructionsSettings } from "./instructions.js";
 import { SecretsFooterAction } from "./secrets.js";
 
 interface RepositoryDirectoryFlowProps extends DirectoryFlowOwnerProps {
@@ -142,6 +143,24 @@ export async function apply(ctx: ClientContext) {
       deleteSecret: async (name: string) =>
         unwrap(await remoteCtx.remote.sandboxManager.deleteSecret(name)),
     });
+    const injectedInstructions = () => ({
+      getInstructions: async () =>
+        unwrap(await remoteCtx.remote.sandboxManager.getInstructions()),
+      setGlobalInstructions: async (content: string) =>
+        unwrap(
+          await remoteCtx.remote.sandboxManager.setGlobalInstructions(content),
+        ),
+      setWorkspaceInstructions: async (
+        repositoryUrl: string,
+        content: string,
+      ) =>
+        unwrap(
+          await remoteCtx.remote.sandboxManager.setWorkspaceInstructions(
+            repositoryUrl,
+            content,
+          ),
+        ),
+    });
     remoteCtx.slots.inject(
       "sidebar.footer.action",
       function* registerSecrets() {
@@ -153,6 +172,21 @@ export async function apply(ctx: ClientContext) {
             inject: injected,
           },
           SecretsFooterAction,
+        );
+      },
+    );
+    remoteCtx.slots.inject(
+      "settings.section",
+      function* registerInstructions() {
+        yield remoteCtx.slots.register(
+          {
+            name: "settings.section",
+            id: "dsh-workbench.instructions",
+            order: 30,
+            label: "Instructions",
+            inject: injectedInstructions,
+          },
+          InstructionsSettings,
         );
       },
     );
