@@ -165,12 +165,12 @@ token plus the host's public tunnel URL.
    notes above (residual impersonation risk, TLS recommendation for the
    tunnel endpoint).
 
-## Open questions
+## Settled decisions
 
-- **Liveness/readiness probing.** Default: keep the plain `/health` listener
-  for the kubelet probe. Alternative is an exec probe; only worth it if we
-  want zero listeners.
-- **In-cluster TLS on the tunnel port.** Default: ship h2c in-cluster and
-  document that host authenticity then rests on the cluster network being
-  inside the trust domain; recommend TLS for any tunnel endpoint exposed
-  beyond the cluster.
+- **Liveness/readiness probing.** Keep the plain `/health` listener for the
+  kubelet probe. An exec probe is only worth revisiting if we ever want zero
+  listeners.
+- **In-cluster TLS on the tunnel port.** Ship h2c in-cluster and document
+  that host authenticity then rests on the cluster network being inside the
+  trust domain. Recommend TLS for any tunnel endpoint exposed beyond the
+  cluster.
