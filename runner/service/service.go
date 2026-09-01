@@ -148,7 +148,13 @@ func (s *Service) Exec(ctx context.Context, request *connect.Request[v1.ExecRequ
 	cmd := exec.Command(request.Msg.Argv[0], request.Msg.Argv[1:]...)
 	cmd.Dir = request.Msg.Cwd
 	cmd.Env = s.environment(request.Msg.Env)
-	cmd.Stdin = bytes.NewReader(request.Msg.Stdin)
+	// Empty stdin means "ignore": leave Stdin nil so the child reads the null
+	// device. Wiring an empty pipe instead would make tools that fall back to
+	// their workdir only for non-pipe stdin — ripgrep among them — silently
+	// search nothing.
+	if len(request.Msg.Stdin) > 0 {
+		cmd.Stdin = bytes.NewReader(request.Msg.Stdin)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

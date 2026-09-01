@@ -31,7 +31,7 @@ export function pathInSandbox(
   return posix.join(sandboxWorkspace, ...childPath.split(sep));
 }
 
-function isInsideSandboxWorkspace(
+export function isInsideSandboxWorkspace(
   path: string,
   sandboxWorkspace: string,
 ): boolean {

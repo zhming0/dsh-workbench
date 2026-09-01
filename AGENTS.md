@@ -69,8 +69,12 @@ likely to mislead you.
 - `shell` is built on top of `subprocess`, so `subprocess` is the seam that
   decides where a command actually runs.
 - `tool-fs-search` (`glob`, `grep`) injects `subprocess`, not `fs`, and spawns a
-  ripgrep binary resolved from the dsh host's `node_modules`. It cannot work
-  against a remote filesystem.
+  ripgrep binary resolved from the dsh host's `node_modules`. On its own it
+  cannot work against a remote filesystem; this repository's sandbox subprocess
+  seam translates host-frame workdirs and host-only executables so the stock
+  row still runs inside the sandbox. The package's `search` row
+  (`@zhming0/dsh-workbench/search`) is the exact implementation, but shipped
+  agent presets that restate the row by stock name load the stock row.
 - A plugin appears in the Web Plugins settings tab only if it both registers a
   settings namespace on the host and ships a hand-written browser card. A
   namespace alone renders nothing.

@@ -102,16 +102,18 @@ describe("search commands", () => {
   });
 
   it("builds the fixed rg --json argv for grep", () => {
-    expect(testing.buildGrepCommand({ pattern: "alpha" })).toEqual([
-      "--json",
-      "--regexp=alpha",
-    ]);
     expect(
-      testing.buildGrepCommand({
-        pattern: "alpha",
-        include: "*.ts",
-        path: "src",
-      }),
+      testing.buildGrepCommand({ pattern: "alpha" }, "/workspace/repo"),
+    ).toEqual(["--json", "--regexp=alpha", "--", "/workspace/repo"]);
+    expect(
+      testing.buildGrepCommand(
+        {
+          pattern: "alpha",
+          include: "*.ts",
+          path: "src",
+        },
+        "/workspace/repo",
+      ),
     ).toEqual(["--json", "--regexp=alpha", "--glob=*.ts", "--", "src"]);
   });
 
