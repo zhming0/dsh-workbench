@@ -37,6 +37,16 @@ try {
 
   await run(client, ["mkdir", "-p", `${workspace}/.git`, `${workspace}/.dsh`]);
   await client.writeFile({
+    path: `${workspace}/mise.toml`,
+    content: new TextEncoder().encode('[tools]\nnode = "24.19.0"\n'),
+    guard: { case: "createIfAbsent", value: true },
+  });
+  await run(client, ["mise", "install"], workspace);
+  const nodeVersion = await run(client, ["node", "--version"], workspace);
+  if (nodeVersion.trim() !== "v24.19.0") {
+    throw new Error(`mise installed unexpected Node version: ${nodeVersion.trim()}`);
+  }
+  await client.writeFile({
     path: `${workspace}/.dsh/setup.sh`,
     content: new TextEncoder().encode(
       `#!/bin/sh\nset -eu\nprintf 'workspace survived' > ${workspace}/sentinel\n`,
@@ -69,6 +79,14 @@ try {
   if (new TextDecoder().decode(sentinel.content) !== "workspace survived") {
     throw new Error("workspace content did not survive hibernation");
   }
+  const nodeVersionAfterWake = await run(
+    client,
+    ["node", "--version"],
+    workspace,
+  );
+  if (nodeVersionAfterWake.trim() !== "v24.19.0") {
+    throw new Error("mise-managed tools did not survive hibernation");
+  }
 
   process.stdout.write("PASS: Docker runner registration, tools, setup, and hibernate/wake\n");
 } finally {
@@ -96,16 +114,21 @@ async function waitForRunner(tunnel, sandboxId) {
   throw new Error(`runner did not become ready: ${String(lastError)}`);
 }
 
-async function run(client, argv) {
+async function run(client, argv, cwd = "/workspace") {
+  let stdout = "";
   let stderr = "";
   let exited = false;
   for await (const response of client.exec({
     argv,
-    cwd: "/workspace",
+    cwd,
     env: {},
     stdin: new Uint8Array(),
   })) {
-    if (response.event.case === "stdout") process.stdout.write(response.event.value);
+    if (response.event.case === "stdout") {
+      const chunk = new TextDecoder().decode(response.event.value);
+      stdout += chunk;
+      process.stdout.write(chunk);
+    }
     if (response.event.case === "stderr") {
       stderr += new TextDecoder().decode(response.event.value);
     }
@@ -124,4 +147,5 @@ async function run(client, argv) {
     }
   }
   if (!exited) throw new Error("command stream ended without an exit status");
+  return stdout;
 }

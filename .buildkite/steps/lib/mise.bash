@@ -5,9 +5,9 @@
 # something has to exist before mise can read its own config. The version and
 # checksums match runner/Dockerfile so CI and the sandbox image install the same
 # mise release.
-MISE_VERSION="2026.8.12"
-MISE_SHA256_x64="28027bc9b245b7c2e669cbfbc61cdfa1b8d4ecdd103d09070c75c8a85304d3be"
-MISE_SHA256_arm64="ca536cb34d746a1caa1ad43d37c548e0f45c1d4192b2eaac38dc400d23940c7d"
+MISE_VERSION="2026.8.16"
+MISE_SHA256_x64="1445289f35e1a5a7216e1ffee5b34c5b9bd46793224e7e6c335503de9d9df0b2"
+MISE_SHA256_arm64="21a03117d27028b1b4602bc83d9aefdccd55325ac3da45f7e28c9320627dcdc6"
 
 # corepack asks before downloading a package manager, which would hang a step.
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
