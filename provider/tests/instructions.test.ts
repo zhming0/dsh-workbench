@@ -8,7 +8,7 @@ import {
   InstructionStore,
   MAX_INSTRUCTIONS_BYTES,
 } from "../src/instruction-store.js";
-import { testing } from "../src/index.js";
+import { testing } from "../src/managed-instructions.js";
 
 describe("UI-managed AGENTS.md instructions", () => {
   let directory: string;
