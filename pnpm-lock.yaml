@@ -71,9 +71,6 @@ importers:
       '@opentelemetry/api':
         specifier: 1.9.0
         version: 1.9.0
-      jose:
-        specifier: 6.2.10
-        version: 6.2.10
     devDependencies:
       '@deepseek-ai/dsh-api-remotes':
         specifier: 0.1.1-rc.2

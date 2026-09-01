@@ -47,8 +47,9 @@ uses one fixed container boundary and does not claim to enforce those
 per-command sandbox modes.
 
 The default backend uses Docker on the same machine as dsh. The Kubernetes
-backend uses Kubernetes SIG agent-sandbox and must run somewhere that can reach
-in-cluster Sandbox service names.
+backend uses Kubernetes SIG agent-sandbox. Runners connect out to the host's
+tunnel listener, so the host never dials into a sandbox; it only needs to be
+reachable by the runners it manages.
 
 ## Settings
 
@@ -63,21 +64,25 @@ Configuration is YAML in the profile's own layer,
     idleMs: 300000
 ```
 
-| Setting          | Default                 | Meaning                                           |
-| ---------------- | ----------------------- | ------------------------------------------------- |
-| `backend`        | `docker`                | `docker` or `kas`                                 |
-| `repository`     | session repository      | Fallback repository for non-anchor sessions       |
-| `revision`       | repository default      | Optional branch, tag, or commit to check out      |
-| `workspace`      | `/workspace/repository` | Repository checkout and working directory         |
-| `idleMs`         | 10 minutes              | Delay after a turn before hibernating             |
-| `expiresAfterMs` | 7 days                  | How long a hibernated workspace is retained       |
-| `stateDir`       | `~/.dsh-sandbox`        | Keys, records, broker data, and Workspace anchors |
-| `wipCommit`      | `false`                 | Make a local safety commit before hibernating     |
-| `docker.image`   | matching release tag    | Runner image used by Docker                       |
-| `docker.binary`  | `docker`                | Docker-compatible command                         |
-| `kas.namespace`  | `dsh-sandbox`           | Namespace containing claims and warm sandboxes    |
-| `kas.warmPool`   | `dsh-universal`         | Warm pool used for claims                         |
-| `kas.kubeconfig` | normal client lookup    | Optional kubeconfig path                          |
+| Setting             | Default                 | Meaning                                            |
+| ------------------- | ----------------------- | -------------------------------------------------- |
+| `backend`           | `docker`                | `docker` or `kas`                                  |
+| `repository`        | session repository      | Fallback repository for non-anchor sessions        |
+| `revision`          | repository default      | Optional branch, tag, or commit to check out       |
+| `workspace`         | `/workspace/repository` | Repository checkout and working directory          |
+| `idleMs`            | 10 minutes              | Delay after a turn before hibernating              |
+| `expiresAfterMs`    | 7 days                  | How long a hibernated workspace is retained        |
+| `stateDir`          | `~/.dsh-sandbox`        | Records, broker data, token, and Workspace anchors |
+| `wipCommit`         | `false`                 | Make a local safety commit before hibernating      |
+| `registrationToken` | see below               | Token(s) runners must present, comma-separated     |
+| `tunnel.port`       | `8081`                  | Port the host listens on for runner tunnels        |
+| `tunnel.bind`       | `0.0.0.0`               | Address the tunnel listener binds to               |
+| `docker.image`      | matching release tag    | Runner image used by Docker                        |
+| `docker.binary`     | `docker`                | Docker-compatible command                          |
+| `docker.hostUrl`    | `host.docker.internal`  | `HOST_URL` runners dial, `tcp://` or `tls://`      |
+| `kas.namespace`     | `dsh-sandbox`           | Namespace containing claims and warm sandboxes     |
+| `kas.warmPool`      | `dsh-universal`         | Warm pool used for claims                          |
+| `kas.kubeconfig`    | normal client lookup    | Optional kubeconfig path                           |
 
 For a Web Workspace created by this package, the repository URL stored in its
 anchor takes precedence. Other sessions use `repository` when set, then run
@@ -128,7 +133,6 @@ a chat transcript is durable. They go through this package's CLI, which
 dsh-workbench secret list
 printf '%s' VALUE | dsh-workbench secret set NAME
 dsh-workbench secret delete NAME
-dsh-workbench key public
 ```
 
 It reads one environment variable and takes no flags:
@@ -158,17 +162,22 @@ are created with owner-only permissions. The runner receives current values in
 memory before it starts a command. Git credentials are served through a Unix
 socket and are never written to the workspace.
 
-## Kubernetes key setup
+## Registration token
 
-Kubernetes warm pods need the provider's public key before a session claims
-them, because a pod exists before any session binds to it. Generate the key from
-the same `stateDir` dsh uses:
+A runner authenticates its tunnel with a shared registration token, presented
+in the connection handshake. The provider resolves the accepted tokens in this
+order:
 
-```sh
-dsh-workbench key public > /tmp/dsh-provider.pub
-```
+1. `registrationToken` in settings — comma-separated to accept several during
+   rotation. The first token is the one injected into new sandboxes.
+2. The `DSH_WORKBENCH_REGISTRATION_TOKEN` environment variable, same format.
+3. Docker backend only: a token generated on first run and persisted at
+   `stateDir/registration-token` with owner-only permissions. The Kubernetes
+   backend refuses to start without an explicit token, because warm pods need
+   the same token before any session claims them.
 
-The private key never goes into Kubernetes. See
+For Kubernetes, put the token in the `dsh-registration-token` Secret in the
+sandbox namespace and in the host's environment. See
 [`docs/kubernetes.md`](https://github.com/zhming0/dsh-workbench/blob/main/docs/kubernetes.md).
 
 ## Limits

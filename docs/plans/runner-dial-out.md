@@ -148,6 +148,8 @@ token plus the host's public tunnel URL.
 
 ## Delivery slices
 
+All four slices are implemented in this PR; the list records the build order.
+
 1. **Tunnel core, proven on Docker.** Handshake + provider registry +
    runner dial-loop; the runner temporarily serves both paths so the tree
    stays green. Docker backend switches to the tunnel. The Node

@@ -61,9 +61,8 @@ echo "Adopted Sandbox/$sandbox in ${adoption_ms}ms"
 (( adoption_ms < 1000 )) || { echo "error: warm Sandbox adoption took 1s or longer" >&2; exit 1; }
 kubectl -n "$NAMESPACE" wait --for=condition=Ready "sandboxclaim/$MAIN_CLAIM" --timeout="$TIMEOUT"
 
-fqdn="$(kubectl -n "$NAMESPACE" get sandbox "$sandbox" -o jsonpath='{.status.serviceFQDN}')"
-[[ -n "$fqdn" ]] || { echo "error: Sandbox has no service endpoint" >&2; exit 1; }
-echo "Endpoint: ${fqdn}:8080"
+# Runners dial the host tunnel, so the Sandbox has no Service; only the
+# in-pod health listener is checked here.
 selector="$(kubectl -n "$NAMESPACE" get sandbox "$sandbox" -o jsonpath='{.status.selector}')"
 [[ -n "$selector" ]] || { echo "error: Sandbox has no status.selector" >&2; exit 1; }
 pod="$(kubectl -n "$NAMESPACE" get pods -l "$selector" -o jsonpath='{.items[0].metadata.name}')"

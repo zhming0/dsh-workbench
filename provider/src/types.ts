@@ -1,11 +1,8 @@
-import type { RunnerClient } from "./runner-client.js";
-
 export type BackendReference = Record<string, unknown>;
 
 export interface SandboxSpec {
   sessionId: string;
   repositoryUrl: string;
-  publicKeyPem: string;
 }
 
 export interface SandboxHandle {
@@ -24,11 +21,10 @@ export class SandboxNotFoundError extends Error {
   }
 }
 
-export interface RunnerAuth {
-  createToken(sandboxId: string): Promise<string>;
-}
-
-/** A backend owns acquisition and transport establishment, not session policy. */
+/**
+ * A backend owns sandbox acquisition and lifecycle, not transport: runners
+ * dial the host tunnel themselves, so there is no connect() here.
+ */
 export interface SandboxBackend {
   readonly name: string;
   readonly capabilities: BackendCapabilities;
@@ -38,7 +34,6 @@ export interface SandboxBackend {
   destroy(reference: BackendReference): Promise<void>;
   expireAt(reference: BackendReference, deadline: Date): Promise<void>;
   health(reference: BackendReference): Promise<boolean>;
-  connect(reference: BackendReference, auth: RunnerAuth): Promise<RunnerClient>;
 }
 
 export type SandboxState = "running" | "hibernated";

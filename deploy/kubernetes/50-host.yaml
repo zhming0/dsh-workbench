@@ -1,8 +1,14 @@
 # The dsh host: one dsh web server whose sessions each run in their own
 # sandbox in this namespace. Everything durable — dsh sessions, the seeded
-# profile with your cordis.patch.yml, and the provider's signing key and
-# session records — lives on the dsh-host-data volume, mounted at the
-# container user's home directory.
+# profile with your cordis.patch.yml, and the provider's session records —
+# lives on the dsh-host-data volume, mounted at the container user's home
+# directory.
+#
+# Runners dial the host on the tunnel port (8081, the dsh-host-tunnel
+# Service) and authenticate with the shared registration token. Create that
+# Secret before applying these manifests:
+#   kubectl -n dsh-sandbox create secret generic dsh-registration-token \
+#     --from-literal=token=$(openssl rand -hex 32)
 #
 # dsh binds loopback by design and ships no user authentication. For yourself,
 # reach it with `kubectl port-forward deploy/dsh-host 3000:3000 -n dsh-sandbox`.
@@ -54,6 +60,16 @@ spec:
       containers:
         - name: dsh-host
           image: DSH_HOST_IMAGE_PLACEHOLDER
+          env:
+            - name: DSH_WORKBENCH_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dsh-registration-token
+                  key: token
+          ports:
+            - name: tunnel
+              containerPort: 8081
+              protocol: TCP
           # The server binds 127.0.0.1:3000, so a TCP probe against the pod IP
           # cannot reach it; probe over loopback from inside the container.
           readinessProbe:
@@ -81,3 +97,20 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: dsh-host-data
+---
+# The stable in-cluster address runners dial; the sandbox template's HOST_URL
+# points here. The tunnel is h2c inside the cluster: host authenticity rests
+# on the cluster network being inside the trust domain. Put TLS in front of
+# any tunnel endpoint exposed beyond the cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: dsh-host-tunnel
+  namespace: dsh-sandbox
+spec:
+  selector:
+    app.kubernetes.io/name: dsh-host
+  ports:
+    - name: tunnel
+      port: 8081
+      targetPort: tunnel

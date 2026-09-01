@@ -28,23 +28,26 @@ scripts/kas/smoke-test.sh --namespace dsh-sandbox
 scripts/kas/teardown.sh
 ```
 
-With `--host-image`, the dsh host itself runs in the cluster and the script
-reads the runner public key from its pod. The script applies the raw
-manifests, so the dev host runs without the OIDC proxy and is reached over
+With `--host-image`, the dsh host itself runs in the cluster and runners dial
+its `dsh-host-tunnel` Service. The script applies the raw manifests, so the
+dev host runs without the OIDC proxy and is reached over
 `kubectl port-forward` — no identity provider needed. To run dsh outside the
-cluster instead, omit it and pass the external provider's key:
+cluster instead, omit it and tell the runners where to dial:
 
 ```sh
-node provider/dist/cli.js key public > /tmp/dsh-provider.pub
 scripts/kas/dev-cluster.sh \
   --runner-image dsh-runner:dev \
-  --public-key-file /tmp/dsh-provider.pub \
+  --host-url tcp://192.0.2.10:8081 \
   --load-runner-image
 ```
 
 `--load-runner-image` is for images already present in the local Docker daemon.
-Omit it when the images are pullable by the cluster. `--public-key-file` must
-be the public half of the key in the provider's configured state directory.
+Omit it when the images are pullable by the cluster. The script generates a
+registration token (or reads `--registration-token-file`) and stores it in the
+`dsh-registration-token` Secret, which both the host Deployment and the warm
+runner pods read. With `--host-url`, hand the same token to the external dsh
+host through `DSH_WORKBENCH_REGISTRATION_TOKEN`, make the address reachable
+from pods, and widen the sandbox NetworkPolicy egress to it.
 The script creates `kind-dsh-kas`,
 installs exactly the v0.5.4 release asset `sandbox-with-extensions.yaml`, waits
 for its CRDs and controllers, and applies `deploy/kubernetes`. It is
@@ -73,27 +76,23 @@ kubectl -n dsh-sandbox create secret generic dsh-host-oidc \
   --from-literal=OAUTH2_PROXY_CLIENT_SECRET=… \
   --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')"
 
+# The registration token both the host and every runner read. It must exist
+# before the manifests are applied — warm pods and the host mount it.
+kubectl -n dsh-sandbox create secret generic dsh-registration-token \
+  --from-literal=token="$(openssl rand -hex 32)"
+
 # Edit DSH_RUNNER_IMAGE_PLACEHOLDER, DSH_HOST_IMAGE_PLACEHOLDER, and
 # dsh.example.com in host-oidc.yaml first.
 kubectl apply -k deploy/kubernetes
 kubectl -n dsh-sandbox rollout status deployment/dsh-host --timeout=300s
-
-# Replace the placeholder public key with the host pod's real key, then let
-# the pool recreate warm pods with it (see "The in-cluster dsh host" below).
-kubectl -n dsh-sandbox exec deploy/dsh-host -- dsh-workbench key public \
-  > /tmp/dsh-provider.pub
-kubectl -n dsh-sandbox create configmap dsh-runner-public-key \
-  --from-file=public-key.pem=/tmp/dsh-provider.pub \
-  --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n dsh-sandbox delete sandbox --all
 
 kubectl -n dsh-sandbox wait --for=jsonpath='{.status.readyReplicas}'=1 \
   sandboxwarmpool/dsh-universal --timeout=300s
 scripts/kas/smoke-test.sh -n dsh-sandbox
 ```
 
-Do not deploy the placeholder public key in a trusted environment. The template
-contains no session-specific environment variables or Secrets. Claim `env` or
+The template contains no session-specific environment variables or Secrets;
+the registration token is the same for every runner by design. Claim `env` or
 `volumeClaimTemplates` overrides force a cold start instead of adopting a warm
 Sandbox, so both injection policies are deliberately `Disallowed`.
 
@@ -104,8 +103,8 @@ Sandbox, so both injection policies are deliberately `Disallowed`.
 Replace `DSH_HOST_IMAGE_PLACEHOLDER` with a released tag. Its home directory is
 the `dsh-host-data` volume, which carries everything durable: dsh sessions and
 storages, the seeded `web` profile with your `cordis.patch.yml`, and the
-provider's signing key and session records. Deleting the pod loses nothing;
-deleting the PVC loses all of it.
+provider's session records. Deleting the pod loses nothing; deleting the PVC
+loses all of it.
 
 The seeded configuration already selects `backend: kas` with this namespace and
 warm pool, and the provider talks to the API server with the automounted
@@ -117,26 +116,25 @@ kubectl -n dsh-sandbox exec -it deploy/dsh-host -- \
   vi /data/.dsh/profiles/web/cordis.patch.yml
 ```
 
-**Publish the host's public key.** The provider generates its signing key on
-first boot, and runners read the trusted public key once, at pod start. So the
-order matters: deploy the host, publish its key, then create warm pods.
+**The registration token** authenticates every runner tunnel. The host reads
+it from `DSH_WORKBENCH_REGISTRATION_TOKEN` and each runner pod reads it from
+the same `dsh-registration-token` Secret, both at start. To rotate it, set the
+new value in the Secret, restart the host, and recycle the warm pods so they
+pick it up:
 
 ```sh
-kubectl -n dsh-sandbox rollout status deployment/dsh-host
-kubectl -n dsh-sandbox exec deploy/dsh-host -- dsh-workbench key public \
-  > /tmp/dsh-provider.pub
-kubectl -n dsh-sandbox create configmap dsh-runner-public-key \
-  --from-file=public-key.pem=/tmp/dsh-provider.pub \
+kubectl -n dsh-sandbox create secret generic dsh-registration-token \
+  --from-literal=token="$(openssl rand -hex 32)" \
   --dry-run=client -o yaml | kubectl apply -f -
-```
-
-If warm pods were already created with a different key, recycle them:
-
-```sh
+kubectl -n dsh-sandbox rollout restart deployment/dsh-host
 kubectl -n dsh-sandbox delete sandbox --all
 ```
 
-The pool recreates them with the updated ConfigMap.
+For a gap-free rotation, first patch the host Deployment's
+`DSH_WORKBENCH_REGISTRATION_TOKEN` to a literal `new,old` value (comma
+separated, new first — the host accepts every listed token), then update the
+Secret to the new token alone, recycle the warm pods, and finally drop the old
+token from the host.
 
 **Credentials and secrets** go through the Web UI's Secrets page or the same
 CLI, never through YAML. A secret named `GITHUB_TOKEN` also serves as the Git
@@ -225,15 +223,18 @@ same sessions, credentials, and sandboxes. Restrict
 
 ## Connectivity and isolation
 
-Each Sandbox gets a headless Service (`service: true`). Its runner endpoint is
-only available in-cluster at the assigned Sandbox's
-**`status.serviceFQDN:8080`**; it is not an ingress or a public URL. The claim's
-`status.sandbox.name` identifies that Sandbox. The provider process therefore
-needs an in-cluster route or an equivalent private network path.
+A Sandbox has no Service (`service: false`) and accepts no ingress at all. The
+runner dials out to the host's `dsh-host-tunnel` Service on port 8081,
+authenticates with the registration token, and all RPCs flow host→runner over
+that runner-initiated tunnel. The claim's `status.sandbox.name` identifies the
+Sandbox; the runner presents the same name in its handshake and the provider
+verifies it. In-cluster the tunnel is h2c: host authenticity rests on the
+cluster network being inside the trust domain. Put TLS (`tls://` in
+`HOST_URL`) in front of any tunnel endpoint exposed beyond the cluster.
 
 The template asks the extension controller to manage a default-deny
-NetworkPolicy. Ingress allows TCP 8080 only from the `dsh-sandbox` namespace.
-The egress allow-list contains DNS to kube-dns (TCP/UDP 53) and HTTPS (TCP 443).
+NetworkPolicy. Ingress is empty. The egress allow-list contains the tunnel to
+the dsh-host pod (TCP 8081), DNS to kube-dns (TCP/UDP 53), and HTTPS (TCP 443).
 Everything else is denied by a conforming NetworkPolicy CNI. The broad 443 rule
 also permits cluster and private addresses on 443, potentially including the
 API server; production deployments should replace it with approved CIDRs or an
@@ -242,9 +243,9 @@ is connectivity control, not a sandbox boundary.
 
 The pod does not mount a service-account token and runs non-root with dropped
 capabilities and RuntimeDefault seccomp. The `dsh-provider` Role is namespace
-scoped: it manages claims, reads/patches Sandboxes for lifecycle operations,
-and reads only the runner public-key ConfigMap. Bind a real provider workload's
-ServiceAccount to this Role rather than granting cluster-admin.
+scoped: it manages claims and reads/patches Sandboxes for lifecycle operations.
+Bind a real provider workload's ServiceAccount to this Role rather than
+granting cluster-admin.
 
 The checked-in template uses the cluster's default runtime (normally `runc`) so
 it works in kind. `runc` provides container isolation, not a VM security
@@ -258,11 +259,10 @@ it. Use node selectors/tolerations where only some nodes support gVisor.
 Typical output resembles:
 
 ```text
-Adopted Sandbox/dsh-universal-abc12 in 180ms (under 1s: yes)
-Endpoint: dsh-universal-abc12.dsh-sandbox.svc.cluster.local:8080
+Adopted Sandbox/dsh-universal-abc12 in 180ms
 Suspended: pod removed; PVC/workspace-dsh-universal-abc12 remains
 Resumed in 2400ms; workspace sentinel verified
-shutdownTime foreground deletion verified
+shutdownTime foreground deletion and workspace cleanup verified
 PASS: agent-sandbox warm adoption, suspend/resume persistence, and expiry
 ```
 
@@ -279,9 +279,10 @@ expired Sandboxes never return to the warm pool. A pool replenishes with a new
 Sandbox after adoption; an adopted Sandbox is not recycled.
 
 The v0.5.4 controller normally gives a warm Sandbox and its backing pod the
-same name. The runner reads that pod name through the downward API and checks it
-against provider tokens. The smoke test verifies this identity rule and fails
-closed if a future controller changes it.
+same name. The runner reads that pod name through the downward API and presents
+it as its identity in the tunnel handshake and Health responses, which the
+provider checks against the assigned Sandbox name. The smoke test verifies this
+identity rule and fails closed if a future controller changes it.
 
 ## OpenTelemetry
 

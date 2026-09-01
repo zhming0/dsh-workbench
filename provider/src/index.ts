@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -14,11 +16,11 @@ import { metrics, trace } from "@opentelemetry/api";
 import { DockerBackend } from "./backends/docker.js";
 import { KasBackend } from "./backends/kas.js";
 import { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
-import { ProviderKeyStore } from "./key-store.js";
 import { workbenchHost } from "./remote-contributions.js";
 import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { RunnerClient } from "./runner-client.js";
 import { SessionStore } from "./state-store.js";
+import { TunnelServer, type RunnerGateway } from "./tunnel.js";
 import { SandboxNotFoundError } from "./types.js";
 import type { SandboxBackend, SessionRecord } from "./types.js";
 import {
@@ -46,14 +48,19 @@ export interface Config {
   idleMs?: number;
   expiresAfterMs?: number;
   wipCommit?: boolean;
+  registrationToken?: string;
+  tunnel?: {
+    port?: number;
+    bind?: string;
+  };
   docker?: {
     image?: string;
     binary?: string;
+    hostUrl?: string;
   };
   kas?: {
     namespace?: string;
     warmPool?: string;
-    runnerPort?: number;
     readyTimeoutMs?: number;
     kubeconfig?: string;
   };
@@ -68,11 +75,12 @@ interface ResolvedConfig {
   idleMs: number;
   expiresAfterMs: number;
   wipCommit: boolean;
-  docker: { image: string; binary?: string };
+  registrationToken?: string;
+  tunnel: { port: number; bind: string };
+  docker: { image: string; binary?: string; hostUrl: string };
   kas: {
     namespace: string;
     warmPool: string;
-    runnerPort: number;
     readyTimeoutMs: number;
     kubeconfig?: string;
   };
@@ -82,7 +90,7 @@ export interface ManagerDependencies {
   backend?: SandboxBackend;
   store?: SessionStore;
   broker?: CredentialBroker;
-  keys?: ProviderKeyStore;
+  gateway?: RunnerGateway;
   workspaceRegistry?: WorkspaceRegistryLike;
 }
 
@@ -114,14 +122,19 @@ export class SandboxManager extends TypertRemoteService {
       .min(1)
       .default(7 * 24 * 60 * 60_000),
     wipCommit: z.boolean().default(false),
+    registrationToken: z.string(),
+    tunnel: z.object({
+      port: z.natural().min(1).max(65_535).default(8081),
+      bind: z.string().default("0.0.0.0"),
+    }),
     docker: z.object({
       image: z.string().default(DEFAULT_RUNNER_IMAGE),
       binary: z.string(),
+      hostUrl: z.string(),
     }),
     kas: z.object({
       namespace: z.string().default("dsh-sandbox"),
       warmPool: z.string().default("dsh-universal"),
-      runnerPort: z.natural().min(1).max(65_535).default(8080),
       readyTimeoutMs: z.number().min(1).default(180_000),
       kubeconfig: z.string(),
     }),
@@ -132,7 +145,8 @@ export class SandboxManager extends TypertRemoteService {
   private readonly backend: SandboxBackend;
   private readonly store: SessionStore;
   private readonly broker: CredentialBroker;
-  private readonly keys: ProviderKeyStore;
+  private readonly gateway: RunnerGateway;
+  private readonly ownedTunnel: TunnelServer | undefined;
   private readonly workspaceRegistry: WorkspaceRegistryLike | undefined;
   private readonly ready: Promise<void>;
   private readonly operations = new Map<string, Promise<void>>();
@@ -148,9 +162,6 @@ export class SandboxManager extends TypertRemoteService {
     super(ctx, "sandboxManager");
     this.config = resolveConfig(config);
     this.workspace = this.config.workspace;
-    this.keys =
-      dependencies.keys ??
-      new ProviderKeyStore(join(this.config.stateDir, "provider-key.pem"));
     this.store =
       dependencies.store ??
       new SessionStore(join(this.config.stateDir, "sessions.json"));
@@ -159,7 +170,26 @@ export class SandboxManager extends TypertRemoteService {
       new CredentialBroker({
         path: join(this.config.stateDir, "broker.json"),
       });
-    this.backend = dependencies.backend ?? createBackend(this.config);
+    let tokens: string[] = [];
+    if (
+      dependencies.gateway === undefined ||
+      dependencies.backend === undefined
+    ) {
+      tokens = resolveRegistrationTokens(this.config);
+    }
+    if (dependencies.gateway === undefined) {
+      this.ownedTunnel = new TunnelServer({
+        port: this.config.tunnel.port,
+        bind: this.config.tunnel.bind,
+        tokens,
+        log: (message) => this.ctx.logger("sandbox").info(message),
+      });
+      this.gateway = this.ownedTunnel;
+    } else {
+      this.gateway = dependencies.gateway;
+    }
+    this.backend =
+      dependencies.backend ?? createBackend(this.config, tokens[0] as string);
     this.workspaceRegistry = dependencies.workspaceRegistry;
     this.ready = this.initialize();
 
@@ -188,6 +218,7 @@ export class SandboxManager extends TypertRemoteService {
     ctx.effect(() => () => {
       for (const timer of this.idleTimers.values()) clearTimeout(timer);
       this.idleTimers.clear();
+      void this.ownedTunnel?.close();
     });
   }
 
@@ -293,13 +324,14 @@ export class SandboxManager extends TypertRemoteService {
       transitions.add(1, { backend: this.backend.name, transition: "missing" });
     }
     this.clients.delete(sessionId);
+    this.gateway.drop(record.sandboxId);
   }
 
   private async initialize(): Promise<void> {
     await Promise.all([
-      this.keys.initialize(),
       this.store.initialize(),
       this.broker.initialize(),
+      this.ownedTunnel?.listen(),
     ]);
     for (const record of this.store.values()) {
       if (record.state === "running") {
@@ -336,6 +368,7 @@ export class SandboxManager extends TypertRemoteService {
       new Date(record.expiresAt).getTime() <= Date.now()
     ) {
       await this.backend.destroy(record.reference);
+      this.gateway.drop(record.sandboxId);
       await this.store.delete(sessionId);
       record = undefined;
     }
@@ -402,7 +435,6 @@ export class SandboxManager extends TypertRemoteService {
       const handle = await this.backend.provision({
         sessionId,
         repositoryUrl,
-        publicKeyPem: this.keys.publicKeyPem,
       });
       claimLatency.record(Date.now() - started, { backend: this.backend.name });
       record = {
@@ -438,7 +470,10 @@ export class SandboxManager extends TypertRemoteService {
     let lastError: unknown;
     while (Date.now() < deadline) {
       try {
-        const client = await this.backend.connect(record.reference, this.keys);
+        const client = await this.gateway.waitFor(
+          record.sandboxId,
+          Math.max(deadline - Date.now(), 1),
+        );
         const health = await client.health({ timeoutMs: 5_000 });
         if (health.sandboxId !== record.sandboxId) {
           throw new Error(
@@ -448,6 +483,9 @@ export class SandboxManager extends TypertRemoteService {
         return client;
       } catch (error) {
         lastError = error;
+        // Sever a registration whose tunnel cannot answer a health probe so
+        // the runner reconnects instead of staying wedged.
+        this.gateway.drop(record.sandboxId);
         await delay(500);
       }
     }
@@ -570,6 +608,7 @@ export class SandboxManager extends TypertRemoteService {
 
 function resolveConfig(config: Config): ResolvedConfig {
   const stateDir = config.stateDir ?? join(homedir(), ".dsh-sandbox");
+  const tunnelPort = config.tunnel?.port ?? 8081;
   const resolved: ResolvedConfig = {
     backend: config.backend ?? "docker",
     stateDir,
@@ -581,16 +620,26 @@ function resolveConfig(config: Config): ResolvedConfig {
     idleMs: config.idleMs ?? 10 * 60_000,
     expiresAfterMs: config.expiresAfterMs ?? 7 * 24 * 60 * 60_000,
     wipCommit: config.wipCommit ?? false,
+    ...(config.registrationToken === undefined
+      ? {}
+      : { registrationToken: config.registrationToken }),
+    tunnel: {
+      port: tunnelPort,
+      bind: config.tunnel?.bind ?? "0.0.0.0",
+    },
     docker: {
       image: config.docker?.image ?? DEFAULT_RUNNER_IMAGE,
       ...(config.docker?.binary === undefined
         ? {}
         : { binary: config.docker.binary }),
+      // host-gateway resolves the Docker host from inside a container on
+      // every Docker platform, so runners reach the host tunnel by default.
+      hostUrl:
+        config.docker?.hostUrl ?? `tcp://host.docker.internal:${tunnelPort}`,
     },
     kas: {
       namespace: config.kas?.namespace ?? "dsh-sandbox",
       warmPool: config.kas?.warmPool ?? "dsh-universal",
-      runnerPort: config.kas?.runnerPort ?? 8080,
       readyTimeoutMs: config.kas?.readyTimeoutMs ?? 180_000,
       ...(config.kas?.kubeconfig === undefined
         ? {}
@@ -609,10 +658,53 @@ function resolveConfig(config: Config): ResolvedConfig {
   return resolved;
 }
 
-function createBackend(config: ResolvedConfig): SandboxBackend {
+function createBackend(
+  config: ResolvedConfig,
+  registrationToken: string,
+): SandboxBackend {
   return config.backend === "docker"
-    ? new DockerBackend(config.docker)
+    ? new DockerBackend({ ...config.docker, registrationToken })
     : new KasBackend(config.kas);
+}
+
+const TOKEN_ENV = "DSH_WORKBENCH_REGISTRATION_TOKEN";
+
+/**
+ * The shared secret runners present when they dial the host tunnel. Accepts
+ * a comma-separated list so a rotation can admit old and new tokens at once;
+ * new sandboxes always receive the first entry.
+ */
+function resolveRegistrationTokens(config: ResolvedConfig): string[] {
+  const configured = config.registrationToken ?? process.env[TOKEN_ENV];
+  if (configured !== undefined) {
+    const tokens = configured
+      .split(",")
+      .map((token) => token.trim())
+      .filter((token) => token !== "");
+    if (tokens.length === 0) {
+      throw new Error("the configured registration token is empty");
+    }
+    return tokens;
+  }
+  if (config.backend !== "docker") {
+    throw new Error(
+      `the ${config.backend} backend needs a registration token; set ${TOKEN_ENV} or the registrationToken config`,
+    );
+  }
+  // Docker development runs host and runners on one machine, so the provider
+  // can mint its own token. Persisting it keeps sandboxes from an earlier
+  // provider process registerable after a restart.
+  const path = join(config.stateDir, "registration-token");
+  try {
+    const existing = readFileSync(path, "utf8").trim();
+    if (existing !== "") return [existing];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  mkdirSync(config.stateDir, { recursive: true, mode: 0o700 });
+  const token = randomBytes(32).toString("hex");
+  writeFileSync(path, `${token}\n`, { mode: 0o600 });
+  return [token];
 }
 
 function delay(milliseconds: number): Promise<void> {
@@ -622,6 +714,8 @@ function delay(milliseconds: number): Promise<void> {
 export { DockerBackend } from "./backends/docker.js";
 export { KasBackend } from "./backends/kas.js";
 export { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
+export { TunnelServer } from "./tunnel.js";
+export type { RunnerGateway } from "./tunnel.js";
 export { SandboxNotFoundError } from "./types.js";
 export type { SandboxBackend } from "./types.js";
 export default SandboxManager;

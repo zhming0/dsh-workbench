@@ -7,18 +7,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
-	"connectrpc.com/connect"
-	"github.com/zhming0/dsh-sandbox/runner/auth"
 	"github.com/zhming0/dsh-sandbox/runner/credentials"
 	"github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1/sandboxv1connect"
 	"github.com/zhming0/dsh-sandbox/runner/service"
 	"github.com/zhming0/dsh-sandbox/runner/telemetry"
+	"github.com/zhming0/dsh-sandbox/runner/tunnel"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 )
 
 func getenv(key, fallback string) string {
@@ -43,20 +41,32 @@ func main() {
 		log.Fatal(err)
 	}
 }
+func registrationToken() (string, error) {
+	if token := os.Getenv("REGISTRATION_TOKEN"); token != "" {
+		return token, nil
+	}
+	if file := os.Getenv("REGISTRATION_TOKEN_FILE"); file != "" {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			return "", err
+		}
+		token := strings.TrimSpace(string(raw))
+		if token != "" {
+			return token, nil
+		}
+	}
+	return "", errors.New("REGISTRATION_TOKEN or REGISTRATION_TOKEN_FILE is required")
+}
 func serve(socket string) error {
 	sandboxID := os.Getenv("SANDBOX_ID")
 	if sandboxID == "" {
 		return errors.New("SANDBOX_ID is required")
 	}
-	pemBytes := []byte(os.Getenv("PROVIDER_PUBLIC_KEY"))
-	if keyFile := os.Getenv("PROVIDER_PUBLIC_KEY_FILE"); len(pemBytes) == 0 && keyFile != "" {
-		var err error
-		pemBytes, err = os.ReadFile(keyFile)
-		if err != nil {
-			return err
-		}
+	hostURL := os.Getenv("HOST_URL")
+	if hostURL == "" {
+		return errors.New("HOST_URL is required")
 	}
-	key, err := auth.ParsePublicKey(pemBytes)
+	token, err := registrationToken()
 	if err != nil {
 		return err
 	}
@@ -77,28 +87,40 @@ func serve(socket string) error {
 		return err
 	}
 	defer listener.Close()
-	interceptor := auth.Interceptor{Key: key, SandboxID: sandboxID}
-	path, handler := sandboxv1connect.NewRunnerServiceHandler(runnerService, connect.WithInterceptors(interceptor))
+	path, handler := sandboxv1connect.NewRunnerServiceHandler(runnerService)
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
-	mux.HandleFunc("GET /health", func(response http.ResponseWriter, _ *http.Request) {
+	instrumented := otelhttp.NewHandler(mux, "dsh-runner")
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// RPCs are served only over the host tunnel. This listener exists for the
+	// kubelet probes and exposes nothing but liveness.
+	health := http.NewServeMux()
+	health.HandleFunc("GET /health", func(response http.ResponseWriter, _ *http.Request) {
 		response.Header().Set("content-type", "text/plain; charset=utf-8")
 		_, _ = response.Write([]byte("ok\n"))
 	})
-	instrumented := otelhttp.NewHandler(mux, "dsh-runner")
-	server := &http.Server{Addr: getenv("ADDR", ":8080"), Handler: h2c.NewHandler(instrumented, &http2.Server{}), ReadHeaderTimeout: 10 * time.Second}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	healthServer := &http.Server{Addr: getenv("ADDR", ":8080"), Handler: health, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_ = server.Shutdown(shutdown)
+		_ = healthServer.Shutdown(shutdown)
 	}()
-	log.Printf("dsh-runner listening on %s", server.Addr)
-	err = server.ListenAndServe()
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
-	}
-	return err
+	go func() {
+		if err := healthServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("health listener: %v", err)
+		}
+	}()
+
+	log.Printf("dsh-runner %s dialing %s", sandboxID, hostURL)
+	return tunnel.Run(ctx, tunnel.Config{
+		HostURL:   hostURL,
+		SandboxID: sandboxID,
+		Token:     token,
+		Handler:   instrumented,
+		Logf:      log.Printf,
+	})
 }

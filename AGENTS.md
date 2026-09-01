@@ -90,8 +90,11 @@ likely to mislead you.
   Kubernetes backends.
 - `runner/` owns commands and file operations inside one sandbox.
 - `proto/` is the source of truth for the ConnectRPC contract between them.
-- The provider always connects to the runner. Do not add a connection from the
-  runner back to the dsh host.
+- The runner dials out to the host's tunnel listener and authenticates with
+  the shared registration token; RPCs then flow host→runner over that
+  runner-initiated connection. Do not add a listener on the runner for the
+  host to dial, and do not give the runner any other channel back to the dsh
+  host.
 - Keep host paths and sandbox paths separate. Model-facing file and shell work
   must resolve inside the session's sandbox workspace.
 - Preserve lifecycle meaning: hibernation keeps workspace data, wake reuses it,
@@ -109,7 +112,10 @@ likely to mislead you.
   `GITHUB_TOKEN` also supplies Git credentials for github.com. There is no
   GitHub device flow or per-repository secret scoping.
 - Sandbox code can read injected secrets by design. Keep credentials in the
-  provider store, never in pod configuration or workspace files.
+  provider store, never in pod configuration or workspace files. The one
+  deliberate exception is the shared registration token: warm pods must hold
+  it before any session exists, so it lives in the `dsh-registration-token`
+  Secret. It only lets a runner register a tunnel; it grants nothing else.
 - The Kubernetes backend uses one cluster-owned template and warm pool. Do not
   let repositories select pod privileges or arbitrary templates.
 

@@ -2,11 +2,9 @@ import { createHash } from "node:crypto";
 
 import { CustomObjectsApi, KubeConfig } from "@kubernetes/client-node";
 
-import { connectToRunner, type RunnerClient } from "../runner-client.js";
 import { SandboxNotFoundError } from "../types.js";
 import type {
   BackendReference,
-  RunnerAuth,
   SandboxBackend,
   SandboxHandle,
   SandboxSpec,
@@ -19,7 +17,6 @@ const API_VERSION = "v1beta1";
 interface KasReference extends BackendReference {
   claimName: string;
   sandboxId: string;
-  serviceFqdn: string;
 }
 
 interface ClaimObject {
@@ -32,7 +29,6 @@ interface ClaimObject {
 
 interface SandboxObject {
   status?: {
-    serviceFQDN?: string;
     conditions?: Array<{ type?: string; status?: string }>;
   };
 }
@@ -40,7 +36,6 @@ interface SandboxObject {
 export interface KasBackendOptions {
   namespace: string;
   warmPool: string;
-  runnerPort?: number;
   readyTimeoutMs?: number;
   kubeconfig?: string;
 }
@@ -49,7 +44,6 @@ export class KasBackend implements SandboxBackend {
   readonly name = "kas";
   readonly capabilities = { supportsHibernate: true };
   private readonly api: CustomObjectsApi;
-  private readonly runnerPort: number;
   private readonly readyTimeoutMs: number;
 
   constructor(
@@ -64,7 +58,6 @@ export class KasBackend implements SandboxBackend {
     } else {
       this.api = api;
     }
-    this.runnerPort = options.runnerPort ?? 8080;
     this.readyTimeoutMs = options.readyTimeoutMs ?? 180_000;
   }
 
@@ -96,12 +89,8 @@ export class KasBackend implements SandboxBackend {
     if (sandboxId === undefined) {
       throw new Error(`SandboxClaim ${claimName} became ready unassigned`);
     }
-    const sandbox = await this.waitForSandboxCondition(sandboxId, "Ready");
-    const serviceFqdn = sandbox.status?.serviceFQDN;
-    if (serviceFqdn === undefined) {
-      throw new Error(`Sandbox ${sandboxId} became ready without an endpoint`);
-    }
-    return { sandboxId, reference: { claimName, sandboxId, serviceFqdn } };
+    await this.waitForSandboxCondition(sandboxId, "Ready");
+    return { sandboxId, reference: { claimName, sandboxId } };
   }
 
   async hibernate(reference: BackendReference): Promise<void> {
@@ -125,17 +114,8 @@ export class KasBackend implements SandboxBackend {
     try {
       await this.clearExpiry(ref.claimName);
       await this.patchSandbox(ref.sandboxId, "Running");
-      const sandbox = await this.waitForSandboxCondition(
-        ref.sandboxId,
-        "Ready",
-      );
-      const serviceFqdn = sandbox.status?.serviceFQDN;
-      if (serviceFqdn === undefined) {
-        throw new Error(
-          `Sandbox ${ref.sandboxId} became ready without an endpoint`,
-        );
-      }
-      return { sandboxId: ref.sandboxId, reference: { ...ref, serviceFqdn } };
+      await this.waitForSandboxCondition(ref.sandboxId, "Ready");
+      return { sandboxId: ref.sandboxId, reference: ref };
     } catch (error) {
       if (isKubernetesStatus(error, 404)) {
         throw new SandboxNotFoundError(
@@ -215,18 +195,6 @@ export class KasBackend implements SandboxBackend {
     }
   }
 
-  async connect(
-    reference: BackendReference,
-    auth: RunnerAuth,
-  ): Promise<RunnerClient> {
-    const ref = kasReference(reference);
-    return connectToRunner(
-      `http://${ref.serviceFqdn}:${this.runnerPort}`,
-      ref.sandboxId,
-      auth,
-    );
-  }
-
   private async patchSandbox(
     name: string,
     operatingMode: "Running" | "Suspended",
@@ -291,13 +259,9 @@ export class KasBackend implements SandboxBackend {
           plural: "sandboxes",
           name,
         })) as SandboxObject;
-        const conditionMet = conditionIsTrue(
-          sandbox.status?.conditions,
-          condition,
-        );
-        const endpointReady =
-          condition !== "Ready" || sandbox.status?.serviceFQDN !== undefined;
-        return conditionMet && endpointReady ? sandbox : undefined;
+        return conditionIsTrue(sandbox.status?.conditions, condition)
+          ? sandbox
+          : undefined;
       },
       this.readyTimeoutMs,
       `Sandbox ${name} did not become ${condition.toLowerCase()}`,
@@ -308,8 +272,7 @@ export class KasBackend implements SandboxBackend {
 function kasReference(value: BackendReference): KasReference {
   if (
     typeof value.claimName !== "string" ||
-    typeof value.sandboxId !== "string" ||
-    typeof value.serviceFqdn !== "string"
+    typeof value.sandboxId !== "string"
   ) {
     throw new Error("invalid Kubernetes agent-sandbox reference");
   }

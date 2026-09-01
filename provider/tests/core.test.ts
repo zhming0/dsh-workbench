@@ -1,11 +1,13 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import http2 from "node:http2";
+import { connect as netConnect, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type { CustomObjectsApi } from "@kubernetes/client-node";
-import { decodeJwt } from "jose";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -18,16 +20,16 @@ import {
   normalizeRepositoryUrl,
   testing as brokerTesting,
 } from "../src/broker.js";
+import { RunnerService } from "../src/gen/dsh/sandbox/v1/runner_pb.js";
 import { SandboxManager } from "../src/index.js";
-import { ProviderKeyStore } from "../src/key-store.js";
 import type { RunnerClient } from "../src/runner-client.js";
 import { pathInSandbox } from "../src/sandbox-path.js";
 import { testing as shellTesting } from "../src/shell.js";
 import { SessionStore } from "../src/state-store.js";
 import { testing as subprocessTesting } from "../src/subprocess.js";
+import { TunnelServer, type RunnerGateway } from "../src/tunnel.js";
 import type {
   BackendReference,
-  RunnerAuth,
   SandboxBackend,
   SandboxSpec,
 } from "../src/types.js";
@@ -49,15 +51,61 @@ describe("provider building blocks", () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  it("creates a short-lived token for one sandbox identity", async () => {
-    const keys = new ProviderKeyStore(join(directory, "provider-key.pem"));
-    await keys.initialize();
-    const token = await keys.createToken("sandbox-one");
-    expect(decodeJwt(token).sandbox_id).toBe("sandbox-one");
-    expect(keys.publicKeyPem).toContain("PUBLIC KEY");
-    expect(
-      await readFile(join(directory, "provider-key.pem"), "utf8"),
-    ).toContain("PRIVATE KEY");
+  it("admits one runner per sandbox through the tunnel handshake", async () => {
+    const tunnel = new TunnelServer({ port: 0, tokens: ["good-token"] });
+    await tunnel.listen();
+    const h2 = http2.createServer(
+      connectNodeAdapter({
+        routes: (router) =>
+          router.service(RunnerService, {
+            health: () => ({ sandboxId: "sandbox-one", setupComplete: true }),
+          }),
+      }),
+    );
+    try {
+      const port = tunnel.port();
+      expect(await handshake(port, "sandbox-one", "bad-token")).toEqual({
+        ok: false,
+        error: "invalid registration token",
+      });
+
+      // An accepted runner serves HTTP/2 over the socket it dialed with.
+      const { socket, reply } = await openTunnel(
+        port,
+        "sandbox-one",
+        "good-token",
+      );
+      expect(reply).toEqual({ ok: true });
+      h2.emit("connection", socket);
+      const client = await tunnel.waitFor("sandbox-one", 5_000);
+      const health = await client.health({ timeoutMs: 5_000 });
+      expect(health.sandboxId).toBe("sandbox-one");
+
+      // While that registration lives, a second one for the same sandbox is
+      // refused; this blocks in-sandbox impersonation of another session.
+      expect(await handshake(port, "sandbox-one", "good-token")).toEqual({
+        ok: false,
+        error: "sandbox is already registered",
+      });
+
+      // Dropping the registration lets the runner register again.
+      tunnel.drop("sandbox-one");
+      const again = await openTunnel(port, "sandbox-one", "good-token");
+      expect(again.reply).toEqual({ ok: true });
+      again.socket.destroy();
+
+      // A dead socket frees its registration without an explicit drop, so a
+      // runner redialing after a broken tunnel is not rejected as a
+      // duplicate.
+      await expect
+        .poll(() => handshake(port, "sandbox-one", "good-token"), {
+          timeout: 5_000,
+        })
+        .toEqual({ ok: true });
+    } finally {
+      await tunnel.close();
+      h2.close();
+    }
   });
 
   it("persists session records atomically", async () => {
@@ -187,7 +235,6 @@ describe("provider building blocks", () => {
             }
           : {
               status: {
-                serviceFQDN: "sandbox-one.example.internal",
                 conditions: [{ type: "Ready", status: "True" }],
               },
             };
@@ -208,10 +255,12 @@ describe("provider building blocks", () => {
     const result = await backend.wake({
       claimName: "claim-one",
       sandboxId: "sandbox-one",
-      serviceFqdn: "old.example.internal",
     });
 
-    expect(result.reference.serviceFqdn).toBe("sandbox-one.example.internal");
+    expect(result).toEqual({
+      sandboxId: "sandbox-one",
+      reference: { claimName: "claim-one", sandboxId: "sandbox-one" },
+    });
     expect(patches).toEqual([
       {
         group: "agents.x-k8s.io",
@@ -224,7 +273,7 @@ describe("provider building blocks", () => {
     ]);
   });
 
-  it("reads a Kubernetes runner endpoint from the assigned Sandbox", async () => {
+  it("provisions a Kubernetes sandbox once its claim is assigned", async () => {
     const reads: string[] = [];
     const api = {
       async createNamespacedCustomObject() {
@@ -241,7 +290,6 @@ describe("provider building blocks", () => {
             }
           : {
               status: {
-                serviceFQDN: "sandbox-one.example.internal",
                 conditions: [{ type: "Ready", status: "True" }],
               },
             };
@@ -255,7 +303,6 @@ describe("provider building blocks", () => {
     const result = await backend.provision({
       sessionId: "session-one",
       repositoryUrl: "https://github.com/example/repo.git",
-      publicKeyPem: "public key",
     });
 
     expect(result).toEqual({
@@ -263,7 +310,6 @@ describe("provider building blocks", () => {
       reference: {
         claimName: kasTesting.claimNameFor("session-one"),
         sandboxId: "sandbox-one",
-        serviceFqdn: "sandbox-one.example.internal",
       },
     });
     expect(reads).toEqual(["sandboxclaims", "sandboxes"]);
@@ -287,12 +333,16 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
 `,
       { mode: 0o700 },
     );
-    const backend = new DockerBackend({ image: "runner:test", binary: docker });
+    const backend = new DockerBackend({
+      image: "runner:test",
+      binary: docker,
+      hostUrl: "tcp://host.docker.internal:8081",
+      registrationToken: "token-value",
+    });
 
     const handle = await backend.provision({
       sessionId: "session-one",
       repositoryUrl: "https://github.com/example/repo.git",
-      publicKeyPem: "test public key",
     });
 
     expect(handle).toEqual({
@@ -311,6 +361,8 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
       "inspect",
       "start",
     ]);
+    expect(commands[0]).toContain("HOST_URL=tcp://host.docker.internal:8081");
+    expect(commands[0]).toContain("REGISTRATION_TOKEN=token-value");
     expect(commands[2]).toEqual(["start", "existing-container"]);
   });
 
@@ -379,7 +431,7 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
         idleMs: 10,
         expiresAfterMs: 60_000,
       },
-      { backend },
+      { backend, gateway: gatewayFor(backend) },
     );
     const agent = {
       id: "session-one",
@@ -453,7 +505,7 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
         stateDir: directory,
         repository: "https://github.com/example/fallback.git",
       },
-      { backend, workspaceRegistry },
+      { backend, gateway: gatewayFor(backend), workspaceRegistry },
     );
     const anchor = await manager.createRepositoryWorkspace(
       "https://github.com/example/public.git",
@@ -485,7 +537,10 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
         stateDir: directory,
         repository: "https://github.com/example/fallback",
       },
-      { backend: new FakeBackend() },
+      (() => {
+        const backend = new FakeBackend();
+        return { backend, gateway: gatewayFor(backend) };
+      })(),
     );
     await manager.ensureRunning({
       id: "headless-session",
@@ -570,8 +625,47 @@ class FakeBackend implements SandboxBackend {
   async health() {
     return this.running;
   }
+}
 
-  async connect(_reference: BackendReference, _auth: RunnerAuth) {
-    return this.client as unknown as RunnerClient;
-  }
+/** Stands in for the tunnel: every wait resolves to the fake runner. */
+function gatewayFor(backend: FakeBackend): RunnerGateway {
+  return {
+    waitFor: async () => backend.client as unknown as RunnerClient,
+    drop() {},
+  };
+}
+
+function openTunnel(
+  port: number,
+  sandboxId: string,
+  token: string,
+): Promise<{ socket: Socket; reply: unknown }> {
+  return new Promise((resolve, reject) => {
+    const socket = netConnect(port, "127.0.0.1", () => {
+      socket.write(`${JSON.stringify({ sandboxId, token })}\n`);
+    });
+    socket.once("error", reject);
+    socket.once("data", (chunk) => {
+      // Anything past the reply line is the host's eager HTTP/2 preface;
+      // pause and leave it buffered for whoever attaches an HTTP/2 server.
+      socket.pause();
+      const newline = chunk.indexOf(0x0a);
+      const rest = chunk.subarray(newline + 1);
+      if (rest.length > 0) socket.unshift(rest);
+      resolve({
+        socket,
+        reply: JSON.parse(chunk.subarray(0, newline).toString("utf8")),
+      });
+    });
+  });
+}
+
+async function handshake(
+  port: number,
+  sandboxId: string,
+  token: string,
+): Promise<unknown> {
+  const { socket, reply } = await openTunnel(port, sandboxId, token);
+  socket.destroy();
+  return reply;
 }
