@@ -32,7 +32,7 @@ RUN mkdir -p /out/meta \
         if (!DEFAULT_RUNNER_IMAGE.endsWith(expected)) { \
           throw new Error('default runner image ' + DEFAULT_RUNNER_IMAGE + ' does not end with ' + expected); \
         }" \
-    && node -p "require('./provider/package.json').dependencies['@deepseek-ai/dsh-agent']" >/out/meta/dsh-version \
+    && node -p "require('./provider/package.json').peerDependencies['@deepseek-ai/dsh-agent']" >/out/meta/dsh-version \
     && node -p "require('./package.json').packageManager" >/out/meta/package-manager \
     && printf '%s\n' "$VERSION" >/out/meta/version
 
