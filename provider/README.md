@@ -83,7 +83,7 @@ Configuration is YAML in the profile's own layer,
 | `repository`        | session repository      | Fallback repository for non-anchor sessions                      |
 | `revision`          | repository default      | Optional branch, tag, or commit to check out                     |
 | `workspace`         | `/workspace/repository` | Repository checkout and working directory                        |
-| `idleMs`            | 10 minutes              | Delay after a turn before hibernating                            |
+| `idleMs`            | 10 minutes              | Idle delay after the last turn or wake before hibernating        |
 | `expiresAfterMs`    | 7 days                  | How long a hibernated workspace is retained                      |
 | `stateDir`          | `~/.dsh-sandbox`        | Records, broker data, token, instructions, and Workspace anchors |
 | `wipCommit`         | `false`                 | Make a local safety commit before hibernating                    |
