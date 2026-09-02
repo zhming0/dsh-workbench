@@ -8,6 +8,7 @@ import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { Context } from "@deepseek-ai/cordis";
 import { agentEvents, type Agent } from "@deepseek-ai/dsh-agent";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
+import type { Session, SessionEvent } from "@deepseek-ai/dsh-session";
 import type { CustomObjectsApi } from "@kubernetes/client-node";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -470,6 +471,81 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     expect(backend.client.setups).toBe(3);
   });
 
+  it("suspends a session woken without a turn once its idle timer fires", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
+      {
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 10,
+        expiresAfterMs: 60_000,
+      },
+      { backend, gateway: gatewayFor(backend) },
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+
+    // Provision, then wake again the way a Web UI session list does: the
+    // cached client answers, no turn runs, and only a re-armed timer can
+    // ever suspend the sandbox.
+    await manager.ensureRunning(agent);
+    await manager.ensureRunning(agent);
+    expect(backend.provisions).toBe(1);
+
+    await sleep(100);
+    expect(backend.hibernations).toBe(1);
+    const store = new SessionStore(join(directory, "sessions.json"));
+    await store.initialize();
+    expect(store.get("session-one")?.state).toBe("hibernated");
+    // The expiry countdown only starts when hibernation happens.
+    expect(store.get("session-one")?.expiresAt).toBeDefined();
+
+    // Waking the hibernated session re-arms instead of running forever.
+    await manager.ensureRunning(agent);
+    expect(backend.wakes).toBe(1);
+    await sleep(100);
+    expect(backend.hibernations).toBe(2);
+  });
+
+  it("does not suspend under a live turn and suspends after turn/end", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
+      {
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 10,
+        expiresAfterMs: 60_000,
+      },
+      { backend, gateway: gatewayFor(backend) },
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+    const session = { id: "session-one" } as unknown as Session;
+
+    await manager.ensureRunning(agent);
+    ctx.emit("session/event", session, {
+      type: "turn/start",
+      data: { turn: 1 },
+    } as unknown as SessionEvent);
+    await sleep(100);
+    expect(backend.hibernations).toBe(0);
+
+    ctx.emit("session/event", session, {
+      type: "turn/end",
+      data: { turn: 1, reason: { kind: "completed" } },
+    } as unknown as SessionEvent);
+    await sleep(100);
+    expect(backend.hibernations).toBe(1);
+  });
+
   it("creates one durable host anchor per repository", async () => {
     const [first, second] = await Promise.all([
       createRepositoryAnchor(
@@ -713,6 +789,10 @@ function gatewayFor(backend: FakeBackend): RunnerGateway {
     waitFor: async () => backend.client as unknown as RunnerClient,
     drop() {},
   };
+}
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function openTunnel(

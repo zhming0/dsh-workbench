@@ -159,6 +159,15 @@ export class SandboxManager extends TypertRemoteService {
   private readonly clients = new Map<string, RunnerClient>();
   private readonly idleTimers = new Map<string, NodeJS.Timeout>();
   private readonly activity = new Map<string, number>();
+  /**
+   * Sessions with a turn appended but not yet closed on the session log —
+   * dsh-session pairs every turn/start with a turn/end (repair synthesizes
+   * one after a crash). The activity counter is silent during a single long
+   * generation, so this is the only signal that suspending would cut a live
+   * turn. Rare — a generation has to outlast idleMs — but a mid-stream
+   * suspend fails the whole turn, so the cheap check is worth keeping.
+   */
+  private readonly liveTurns = new Set<string>();
 
   constructor(
     ctx: Context,
@@ -230,7 +239,12 @@ export class SandboxManager extends TypertRemoteService {
       if (status === "running") this.markActive(String(agent.id));
     });
     ctx.on("session/event", (session, event) => {
-      if (event.type === "turn/end") this.scheduleIdle(session);
+      if (event.type === "turn/start") {
+        this.liveTurns.add(String(session.id));
+      } else if (event.type === "turn/end") {
+        this.liveTurns.delete(String(session.id));
+        this.scheduleIdle(session);
+      }
     });
     ctx.effect(() => () => {
       for (const timer of this.idleTimers.values()) clearTimeout(timer);
@@ -303,7 +317,7 @@ export class SandboxManager extends TypertRemoteService {
     await this.ready;
     const sessionId = String(agent.id);
     this.markActive(sessionId);
-    return this.serialize(sessionId, () =>
+    const client = await this.serialize(sessionId, () =>
       tracer.startActiveSpan("sandbox.ensure-running", async (span) => {
         try {
           return await this.ensureRunningUnlocked(agent);
@@ -316,6 +330,11 @@ export class SandboxManager extends TypertRemoteService {
         }
       }),
     );
+    // Waking for a history read (the Web UI session list) never reaches a
+    // turn, and markActive cancelled any armed countdown above, so re-arm
+    // here: a running record must always carry an idle timer.
+    this.scheduleIdle(sessionId);
+    return client;
   }
 
   async hibernate(sessionId: string): Promise<void> {
@@ -588,6 +607,12 @@ export class SandboxManager extends TypertRemoteService {
     await this.ready;
     await this.serialize(sessionId, async () => {
       if ((this.activity.get(sessionId) ?? 0) !== expectedActivity) return;
+      // A live turn holds no countdown of its own, and a timer this wake
+      // re-armed must not suspend under it: retry until turn/end re-arms.
+      if (this.liveTurns.has(sessionId)) {
+        this.scheduleIdle(sessionId);
+        return;
+      }
       await this.hibernateUnlocked(sessionId);
     });
   }
