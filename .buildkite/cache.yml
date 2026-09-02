@@ -1,0 +1,25 @@
+# Checkout-root caches. Cache paths resolve against the working directory;
+# runner/ has its own cache.yml.
+caches:
+  # Toolchains from mise.toml, incl. the go: protobuf plugins.
+  - name: mise
+    cache_key:
+      - "v1"
+      - agent: "os"
+      - agent: "arch"
+        fallback_limit: true
+      - checksum: "mise.toml"
+      - checksum: ".buildkite/steps/lib/mise.bash"
+    target_paths:
+      - "~/.local/share/mise"
+
+  # pnpm download store, hardlinked into node_modules by `pnpm install`.
+  - name: pnpm
+    cache_key:
+      - "v1"
+      - agent: "os"
+      - agent: "arch"
+        fallback_limit: true
+      - checksum: "pnpm-lock.yaml"
+    target_paths:
+      - "~/.local/share/pnpm/store"

@@ -6,6 +6,9 @@ ensure_tools
 
 cd runner
 
+echo "--- :golang: Restoring the Go cache"
+buildkite-agent cache restore --name go
+
 echo "--- :golang: Vetting"
 go vet ./...
 
@@ -14,3 +17,7 @@ go build ./...
 
 echo "+++ :golang: Running tests"
 go test -race ./...
+
+# go stores module cache contents read-only; make them archivable.
+chmod -R u+w "$HOME/go/pkg/mod"
+buildkite-agent cache save --name go

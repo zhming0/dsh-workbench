@@ -8,7 +8,9 @@ echo "--- :docker: Building the runner image"
 docker buildx bake dev --load
 
 echo "--- :pnpm: Installing dependencies"
+buildkite-agent cache restore --name pnpm
 pnpm install --frozen-lockfile
+buildkite-agent cache save --name pnpm
 
 echo "--- :package: Building the provider"
 pnpm build
