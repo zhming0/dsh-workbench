@@ -233,7 +233,12 @@ export class SandboxManager extends TypertRemoteService {
       typertCtx.typert.register(workbenchHost);
     });
 
-    ctx.on("agent/session-start", ({ agent }) => this.ensureRunning(agent));
+    // Only a brand-new session provisions eagerly. Every UI action that
+    // resolves a cold session resumes it, and a resume must not schedule
+    // pods: real work wakes the sandbox at the first pre-step or tool call.
+    ctx.on("agent/session-start", ({ agent, source }) => {
+      if (source === "startup") this.ensureRunning(agent);
+    });
     this.instructions.install();
     ctx.on("agent/status", ({ agent, status }) => {
       if (status === "running") this.markActive(String(agent.id));
@@ -330,9 +335,9 @@ export class SandboxManager extends TypertRemoteService {
         }
       }),
     );
-    // Waking for a history read (the Web UI session list) never reaches a
-    // turn, and markActive cancelled any armed countdown above, so re-arm
-    // here: a running record must always carry an idle timer.
+    // markActive cancelled any armed countdown above, and a wake never
+    // guarantees a turn follows (a created session can idle out untouched),
+    // so re-arm here: a running record must always carry an idle timer.
     this.scheduleIdle(sessionId);
     return client;
   }

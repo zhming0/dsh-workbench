@@ -546,6 +546,48 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     expect(backend.hibernations).toBe(1);
   });
 
+  it("wakes sandboxes for created sessions but not resumed ones", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
+      {
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 10,
+        expiresAfterMs: 60_000,
+      },
+      { backend, gateway: gatewayFor(backend) },
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+
+    // Every UI action that resolves a cold session resumes it; reading the
+    // session list must not schedule pods.
+    ctx.emit("agent/session-start", { agent, source: "resume" });
+    await sleep(50);
+    expect(backend.provisions).toBe(0);
+    expect(backend.wakes).toBe(0);
+
+    // A just-created session still provisions eagerly. Riding the same
+    // serialized queue (rather than sleeping) keeps the 10ms idle timer
+    // from auto-hibernating the session mid-test.
+    ctx.emit("agent/session-start", { agent, source: "startup" });
+    await manager.ensureRunning(agent);
+    expect(backend.provisions).toBe(1);
+
+    // A resume of a hibernated session leaves it hibernated.
+    await manager.hibernate("session-one");
+    ctx.emit("agent/session-start", { agent, source: "resume" });
+    await sleep(50);
+    expect(backend.wakes).toBe(0);
+    const store = new SessionStore(join(directory, "sessions.json"));
+    await store.initialize();
+    expect(store.get("session-one")?.state).toBe("hibernated");
+  });
+
   it("creates one durable host anchor per repository", async () => {
     const [first, second] = await Promise.all([
       createRepositoryAnchor(
