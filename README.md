@@ -170,10 +170,11 @@ Every setting, with its default, is in
 | Session logs, attachments, spill files        | your disk                 | unchanged, still your disk             |
 
 Replacing the filesystem row also turns off dsh's host-side permission model:
-`workspace-write` and the approval prompts came from that row. The container
-is the boundary instead, and the agent acts inside it without asking — treat
-the sandbox, not the prompt, as what stands between a repository and your
-machine.
+`workspace-write` and the approval prompts came from that row, and the bundle
+drops the "Current DSH file policy" line from the agent's context with it. The
+container is the boundary instead, and the agent acts inside it without asking
+— treat the sandbox, not the prompt, as what stands between a repository and
+your machine.
 
 How the bundle patch does this — which rows it replaces, how `glob` and `grep`
 come to run ripgrep inside the sandbox, and how a repository URL becomes a dsh

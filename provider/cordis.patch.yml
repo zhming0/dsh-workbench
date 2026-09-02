@@ -27,6 +27,17 @@
 - id: permission
   disabled: true
 
+# The file policy line dsh adds to every session's context ("Current DSH file
+# policy: workspace-write ... may modify files under the session workspace:
+# <path>") renders the session cwd, which here is the host anchor and does not
+# exist inside the sandbox. It also describes a host boundary the rows above
+# turn off. Both halves would mislead the model, whose paths are sandbox
+# paths, so the row goes. Nothing left enabled needs the service: the stock
+# tool rows only resolve `sandboxPolicy` when the fs or shell backend confines,
+# and the sandbox backends do not.
+- id: sandbox-policy
+  disabled: true
+
 # Replace the Web app's host-directory chooser with this package's repository
 # URL flow. This patch is skipped with a warning in profiles, such as headless,
 # where the Web-only row does not exist.
