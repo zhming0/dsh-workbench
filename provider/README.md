@@ -52,9 +52,13 @@ The **Settings → Instructions** page manages AGENTS.md-style guidance at two
 scopes: one global layer and one layer for each repository Workspace. These
 layers live in host state rather than in repository checkouts.
 
-The bundle also disables dsh's local shell permission presets. The remote shell
-uses one fixed container boundary and does not claim to enforce those
-per-command sandbox modes.
+The bundle also disables dsh's local shell permission presets and its file
+policy line. The remote shell uses one fixed container boundary and does not
+claim to enforce those per-command sandbox modes. The policy line would tell
+the model it may write under the session workspace and name that workspace by
+its host anchor path, which does not exist inside the sandbox; the model only
+ever needs sandbox paths, and it finds its working directory the way any shell
+user does.
 
 The default backend uses Docker on the same machine as dsh. The Kubernetes
 backend uses Kubernetes SIG agent-sandbox. Runners connect out to the host's
@@ -204,7 +208,9 @@ sandbox namespace and in the host's environment. See
   `--flag=value` pair reaches the sandbox untranslated.
 - Interactive terminals and streaming subprocess input are not implemented.
   One-shot stdin, streamed stdout/stderr, cancellation, and background process
-  handles are supported.
+  handles are supported. The shipped `minimal` agent preset is built on a
+  terminal and also requires the disabled `sandbox-policy` service, so a
+  session on that preset fails to compose; use `standard`, `code`, or `cordis`.
 - Shell and subprocess output is kept in bounded in-memory tails. Truncated
   output is reported, but it is not copied to a spill file.
 - Docker stop/start keeps the same container. Kubernetes suspension removes the
