@@ -5,7 +5,9 @@ source "$(dirname "$0")/lib/mise.bash"
 ensure_tools
 
 echo "--- :pnpm: Installing dependencies"
+buildkite-agent cache restore --name pnpm
 pnpm install --frozen-lockfile
+buildkite-agent cache save --name pnpm
 
 echo "--- :mag: Type check and protobuf lint"
 pnpm check

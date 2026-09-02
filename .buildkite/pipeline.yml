@@ -1,4 +1,9 @@
+# Default queue; the Kubernetes end-to-end step below overrides it.
+agents:
+  queue: hosted-amd64-small
+
 steps:
+  # Hosted agents are single-use; reusable state goes through .buildkite/cache.yml.
   # Every step installs its toolchain from mise.toml, so the image only has to
   # supply git, curl, and a C compiler, the last of which `go test -race` needs.
   # Pinning a language image here would put a second version of Go or Node next
@@ -16,13 +21,9 @@ steps:
     command: .buildkite/steps/check-codegen
 
   - label: ":docker: Runner image & smoke test"
-    agents:
-      queue: hosted-amd64-small
     command: .buildkite/steps/smoke-test
 
   - label: ":docker: Host image"
-    agents:
-      queue: hosted-amd64-small
     command: .buildkite/steps/check-host-image
 
   - label: ":kubernetes: Agent Sandbox end-to-end"

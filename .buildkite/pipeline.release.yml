@@ -1,3 +1,6 @@
+agents:
+  queue: hosted-amd64-small
+
 steps:
   - label: ":calendar: Calculate version"
     command: .buildkite/steps/set-calver
@@ -8,8 +11,6 @@ steps:
   # version into the provider and fails if the provider's default runner tag
   # would not match, so the pair cannot drift.
   - label: ":docker: Build & Push host and runner images"
-    agents:
-      queue: hosted-amd64-small
     secrets:
       - GITHUB_TOKEN
     command: .buildkite/steps/build-and-push-image
