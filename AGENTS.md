@@ -150,9 +150,13 @@ For runner changes, also run:
 ```
 
 Run `pnpm test:docker` for Docker lifecycle, runner protocol, setup, credential,
-or sandbox tool changes. Run the kind scripts in `scripts/kas/` for Kubernetes
-lifecycle or manifest changes. Regenerate protobuf code and confirm there is no
-generated-code diff when the contract or generator settings change.
+or sandbox tool changes. Run `pnpm test:kas` for provider-to-runner transport,
+Kubernetes lifecycle, or manifest changes. Regenerate protobuf code and confirm
+there is no generated-code diff when the contract or generator settings change.
+
+Follow [`docs/e2e-testing.md`](docs/e2e-testing.md) for the complete Docker,
+Kubernetes, and browser/model acceptance workflows, including expected results,
+cleanup, and failure investigation.
 
 Update the relevant README or `docs/` page when behavior, configuration,
 security boundaries, setup, or supported limits change.

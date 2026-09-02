@@ -10,16 +10,19 @@ HOST_IMAGE=""
 HOST_URL=""
 TOKEN_FILE=""
 LOAD_IMAGE=false
+SKIP_WARM_POOL=false
 
 usage() {
   cat <<'EOF'
 Usage: dev-cluster.sh --runner-image IMAGE (--host-image IMAGE | --host-url URL)
                       [--registration-token-file FILE]
-                      [--load-runner-image] [--name NAME]
+                      [--load-runner-image] [--skip-warm-pool] [--name NAME]
 
 Creates/reuses a kind cluster, installs agent-sandbox v0.5.4, and applies the
 reference environment. --load-runner-image loads existing local Docker images
 (the runner, and the host when --host-image is set) into kind.
+--skip-warm-pool applies the SandboxTemplate but leaves warm-pool creation to
+the caller.
 
 With --host-image, the dsh host runs in-cluster and runners dial its
 dsh-host-tunnel Service. With --host-url, dsh runs outside the cluster and
@@ -40,6 +43,7 @@ while (($#)); do
     --host-url) [[ $# -ge 2 ]] || { echo "error: --host-url needs a value" >&2; exit 2; }; HOST_URL="$2"; shift 2 ;;
     --registration-token-file) [[ $# -ge 2 ]] || { echo "error: --registration-token-file needs a value" >&2; exit 2; }; TOKEN_FILE="$2"; shift 2 ;;
     --load-runner-image) LOAD_IMAGE=true; shift ;;
+    --skip-warm-pool) SKIP_WARM_POOL=true; shift ;;
     --name) [[ $# -ge 2 ]] || { echo "error: --name needs a value" >&2; exit 2; }; CLUSTER_NAME="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "error: unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -112,8 +116,10 @@ if [[ -n "$HOST_URL" ]]; then
   TEMPLATE="$(sed "s|tcp://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081|${HOST_URL//&/\\&}|g" <<<"$TEMPLATE")"
 fi
 kubectl apply -f - <<<"$TEMPLATE"
-kubectl apply -f "$ROOT_DIR/deploy/kubernetes/30-warm-pool.yaml"
 
-echo "Waiting for warm capacity..."
-kubectl -n dsh-sandbox wait --for=jsonpath='{.status.readyReplicas}'=1 sandboxwarmpool/dsh-universal --timeout=300s
-echo "Ready. Run: scripts/kas/smoke-test.sh --namespace dsh-sandbox"
+if ! $SKIP_WARM_POOL; then
+  kubectl apply -f "$ROOT_DIR/deploy/kubernetes/30-warm-pool.yaml"
+  echo "Waiting for warm capacity..."
+  kubectl -n dsh-sandbox wait --for=jsonpath='{.status.readyReplicas}'=1 sandboxwarmpool/dsh-universal --timeout=300s
+  echo "Ready. Run: scripts/kas/smoke-test.sh --namespace dsh-sandbox"
+fi

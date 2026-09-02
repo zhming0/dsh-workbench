@@ -8,6 +8,8 @@ min_version = "2025.11.0"
 [tools]
 node = "24.19.0"
 go = "1.26.7"
+kind = "0.33.0"
+kubectl = "1.37.0"
 
 # `buf generate` calls these two plugins as local binaries. Keep the versions
 # equal to the matching modules in runner/go.mod, or generated code and the

@@ -43,6 +43,7 @@ type helloReply struct {
 
 const (
 	handshakeTimeout = 10 * time.Second
+	dialTimeout      = 10 * time.Second
 	replyLimit       = 4096
 	backoffFloor     = 500 * time.Millisecond
 	backoffCeiling   = 10 * time.Second
@@ -85,7 +86,9 @@ func Run(ctx context.Context, config Config) error {
 // registered reports whether the host accepted the handshake, which resets
 // the redial backoff.
 func serveOnce(ctx context.Context, dial dialer, config Config) (registered bool, err error) {
-	conn, err := dial(ctx)
+	dialCtx, cancelDial := context.WithTimeout(ctx, dialTimeout)
+	conn, err := dial(dialCtx)
+	cancelDial()
 	if err != nil {
 		return false, err
 	}
