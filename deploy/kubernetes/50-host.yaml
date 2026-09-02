@@ -57,6 +57,26 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      # fsGroup is what lets uid 1000 write a block-CSI volume, but its
+      # permission walk also ORs group-read/write onto every file on the volume
+      # at each pod start, turning dsh's owner-only credentials document
+      # (/data/.dsh/.credentials.yaml, 0600) into 0660 — and the host refuses
+      # to boot on a credentials document readable beyond its owner. The walk
+      # finishes before any container starts, so this runs after it and before
+      # dsh, restoring owner-only mode. The `|| true` covers first boots, where
+      # the document does not exist yet; if the chmod cannot succeed, dsh fails
+      # on the same rule with an actionable error.
+      initContainers:
+        - name: fix-credentials-mode
+          image: DSH_HOST_IMAGE_PLACEHOLDER
+          command: ["sh", "-c", "chmod 600 /data/.dsh/.credentials.yaml || true"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /data
       containers:
         - name: dsh-host
           image: DSH_HOST_IMAGE_PLACEHOLDER

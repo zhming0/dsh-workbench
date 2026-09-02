@@ -110,6 +110,14 @@ storages, the seeded `web` profile with your `cordis.patch.yml`, and the
 provider's session records. Deleting the pod loses nothing; deleting the PVC
 loses all of it.
 
+The pod sets `fsGroup` so uid 1000 can write the volume, which on block-CSI
+StorageClasses makes the kubelet re-add group-read/write to every file on the
+volume at each pod start. The host's credentials document
+(`/data/.dsh/.credentials.yaml`) must stay owner-only — dsh refuses to boot
+otherwise — so the Deployment runs a small init container that restores mode
+`0600` after the walk and before dsh starts. Nothing to configure; if you
+inspect the pod, the init container is expected.
+
 The seeded configuration already selects `backend: kas` with this namespace and
 warm pool, and the provider talks to the API server with the automounted
 `dsh-provider` ServiceAccount token, so the host needs no further wiring. Edit
