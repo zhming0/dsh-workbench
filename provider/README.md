@@ -20,26 +20,23 @@ every setting, and the CLI.
 The package declares a bundle patch. Once the package is installed in a
 profile, dsh includes that patch in the layer stack on boot. It replaces three
 host capability rows (`fs-sandbox`, `bash-sandbox`, `subprocess`) with
-sandbox-backed ones, and replaces the stock `tool-fs-search` row with this
-package's search backend, so `glob` and `grep` spawn ripgrep inside the sandbox
-through its subprocess seam. The stock row resolves a ripgrep binary on the dsh
-host, and no such path exists in a sandbox. Tool names, schemas, prompt
-guidance, and caps are the stock ones; the search root is translated from the
-session workspace to the sandbox workspace at the tool boundary.
+sandbox-backed ones. The tool rows are left alone: the stock tools keep their
+names, schemas, prompt guidance, and caps, and reach the sandbox through those
+three services without knowing one exists.
 
-The sandbox subprocess seam translates the same frames for anything that spawns
-through it: a workdir in session coordinates maps onto the sandbox workspace,
-and an executable path that cannot exist in the sandbox — a host install path
-such as `@vscode/ripgrep`'s packaged ripgrep — resolves to the sandbox's own
-build of the same tool name. That keeps stock rows which assume the host world
-working against the sandbox, including the stock search row.
-
-The other tool rows are left alone. Shipped agent presets that restate the
-`tool-fs-search` row by its stock package name load the stock search row, which
-the seam keeps working for searches rooted at the workspace; a preset that
-wants this package's exact backend — absolute search roots included — loads
-`@zhming0/dsh-workbench/search` instead; [`examples/`](../examples/agent.cordis.yml)
-shows it in place.
+The stock `tool-fs-search` row (`glob`, `grep`) is the case that needs the
+subprocess seam to translate paths, not just relay them. It spawns the host's
+packaged `@vscode/ripgrep` binary with the session working directory and the
+model's search root, all in host coordinates that do not exist in a sandbox.
+The seam maps every path it can prove is the session workspace onto the sandbox
+workspace — the workdir and any absolute argv element under the session
+workspace — and resolves an executable path the sandbox cannot have to the
+sandbox's own build of the same tool name (`rg` on the runner image). Anything
+else in argv passes through unchanged. This is the same translation the shell
+and filesystem seams apply to their paths, so a stock row that assumes the host
+world runs against the sandbox whether the Web surface mounts it from a shipped
+agent preset, a copied one, or the [`examples/`](../examples/agent.cordis.yml)
+preset.
 
 In the Web profile, the package replaces directory picking with a repository
 URL dialog. It creates an owner-only host anchor, registers it as a dsh
@@ -113,27 +110,11 @@ matters when testing a locally built image.
 
 ### Search
 
-The `tool-fs-search` row comes from this package and configures the sandbox
-`glob` and `grep` tools. It overrides by row id like any other:
-
-```yaml
-- id: tool-fs-search
-  config:
-    globMaxResults: 200
-```
-
-| Setting             | Default    | Meaning                                        |
-| ------------------- | ---------- | ---------------------------------------------- |
-| `globMaxResults`    | `100`      | Paths one `glob` call shows inline             |
-| `grepMaxMatches`    | `250`      | Matches one `grep` call shows inline           |
-| `grepMaxLineBytes`  | `2000`     | Byte cap per matched-line preview              |
-| `rawOutputMaxBytes` | `20000000` | Complete raw `rg` stdout one search will parse |
-| `timeoutMs`         | `30000`    | Cooperative budget for one search call         |
-| `graceMs`           | `3000`     | Terminate-escalation grace after `timeoutMs`   |
-| `stderrMaxBytes`    | `65536`    | Diagnostic tail retained from `rg` stderr      |
-
-A result past its inline cap is truncated with a note; the complete result is
-not saved to a spill file.
+`glob` and `grep` are the stock `@deepseek-ai/dsh-tool-fs-search` row, so
+their caps are that package's settings, set where the row is mounted. On the
+Web surface that is the agent preset, not this profile layer: shipped presets
+restate the row by its stock name, and a preset copied from one carries the
+same rows to edit.
 
 ### AGENTS.md instructions
 
@@ -218,9 +199,9 @@ sandbox namespace and in the host's environment. See
 
 ## Limits
 
-- `glob` and `grep` run ripgrep inside the sandbox through this package's
-  search backend. A result past its inline cap is truncated with a note; the
-  complete result is not copied to a spill file.
+- The subprocess seam translates a path argument only when it is a whole argv
+  element under the session workspace. A session-frame path embedded in a
+  `--flag=value` pair reaches the sandbox untranslated.
 - Interactive terminals and streaming subprocess input are not implemented.
   One-shot stdin, streamed stdout/stderr, cancellation, and background process
   handles are supported.

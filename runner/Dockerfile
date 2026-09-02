@@ -17,8 +17,9 @@ ARG JJ_SHA256_arm64=60d42fa2a9abaa445eff10cd2087458562aaad5a54b90309e5a3787ecc98
 ARG MISE_VERSION=2026.8.16
 ARG MISE_SHA256_amd64=1445289f35e1a5a7216e1ffee5b34c5b9bd46793224e7e6c335503de9d9df0b2
 ARG MISE_SHA256_arm64=21a03117d27028b1b4602bc83d9aefdccd55325ac3da45f7e28c9320627dcdc6
-# ripgrep backs the session's `glob` and `grep` search tools; the provider
-# resolves it on the runner's PATH.
+# ripgrep backs the session's `glob` and `grep` search tools: the stock row
+# names the host's packaged binary, and the provider's subprocess seam resolves
+# `rg` on the runner's PATH in its place.
 ARG RIPGREP_VERSION=15.2.0
 ARG RIPGREP_SHA256_amd64=33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c
 ARG RIPGREP_SHA256_arm64=800b1e7206afe799dfb5a6901f23147cfaabe0e52210538100f61e86e1740915

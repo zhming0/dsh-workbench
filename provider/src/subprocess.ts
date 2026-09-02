@@ -53,10 +53,11 @@ export class SandboxSubprocessRuntime extends SubprocessRuntime {
   /**
    * The two path frames one spawn translates between. Callers may speak
    * session coordinates (the dsh session workspace) because they were written
-   * for the host world — the stock `tool-fs-search` row passes its session cwd
-   * and a ripgrep path resolved from the host's own node_modules. The sandbox
-   * is the execution world that has to answer, so the seam maps both onto the
-   * sandbox the same way the shell seam maps its workdir.
+   * for the host world — the stock `tool-fs-search` row passes its session cwd,
+   * a ripgrep path resolved from the host's own node_modules, and the model's
+   * search root, which the model knows in session coordinates. The sandbox is
+   * the execution world that has to answer, so the seam maps all of them onto
+   * the sandbox the same way the shell and filesystem seams map their paths.
    */
   private executionFrame(): ExecutionFrame {
     let sessionWorkspace: string | undefined;
@@ -188,7 +189,7 @@ class RemoteProcess implements SubprocessHandle {
         ? new TextEncoder().encode(this.spec.stdio.stdin.data)
         : new Uint8Array();
     const argv = await this.canonicalExecutable(
-      this.spec.argv,
+      this.translatedArgv(),
       client,
       environment,
     );
@@ -240,6 +241,24 @@ class RemoteProcess implements SubprocessHandle {
       this.spec.cwd,
       this.frame.sessionWorkspace,
       this.frame.sandboxWorkspace,
+    );
+  }
+
+  /**
+   * The spawn's argv in sandbox coordinates. Every element that is an absolute
+   * path inside the session workspace maps onto the sandbox workspace; the
+   * stock `tool-fs-search` row passes the model's search root that way. The
+   * mapping is exact rather than a guess: a path under the session workspace
+   * can only name that workspace, so nothing else can match. Relative values,
+   * flags, and paths already in sandbox coordinates are unchanged.
+   */
+  private translatedArgv(): string[] {
+    return this.spec.argv.map((argument) =>
+      pathInSandbox(
+        argument,
+        this.frame.sessionWorkspace,
+        this.frame.sandboxWorkspace,
+      ),
     );
   }
 
