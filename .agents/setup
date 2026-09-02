@@ -8,8 +8,13 @@ source "${ROOT_DIR}/.buildkite/steps/lib/mise.bash"
 ensure_tools
 
 # Later shells in this sandbox get ~/.local/bin on PATH but not the mise shims
-# directory, so link the shims across.
+# directory, so link the shims across. Amp owns its gh wrapper; replacing it
+# with a mise shim lets a later wrapper refresh overwrite the mise executable
+# that every shim shares.
 mkdir -p "$HOME/.local/bin"
-ln -sf "${MISE_DATA_DIR:-$HOME/.local/share/mise}/shims/"* "$HOME/.local/bin/"
+shim_dir="${MISE_DATA_DIR:-$HOME/.local/share/mise}/shims"
+for shim in "$shim_dir/"*; do
+  [[ "${shim##*/}" == "gh" ]] || ln -sf "$shim" "$HOME/.local/bin/"
+done
 
 pnpm install --frozen-lockfile
