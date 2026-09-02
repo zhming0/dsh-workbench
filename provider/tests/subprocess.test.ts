@@ -97,6 +97,75 @@ describe("sandbox subprocess seam", () => {
     expect(requests[0]?.cwd).toBe(`${SANDBOX_WORKSPACE}/nested`);
   });
 
+  it("maps session-frame argv paths onto the sandbox workspace", async () => {
+    const requests: ExecRequest[] = [];
+    const client = fakeRunnerClient(requests, [], {
+      existing: ["/usr/local/bin/rg"],
+    });
+    // The stock grep row: session cwd, a --flag=value pair, and the model's
+    // absolute search root behind `--`.
+    await spawn(runtimeWith(client), {
+      argv: [
+        "/usr/local/bin/rg",
+        "--json",
+        "--regexp=TODO",
+        "--glob=*.ts",
+        "--",
+        `${SESSION_WORKSPACE}/src`,
+      ],
+      cwd: SESSION_WORKSPACE,
+    });
+    expect(requests[0]?.argv).toEqual([
+      "/usr/local/bin/rg",
+      "--json",
+      "--regexp=TODO",
+      "--glob=*.ts",
+      "--",
+      `${SANDBOX_WORKSPACE}/src`,
+    ]);
+    expect(requests[0]?.cwd).toBe(SANDBOX_WORKSPACE);
+  });
+
+  it("leaves relative, sandbox-frame, and foreign absolute argv values unchanged", async () => {
+    const requests: ExecRequest[] = [];
+    const client = fakeRunnerClient(requests, [], {
+      existing: ["/usr/local/bin/rg"],
+    });
+    await spawn(runtimeWith(client), {
+      argv: [
+        "/usr/local/bin/rg",
+        "--files",
+        "--",
+        "src",
+        `${SANDBOX_WORKSPACE}/lib`,
+        "/etc/hosts",
+        `${SESSION_WORKSPACE}-other/src`,
+      ],
+    });
+    expect(requests[0]?.argv).toEqual([
+      "/usr/local/bin/rg",
+      "--files",
+      "--",
+      "src",
+      `${SANDBOX_WORKSPACE}/lib`,
+      "/etc/hosts",
+      `${SESSION_WORKSPACE}-other/src`,
+    ]);
+  });
+
+  it("runs a session-frame executable from its sandbox path without a lookup", async () => {
+    const requests: ExecRequest[] = [];
+    const resolves: string[] = [];
+    const client = fakeRunnerClient(requests, resolves);
+    await spawn(runtimeWith(client), {
+      argv: [`${SESSION_WORKSPACE}/scripts/check.sh`],
+    });
+    expect(resolves).toEqual([]);
+    expect(requests[0]?.argv).toEqual([
+      `${SANDBOX_WORKSPACE}/scripts/check.sh`,
+    ]);
+  });
+
   it("resolves a host-only executable to the sandbox build of the same tool", async () => {
     const requests: ExecRequest[] = [];
     const resolves: string[] = [];

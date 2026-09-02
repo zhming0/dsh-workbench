@@ -69,12 +69,18 @@ likely to mislead you.
 - `shell` is built on top of `subprocess`, so `subprocess` is the seam that
   decides where a command actually runs.
 - `tool-fs-search` (`glob`, `grep`) injects `subprocess`, not `fs`, and spawns a
-  ripgrep binary resolved from the dsh host's `node_modules`. On its own it
-  cannot work against a remote filesystem; this repository's sandbox subprocess
-  seam translates host-frame workdirs and host-only executables so the stock
-  row still runs inside the sandbox. The package's `search` row
-  (`@zhming0/dsh-workbench/search`) is the exact implementation, but shipped
-  agent presets that restate the row by stock name load the stock row.
+  ripgrep binary resolved from the dsh host's `node_modules`, with the session
+  cwd and the model's search root in host coordinates. On its own it cannot
+  work against a remote filesystem; this repository's sandbox subprocess seam
+  translates the workdir, session-frame argv paths, and host-only executables
+  so the stock row runs inside the sandbox.
+- On the Web surface, tool rows are mounted by agent presets, and a preset
+  row's `name:` is the module that loads. A bundle patch that renames a tool
+  row (`tool-fs-search: name: ...`) is not what Web sessions run: the shipped
+  presets restate the row by its stock name, and the launcher force-sets the
+  preset roots after every patch layer, so a bundle cannot add, remove, or
+  patch presets. Make stock rows work through the three capability seams
+  instead of replacing them.
 - A plugin appears in the Web Plugins settings tab only if it both registers a
   settings namespace on the host and ships a hand-written browser card. A
   namespace alone renders nothing.
