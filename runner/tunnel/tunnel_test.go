@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -113,6 +114,45 @@ func TestRejectedRegistrationRedials(t *testing.T) {
 	// A rejected runner must come back on its own.
 	acceptOne(t, listener, false)
 	acceptOne(t, listener, false)
+}
+
+func TestAcceptedRegistrationRedialsAfterClose(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer listener.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go Run(ctx, Config{
+		HostURL:   "tcp://" + listener.Addr().String(),
+		SandboxID: "sandbox-one",
+		Token:     "token-one",
+		Handler:   http.NewServeMux(),
+	})
+
+	conn, _ := acceptOne(t, listener, true)
+	conn.Close()
+	conn, _ = acceptOne(t, listener, true)
+	conn.Close()
+}
+
+func TestServeOnceBoundsDialAttempt(t *testing.T) {
+	_, err := serveOnce(context.Background(), func(ctx context.Context) (net.Conn, error) {
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			t.Fatal("dial context has no deadline")
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 || remaining > dialTimeout {
+			t.Fatalf("dial deadline is in %v, want (0, %v]", remaining, dialTimeout)
+		}
+		return nil, errors.New("dial failed")
+	}, Config{})
+	if err == nil {
+		t.Fatal("serveOnce succeeded after dial failure")
+	}
 }
 
 func TestDialerForRejectsInvalidURLs(t *testing.T) {

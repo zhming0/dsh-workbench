@@ -28,6 +28,10 @@ scripts/kas/smoke-test.sh --namespace dsh-sandbox
 scripts/kas/teardown.sh
 ```
 
+For the self-contained provider-to-runner transport and lifecycle test used by
+CI, build both images and run `pnpm test:kas`; see
+[`e2e-testing.md`](e2e-testing.md#kubernetes-transport-and-lifecycle-test).
+
 With `--host-image`, the dsh host itself runs in the cluster and runners dial
 its `dsh-host-tunnel` Service. The script applies the raw manifests, so the
 dev host runs without the OIDC proxy and is reached over

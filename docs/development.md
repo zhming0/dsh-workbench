@@ -39,12 +39,16 @@ pnpm build
 (cd runner && go test -race ./... && go vet ./... && go build ./cmd/dsh-runner)
 docker buildx bake dev --load
 pnpm test:docker
+docker buildx bake dev host-dev --load
+pnpm test:kas
 ```
 
 `docker buildx bake dev` builds the runner image for the current machine; the
 release build covers `linux/amd64` and `linux/arm64`. The Docker smoke test
-checks signed access, secret injection, Git/Jujutsu/mise, first-run setup, and
-file survival across stop/start.
+checks runner registration, secret injection, Git/Jujutsu/mise, first-run
+setup, and file survival across stop/start. The Kubernetes test creates a
+disposable kind cluster and checks the provider-to-runner tunnel, forced
+reconnection, hibernate/wake, warm adoption, volume persistence, and expiry.
 
 To regenerate code after editing the protobuf file:
 
@@ -52,10 +56,10 @@ To regenerate code after editing the protobuf file:
 pnpm proto:generate
 ```
 
-For the Kubernetes lifecycle, `scripts/kas/dev-cluster.sh` creates a
-disposable kind cluster with both dev images, and `scripts/kas/smoke-test.sh`
-checks warm claim, suspend, resume, volume persistence, and expiry against it.
-The exact commands are at the top of [kubernetes.md](kubernetes.md).
+For focused Kubernetes development, `scripts/kas/dev-cluster.sh` creates a
+cluster that can be inspected between runs, and `scripts/kas/smoke-test.sh`
+checks the controller lifecycle against it. See
+[e2e-testing.md](e2e-testing.md) for both workflows.
 
 ## Running from a checkout (laptop + Docker)
 
@@ -99,7 +103,8 @@ and a checkout install is the contributor path.
 
 Buildkite runs [`.buildkite/pipeline.yml`](../.buildkite/pipeline.yml) on
 every branch: provider checks and tests, runner tests, a check that the
-generated protobuf code is current, and the Docker lifecycle smoke test.
+generated protobuf code is current, the Docker lifecycle smoke test, and the
+Kubernetes transport and lifecycle test.
 
 On `main`, a manual block step unlocks
 [`.buildkite/pipeline.release.yml`](../.buildkite/pipeline.release.yml), which

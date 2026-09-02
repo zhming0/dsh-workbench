@@ -14,7 +14,8 @@
     "proto:check": "buf lint && buf format --diff --exit-code",
     "proto:generate": "buf generate",
     "test": "pnpm --filter @zhming0/dsh-workbench test",
-    "test:docker": "node scripts/docker-smoke.mjs"
+    "test:docker": "node scripts/docker-smoke.mjs",
+    "test:kas": "scripts/kas/e2e-test.sh"
   },
   "devDependencies": {
     "@bufbuild/buf": "1.72.0",

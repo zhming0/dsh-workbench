@@ -25,6 +25,12 @@ steps:
       queue: hosted-amd64-small
     command: .buildkite/steps/check-host-image
 
+  - label: ":kubernetes: Agent Sandbox end-to-end"
+    agents:
+      queue: hosted-amd64-large
+    command: .buildkite/steps/kas-smoke-test
+    timeout_in_minutes: 30
+
   - block: ":rocket: Release"
     if: build.branch == "main"
     prompt: "Publish the host and runner images?"
