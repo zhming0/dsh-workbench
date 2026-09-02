@@ -1,4 +1,5 @@
 import { PassThrough, Writable, type Readable } from "node:stream";
+import { basename, isAbsolute } from "node:path";
 
 import {
   SubprocessRuntime,
@@ -11,6 +12,7 @@ import {
 import type { Context } from "@deepseek-ai/cordis";
 
 import type { RunnerClient } from "./runner-client.js";
+import { isInsideSandboxWorkspace, pathInSandbox } from "./sandbox-path.js";
 
 export class SandboxSubprocessRuntime extends SubprocessRuntime {
   static inject = ["sandboxManager", "agents"];
@@ -41,10 +43,32 @@ export class SandboxSubprocessRuntime extends SubprocessRuntime {
     const process = new RemoteProcess(
       this.ctx.sandboxManager.clientForCurrentAgent(),
       spec,
+      this.executionFrame(),
     );
     this.live.add(process);
     void process.done.finally(() => this.live.delete(process)).catch(() => {});
     return process;
+  }
+
+  /**
+   * The two path frames one spawn translates between. Callers may speak
+   * session coordinates (the dsh session workspace) because they were written
+   * for the host world — the stock `tool-fs-search` row passes its session cwd
+   * and a ripgrep path resolved from the host's own node_modules. The sandbox
+   * is the execution world that has to answer, so the seam maps both onto the
+   * sandbox the same way the shell seam maps its workdir.
+   */
+  private executionFrame(): ExecutionFrame {
+    let sessionWorkspace: string | undefined;
+    try {
+      sessionWorkspace = this.ctx.agents.requireInitiator().session.header.cwd;
+    } catch {
+      // No foreground agent: nothing names session coordinates to translate.
+    }
+    return {
+      sessionWorkspace,
+      sandboxWorkspace: this.ctx.sandboxManager.workspace,
+    };
   }
 
   async spawnTerminal(
@@ -54,6 +78,12 @@ export class SandboxSubprocessRuntime extends SubprocessRuntime {
       "interactive terminals are not supported by dsh-sandbox Milestone 1",
     );
   }
+}
+
+/** The path frames one spawn translates between (see {@link SandboxSubprocessRuntime.executionFrame}). */
+interface ExecutionFrame {
+  readonly sessionWorkspace: string | undefined;
+  readonly sandboxWorkspace: string;
 }
 
 class RemoteProcess implements SubprocessHandle {
@@ -72,6 +102,7 @@ class RemoteProcess implements SubprocessHandle {
   constructor(
     client: Promise<RunnerClient>,
     private readonly spec: SubprocessSpawnSpec,
+    private readonly frame: ExecutionFrame,
   ) {
     this.stdin =
       spec.stdio.stdin === "pipe" ? new UnsupportedStdin() : undefined;
@@ -156,10 +187,15 @@ class RemoteProcess implements SubprocessHandle {
       typeof this.spec.stdio.stdin === "object"
         ? new TextEncoder().encode(this.spec.stdio.stdin.data)
         : new Uint8Array();
+    const argv = await this.canonicalExecutable(
+      this.spec.argv,
+      client,
+      environment,
+    );
     const stream = client.exec(
       {
-        argv: [...this.spec.argv],
-        cwd: this.spec.cwd,
+        argv,
+        cwd: this.translatedWorkdir(),
         env: environment,
         stdin,
       },
@@ -191,6 +227,57 @@ class RemoteProcess implements SubprocessHandle {
       this.stdoutPipe?.end();
       this.stderrPipe?.end();
     }
+  }
+
+  /**
+   * The spawn's workdir in sandbox coordinates. Callers that already speak
+   * sandbox coordinates are unchanged; a session-frame cwd — the stock tool
+   * rows pass `session.header.cwd` — maps onto the sandbox workspace, where
+   * this process actually runs.
+   */
+  private translatedWorkdir(): string {
+    return pathInSandbox(
+      this.spec.cwd,
+      this.frame.sessionWorkspace,
+      this.frame.sandboxWorkspace,
+    );
+  }
+
+  /**
+   * Map argv[0] onto the sandbox execution world when it names a host path.
+   * An absolute path outside the sandbox workspace cannot exist there — a
+   * packaged host binary such as `@vscode/ripgrep`'s ripgrep has no counterpart
+   * at the same path — so resolve it against the sandbox's own lookup: first
+   * the literal path (callers already speaking sandbox coordinates hit this),
+   * then the basename, which resolves to the sandbox's own build of the same
+   * tool. When neither resolves, keep the original so the runner reports the
+   * failure it always did.
+   */
+  private async canonicalExecutable(
+    argv: readonly string[],
+    client: RunnerClient,
+    environment: Record<string, string>,
+  ): Promise<string[]> {
+    const [executable] = argv;
+    if (
+      executable === undefined ||
+      !isAbsolute(executable) ||
+      isInsideSandboxWorkspace(executable, this.frame.sandboxWorkspace)
+    ) {
+      return [...argv];
+    }
+    for (const candidate of [executable, basename(executable)]) {
+      try {
+        const resolved = await client.resolveExecutable({
+          command: candidate,
+          env: { ...environment },
+        });
+        return [resolved.path, ...argv.slice(1)];
+      } catch {
+        // Try the next candidate; falling through keeps the original argv[0].
+      }
+    }
+    return [...argv];
   }
 
   private writeOutput(stream: "stdout" | "stderr", chunk: Uint8Array): void {

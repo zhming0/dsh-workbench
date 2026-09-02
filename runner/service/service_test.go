@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,7 +11,48 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1"
+	"github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1/sandboxv1connect"
 )
+
+func TestExecEmptyStdinMeansIgnore(t *testing.T) {
+	s := New("box")
+	mux := http.NewServeMux()
+	mux.Handle(sandboxv1connect.NewRunnerServiceHandler(s))
+	server := httptest.NewUnstartedServer(mux)
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+	client := sandboxv1connect.NewRunnerServiceClient(server.Client(), server.URL)
+
+	exitCode := func(stdin []byte) int {
+		stream, err := client.Exec(context.Background(), connect.NewRequest(&v1.ExecRequest{
+			Argv:  []string{"/bin/bash", "-c", "test -p /dev/stdin"},
+			Cwd:   t.TempDir(),
+			Stdin: stdin,
+		}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer stream.Close()
+		for stream.Receive() {
+			if exited := stream.Msg().GetExited(); exited != nil {
+				return int(exited.GetExitCode())
+			}
+		}
+		t.Fatal("exec stream ended without an exit status")
+		return -1
+	}
+
+	// Delivered bytes arrive over a pipe.
+	if code := exitCode([]byte("data")); code != 0 {
+		t.Fatalf("non-empty stdin: child saw a non-pipe stdin, exit = %d", code)
+	}
+	// Empty stdin is ignore: the child reads the null device, not an empty
+	// pipe, so workdir-fallback tools like ripgrep behave.
+	if code := exitCode(nil); code != 1 {
+		t.Fatalf("empty stdin: child saw a pipe stdin, exit = %d", code)
+	}
+}
 
 func TestWriteGuardsAndEditAmbiguity(t *testing.T) {
 	s := New("box")

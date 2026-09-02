@@ -27,10 +27,19 @@ host, and no such path exists in a sandbox. Tool names, schemas, prompt
 guidance, and caps are the stock ones; the search root is translated from the
 session workspace to the sandbox workspace at the tool boundary.
 
-The other tool rows are left alone, so the stock agent presets keep working and
-point at the sandbox instead of the host. A preset that lists its own tool rows
-gets `glob` and `grep` by loading the same row, `@zhming0/dsh-workbench/search`;
-[`examples/`](../examples/agent.cordis.yml) shows it in place.
+The sandbox subprocess seam translates the same frames for anything that spawns
+through it: a workdir in session coordinates maps onto the sandbox workspace,
+and an executable path that cannot exist in the sandbox — a host install path
+such as `@vscode/ripgrep`'s packaged ripgrep — resolves to the sandbox's own
+build of the same tool name. That keeps stock rows which assume the host world
+working against the sandbox, including the stock search row.
+
+The other tool rows are left alone. Shipped agent presets that restate the
+`tool-fs-search` row by its stock package name load the stock search row, which
+the seam keeps working for searches rooted at the workspace; a preset that
+wants this package's exact backend — absolute search roots included — loads
+`@zhming0/dsh-workbench/search` instead; [`examples/`](../examples/agent.cordis.yml)
+shows it in place.
 
 In the Web profile, the package replaces directory picking with a repository
 URL dialog. It creates an owner-only host anchor, registers it as a dsh

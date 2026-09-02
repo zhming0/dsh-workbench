@@ -579,15 +579,21 @@ function parseGrepArgs(args: {
  * model-controlled value is a plain argv element — no shell layer exists, so
  * no quoting applies; the pattern and include ride in `--flag=value` form and
  * the target behind `--`, so a leading-dash value can never be parsed as a flag.
+ * The workdir is always the explicit target: with none, ripgrep searches stdin,
+ * and the subprocess transport hands it an empty pipe, which would report "no
+ * matches" for a workdir full of hits.
  */
-function buildGrepCommand(input: {
-  pattern: string;
-  path?: string;
-  include?: string;
-}): string[] {
+function buildGrepCommand(
+  input: {
+    pattern: string;
+    path?: string;
+    include?: string;
+  },
+  workdir: string,
+): string[] {
   const parts = ["--json", `--regexp=${input.pattern}`];
   if (input.include !== undefined) parts.push(`--glob=${input.include}`);
-  if (input.path !== undefined) parts.push("--", input.path);
+  parts.push("--", input.path ?? workdir);
   return parts;
 }
 
@@ -796,7 +802,7 @@ function applyGrepTool(
         search,
         exec,
         "grep",
-        buildGrepCommand(parseGrepArgs(args)),
+        buildGrepCommand(parseGrepArgs(args), search.sandboxWorkspace),
         caps,
       );
       if (run.noMatches) return { matches: [] };
