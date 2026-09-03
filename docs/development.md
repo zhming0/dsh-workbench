@@ -45,10 +45,11 @@ pnpm test:kas
 
 `docker buildx bake dev` builds the runner image for the current machine; the
 release build covers `linux/amd64` and `linux/arm64`. The Docker smoke test
-checks runner registration, secret injection, Git/Jujutsu/mise, first-run
-setup, and file survival across stop/start. The Kubernetes test creates a
-disposable kind cluster and checks the provider-to-runner tunnel, forced
-reconnection, hibernate/wake, warm adoption, volume persistence, and expiry.
+checks runner registration, secret injection, the bundled command-line tools,
+first-run setup, and file survival across stop/start. The Kubernetes test
+creates a disposable kind cluster and checks the provider-to-runner tunnel,
+forced reconnection, hibernate/wake, warm adoption, volume persistence, and
+expiry.
 
 To regenerate code after editing the protobuf file:
 

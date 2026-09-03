@@ -32,7 +32,7 @@ try {
   await run(client, [
     "/bin/bash",
     "-lc",
-    'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version',
+    'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version && python --version && uv --version && uvx --version && node --version && npm --version && jq --version && yq --version && docker --version && docker buildx version && docker compose version && for command in cc make pkg-config unzip zip xz file patch ssh rsync ps gh pnpm yarn; do command -v "$command" || exit 1; done && ! command -v pip && ! command -v dockerd && ! command -v containerd',
   ]);
 
   await run(client, ["mkdir", "-p", `${workspace}/.git`, `${workspace}/.dsh`]);

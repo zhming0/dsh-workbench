@@ -27,11 +27,15 @@ container platform boundary.
 process-readiness probe for the kubelet; it is the only listener the runner
 opens and does not expose sandbox data or RPCs.
 
-The reference Dockerfile builds `linux/amd64` and `linux/arm64`. It selects the
-`jj`, `mise`, and `ripgrep` archives from `TARGETARCH` and verifies a pinned
-checksum per architecture, so adding another one means adding both the archive
-name and its checksum. The Go stage cross-compiles from the builder's own
-architecture rather than running the toolchain under emulation.
+The reference Dockerfile builds `linux/amd64` and `linux/arm64`. It includes
+Git, GitHub CLI, Jujutsu, mise, ripgrep, Python with uv, Node.js,
+Corepack-backed pnpm and Yarn, a native build toolchain, common archive and
+process utilities, jq, yq, and the Docker CLI with Buildx and Compose. It
+deliberately excludes pip, the Docker daemon, and the container runtime;
+platforms that want Docker commands to reach a daemon must provide one
+separately. Architecture-specific archives have pinned checksums, and the Go
+stage cross-compiles from the builder's own architecture rather than running
+the toolchain under emulation.
 
 Releases are published to `ghcr.io/zhming0/dsh-runner`, tagged with the same
 version as the `@zhming0/dsh-workbench` package that expects them.
