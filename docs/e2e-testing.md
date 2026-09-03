@@ -73,7 +73,8 @@ then verifies:
 
 1. the runner registers with the provider and its health check succeeds over
    the reversed HTTP/2 tunnel;
-2. secrets reach commands, and Git, Jujutsu, and mise are installed;
+2. secrets reach commands, and the runner's bundled tools are installed,
+   including Python, Node.js, jq, yq, and the Docker client without its daemon;
 3. `.dsh/setup.sh` runs exactly once;
 4. hibernate/wake reconnects the runner and preserves its setup marker,
    workspace files, and mise-managed tools.
