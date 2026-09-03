@@ -82,16 +82,28 @@ pnpm install && pnpm build
 dsh plugin --profile web add "$PWD/provider"
 ```
 
-With no `backend` configured the provider selects Docker, which is a complete
-working configuration by itself. Point the manager at the locally built runner
-image in your profile layer, then run `dsh web` and open the `?token=` URL it
-prints:
+Declare one Docker profile that points at the locally built runner image in
+your profile layer, then run `dsh web` and open the `?token=` URL it prints:
 
 ```yaml
 - id: sandbox-manager
   config:
-    docker:
-      image: dsh-runner:dev
+    profiles:
+      standard:
+        backend: docker
+        image: dsh-runner:dev
+```
+
+To exercise the profile chip without a cluster, declare two Docker profiles
+with the same image; only the name differs, which is enough to see the choice
+land on the session record:
+
+```yaml
+- id: sandbox-manager
+  config:
+    profiles:
+      standard: { backend: docker, image: dsh-runner:dev }
+      large: { backend: docker, image: dsh-runner:dev }
 ```
 
 On a development machine the CLI is at

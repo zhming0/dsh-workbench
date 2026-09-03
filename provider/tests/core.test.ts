@@ -23,8 +23,9 @@ import {
   testing as brokerTesting,
 } from "../src/broker.js";
 import { RunnerService } from "../src/gen/dsh/sandbox/v1/runner_pb.js";
-import { SandboxManager } from "../src/index.js";
+import { SandboxManager, testing as managerTesting } from "../src/index.js";
 import type { RunnerClient } from "../src/runner-client.js";
+import { DEFAULT_RUNNER_IMAGE } from "../src/runner-image.js";
 import { pathInSandbox } from "../src/sandbox-path.js";
 import { testing as shellTesting } from "../src/shell.js";
 import { SessionStore } from "../src/state-store.js";
@@ -117,6 +118,7 @@ describe("provider building blocks", () => {
     await store.set({
       sessionId: "one",
       backend: "fake",
+      profile: "standard",
       sandboxId: "sandbox-one",
       reference: { id: "one" },
       repositoryUrl: "https://github.com/example/repo.git",
@@ -277,8 +279,10 @@ describe("provider building blocks", () => {
 
   it("provisions a Kubernetes sandbox once its claim is assigned", async () => {
     const reads: string[] = [];
+    const claims: Array<{ body: { spec: unknown } }> = [];
     const api = {
-      async createNamespacedCustomObject() {
+      async createNamespacedCustomObject(request: { body: { spec: unknown } }) {
+        claims.push(request);
         return {};
       },
       async getNamespacedCustomObject(request: { plural: string }) {
@@ -298,7 +302,7 @@ describe("provider building blocks", () => {
       },
     } as unknown as CustomObjectsApi;
     const backend = new KasBackend(
-      { namespace: "test", warmPool: "test" },
+      { namespace: "test", warmPool: "dsh-large" },
       api,
     );
 
@@ -315,6 +319,9 @@ describe("provider building blocks", () => {
       },
     });
     expect(reads).toEqual(["sandboxclaims", "sandboxes"]);
+    expect(claims.map((claim) => claim.body.spec)).toEqual([
+      { warmPoolRef: { name: "dsh-large" } },
+    ]);
   });
 
   it("recovers a Docker container created before its session was saved", async () => {
@@ -336,7 +343,7 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
       { mode: 0o700 },
     );
     const backend = new DockerBackend({
-      image: "runner:test",
+      image: "runner:large",
       binary: docker,
       hostUrl: "tcp://host.docker.internal:8081",
       registrationToken: "token-value",
@@ -365,6 +372,7 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     ]);
     expect(commands[0]).toContain("HOST_URL=tcp://host.docker.internal:8081");
     expect(commands[0]).toContain("REGISTRATION_TOKEN=token-value");
+    expect(commands[0]?.at(-1)).toBe("runner:large");
     expect(commands[2]).toEqual(["start", "existing-container"]);
   });
 
@@ -428,12 +436,13 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     const manager = new SandboxManager(
       ctx,
       {
+        profiles: { standard: { backend: "docker" } },
         stateDir: directory,
         repository: "https://github.com/example/public.git",
         idleMs: 10,
         expiresAfterMs: 60_000,
       },
-      { backend, gateway: gatewayFor(backend) },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
     );
     const agent = {
       id: "session-one",
@@ -477,12 +486,13 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     const manager = new SandboxManager(
       ctx,
       {
+        profiles: { standard: { backend: "docker" } },
         stateDir: directory,
         repository: "https://github.com/example/public.git",
         idleMs: 10,
         expiresAfterMs: 60_000,
       },
-      { backend, gateway: gatewayFor(backend) },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
     );
     const agent = {
       id: "session-one",
@@ -517,12 +527,13 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     const manager = new SandboxManager(
       ctx,
       {
+        profiles: { standard: { backend: "docker" } },
         stateDir: directory,
         repository: "https://github.com/example/public.git",
         idleMs: 10,
         expiresAfterMs: 60_000,
       },
-      { backend, gateway: gatewayFor(backend) },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
     );
     const agent = {
       id: "session-one",
@@ -546,35 +557,34 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     expect(backend.hibernations).toBe(1);
   });
 
-  it("wakes sandboxes for created sessions but not resumed ones", async () => {
+  it("leaves provisioning and waking to the first prompt, not session-start", async () => {
     const backend = new FakeBackend();
     const ctx = new Context();
     const manager = new SandboxManager(
       ctx,
       {
+        profiles: { standard: { backend: "docker" } },
         stateDir: directory,
         repository: "https://github.com/example/public.git",
         idleMs: 10,
         expiresAfterMs: 60_000,
       },
-      { backend, gateway: gatewayFor(backend) },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
     );
     const agent = {
       id: "session-one",
       session: { header: {} },
     } as unknown as Agent;
 
-    // Every UI action that resolves a cold session resumes it; reading the
-    // session list must not schedule pods.
+    // A blank session exists before the user has picked a profile, and every
+    // UI action that resolves a cold session resumes it. Neither may schedule
+    // a sandbox; the first pre-step does, through ensureRunning.
+    ctx.emit("agent/session-start", { agent, source: "startup" });
     ctx.emit("agent/session-start", { agent, source: "resume" });
     await sleep(50);
     expect(backend.provisions).toBe(0);
     expect(backend.wakes).toBe(0);
 
-    // A just-created session still provisions eagerly. Riding the same
-    // serialized queue (rather than sleeping) keeps the 10ms idle timer
-    // from auto-hibernating the session mid-test.
-    ctx.emit("agent/session-start", { agent, source: "startup" });
     await manager.ensureRunning(agent);
     expect(backend.provisions).toBe(1);
 
@@ -586,6 +596,192 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     const store = new SessionStore(join(directory, "sessions.json"));
     await store.initialize();
     expect(store.get("session-one")?.state).toBe("hibernated");
+  });
+
+  it("resolves each sandbox profile with its own backend settings", () => {
+    const single = managerTesting.resolveConfig({
+      profiles: { standard: { backend: "kas" } },
+    });
+    expect(single.defaultProfile).toBe("standard");
+    expect(single.profiles).toEqual({
+      standard: {
+        name: "standard",
+        backend: "kas",
+        namespace: "dsh-sandbox",
+        warmPool: "dsh-universal",
+        readyTimeoutMs: 180_000,
+      },
+    });
+
+    const explicit = managerTesting.resolveConfig({
+      defaultProfile: "large",
+      tunnel: { port: 9000 },
+      profiles: {
+        standard: { backend: "kas", namespace: "team-a" },
+        large: { backend: "kas", warmPool: "dsh-large" },
+        local: { backend: "docker", image: "runner:dev" },
+        remote: { backend: "docker", hostUrl: "tcp://10.0.0.1:8081" },
+      },
+    });
+    expect(explicit.defaultProfile).toBe("large");
+    expect(explicit.profiles).toEqual({
+      standard: {
+        name: "standard",
+        backend: "kas",
+        namespace: "team-a",
+        warmPool: "dsh-universal",
+        readyTimeoutMs: 180_000,
+      },
+      large: {
+        name: "large",
+        backend: "kas",
+        namespace: "dsh-sandbox",
+        warmPool: "dsh-large",
+        readyTimeoutMs: 180_000,
+      },
+      local: {
+        name: "local",
+        backend: "docker",
+        image: "runner:dev",
+        hostUrl: "tcp://host.docker.internal:9000",
+      },
+      remote: {
+        name: "remote",
+        backend: "docker",
+        image: DEFAULT_RUNNER_IMAGE,
+        hostUrl: "tcp://10.0.0.1:8081",
+      },
+    });
+
+    expect(() =>
+      managerTesting.resolveConfig({
+        defaultProfile: "missing",
+        profiles: { standard: { backend: "docker" } },
+      }),
+    ).toThrow("defaultProfile missing is not a configured profile");
+    expect(() => managerTesting.resolveConfig({ profiles: {} })).toThrow(
+      "at least one profile",
+    );
+  });
+
+  it("provisions with the profile a session picked before its first prompt", async () => {
+    const standard = new FakeBackend();
+    const large = new FakeBackend();
+    const config = {
+      stateDir: directory,
+      repository: "https://github.com/example/public.git",
+      profiles: {
+        standard: { backend: "docker" as const },
+        large: { backend: "kas" as const, warmPool: "dsh-large" },
+      },
+    };
+    const manager = new SandboxManager(new Context(), config, {
+      backends: { standard, large },
+      gateway: gatewayFor(large),
+    });
+
+    expect(await manager.getSessionProfile("session-one")).toEqual({
+      profiles: [
+        { name: "standard", backend: "docker" },
+        { name: "large", backend: "kas" },
+      ],
+      selected: "standard",
+      locked: false,
+    });
+    await expect(
+      manager.setSessionProfile("session-one", "huge"),
+    ).rejects.toThrow("unknown sandbox profile: huge");
+    await manager.setSessionProfile("session-one", "large");
+
+    // The choice survives a host restart before the sandbox exists.
+    const restarted = new SandboxManager(new Context(), config, {
+      backends: { standard, large },
+      gateway: gatewayFor(large),
+    });
+    expect((await restarted.getSessionProfile("session-one")).selected).toBe(
+      "large",
+    );
+
+    await restarted.ensureRunning({
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent);
+    expect(standard.provisions).toBe(0);
+    expect(large.provisions).toBe(1);
+    const state = JSON.parse(
+      await readFile(join(directory, "sessions.json"), "utf8"),
+    ) as {
+      sessions: Record<string, { backend: string; profile: string }>;
+      pendingProfiles: Record<string, string>;
+    };
+    expect(state.sessions["session-one"]).toMatchObject({
+      backend: "fake",
+      profile: "large",
+    });
+    expect(state.pendingProfiles).toEqual({});
+
+    expect(await restarted.getSessionProfile("session-one")).toMatchObject({
+      selected: "large",
+      locked: true,
+    });
+    await expect(
+      restarted.setSessionProfile("session-one", "standard"),
+    ).rejects.toThrow("already has a sandbox");
+  });
+
+  it("keeps sessions whose profile is no longer configured", async () => {
+    const store = new SessionStore(join(directory, "sessions.json"));
+    await store.initialize();
+    await store.set({
+      sessionId: "session-one",
+      backend: "kas",
+      profile: "large",
+      sandboxId: "sandbox-one",
+      reference: { claimName: "claim-one", sandboxId: "sandbox-one" },
+      repositoryUrl: "https://github.com/example/public.git",
+      state: "hibernated",
+      updatedAt: new Date().toISOString(),
+    });
+    // Same profile name, but the profile now points at a different backend.
+    await store.set({
+      sessionId: "session-two",
+      backend: "kas",
+      profile: "standard",
+      sandboxId: "sandbox-two",
+      reference: { claimName: "claim-two", sandboxId: "sandbox-two" },
+      repositoryUrl: "https://github.com/example/public.git",
+      state: "hibernated",
+      updatedAt: new Date().toISOString(),
+    });
+    const backend = new FakeBackend();
+    const manager = new SandboxManager(
+      new Context(),
+      {
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public",
+      },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
+    );
+
+    for (const [sessionId, profile] of [
+      ["session-one", "large"],
+      ["session-two", "standard"],
+    ]) {
+      await expect(
+        manager.ensureRunning({
+          id: sessionId,
+          session: { header: {} },
+        } as unknown as Agent),
+      ).rejects.toThrow(
+        `kas sandbox from profile ${profile}, which is no longer configured on that backend`,
+      );
+    }
+    expect(backend.provisions).toBe(0);
+    const reopened = new SessionStore(join(directory, "sessions.json"));
+    await reopened.initialize();
+    expect(reopened.get("session-one")?.state).toBe("hibernated");
+    expect(reopened.get("session-two")?.state).toBe("hibernated");
   });
 
   it("creates one durable host anchor per repository", async () => {
@@ -621,10 +817,15 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     const manager = new SandboxManager(
       ctx,
       {
+        profiles: { standard: { backend: "docker" } },
         stateDir: directory,
         repository: "https://github.com/example/fallback.git",
       },
-      { backend, gateway: gatewayFor(backend), workspaceRegistry },
+      {
+        backends: { standard: backend },
+        gateway: gatewayFor(backend),
+        workspaceRegistry,
+      },
     );
     const anchor = await manager.createRepositoryWorkspace(
       "https://github.com/example/public.git",
@@ -727,12 +928,16 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     const manager = new SandboxManager(
       new Context(),
       {
+        profiles: { standard: { backend: "docker" } },
         stateDir: directory,
         repository: "https://github.com/example/fallback",
       },
       (() => {
         const backend = new FakeBackend();
-        return { backend, gateway: gatewayFor(backend) };
+        return {
+          backends: { standard: backend },
+          gateway: gatewayFor(backend),
+        };
       })(),
     );
     await manager.ensureRunning({

@@ -80,6 +80,15 @@ backend uses Kubernetes SIG agent-sandbox. Runners connect out to the host's
 tunnel listener, so the host never dials into a sandbox; it only needs to be
 reachable by the runners it manages.
 
+A host can offer several **sandbox profiles**. A profile is a complete
+description of one kind of sandbox: which backend provisions it and that
+backend's settings, such as a runner image for Docker or a warm pool for
+Kubernetes. When more than one profile is
+configured, a chip in the composer's tool row lets the user pick one for a new
+session. The sandbox is provisioned on the first prompt, not when the session
+is created, so the choice can still change until then. Once a sandbox exists
+the chip shows the profile in use and is disabled.
+
 ## Settings
 
 Configuration is YAML in the profile's own layer,
@@ -89,13 +98,18 @@ Configuration is YAML in the profile's own layer,
 ```yaml
 - id: sandbox-manager
   config:
-    backend: docker
+    profiles:
+      standard:
+        backend: docker
     idleMs: 300000
 ```
 
+`profiles` is the one required setting.
+
 | Setting             | Default                 | Meaning                                                          |
 | ------------------- | ----------------------- | ---------------------------------------------------------------- |
-| `backend`           | `docker`                | `docker` or `kas`                                                |
+| `profiles.<name>`   | required                | One sandbox profile; its fields are listed in the next table     |
+| `defaultProfile`    | first profile           | Profile used when a session does not pick one                    |
 | `repository`        | session repository      | Fallback repository for non-anchor sessions                      |
 | `revision`          | repository default      | Optional branch, tag, or commit to check out                     |
 | `workspace`         | `/workspace/repository` | Repository checkout and working directory                        |
@@ -106,12 +120,21 @@ Configuration is YAML in the profile's own layer,
 | `registrationToken` | see below               | Token(s) runners must present, comma-separated                   |
 | `tunnel.port`       | `8081`                  | Port the host listens on for runner tunnels                      |
 | `tunnel.bind`       | `0.0.0.0`               | Address the tunnel listener binds to                             |
-| `docker.image`      | matching release tag    | Runner image used by Docker                                      |
-| `docker.binary`     | `docker`                | Docker-compatible command                                        |
-| `docker.hostUrl`    | `host.docker.internal`  | `HOST_URL` runners dial, `tcp://` or `tls://`                    |
-| `kas.namespace`     | `dsh-sandbox`           | Namespace containing claims and warm sandboxes                   |
-| `kas.warmPool`      | `dsh-universal`         | Warm pool used for claims                                        |
-| `kas.kubeconfig`    | normal client lookup    | Optional kubeconfig path                                         |
+
+Each profile carries the settings of its own backend. Profiles do not share
+settings with each other, so two Kubernetes profiles in one namespace both
+name that namespace.
+
+| Profile field    | Backend  | Default                | Meaning                                        |
+| ---------------- | -------- | ---------------------- | ---------------------------------------------- |
+| `backend`        | both     | required               | `docker` or `kas`                              |
+| `image`          | `docker` | matching release tag   | Runner image                                   |
+| `binary`         | `docker` | `docker`               | Docker-compatible command                      |
+| `hostUrl`        | `docker` | `host.docker.internal` | `HOST_URL` runners dial, `tcp://` or `tls://`  |
+| `namespace`      | `kas`    | `dsh-sandbox`          | Namespace containing claims and warm sandboxes |
+| `warmPool`       | `kas`    | `dsh-universal`        | Warm pool used for claims                      |
+| `readyTimeoutMs` | `kas`    | 3 minutes              | How long to wait for a claimed sandbox         |
+| `kubeconfig`     | `kas`    | normal client lookup   | Optional kubeconfig path                       |
 
 For a Web Workspace created by this package, the repository URL stored in its
 anchor takes precedence. Other sessions use `repository` when set, then run
@@ -124,8 +147,34 @@ inside the sandbox. Anchors remain after sandbox expiry so historical dsh
 Workspace registrations do not become missing directories.
 
 Each release publishes a runner image tagged with the same version as this
-package, and the provider defaults to that exact tag, so `docker.image` only
-matters when testing a locally built image.
+package, and the provider defaults to that exact tag, so a Docker profile's
+`image` only matters when testing a locally built image.
+
+### Sandbox profiles
+
+`profiles` is a map from profile name to a backend and that backend's
+settings. A Kubernetes host with two pod sizes looks like this; each warm pool
+must exist in the cluster (see [`docs/kubernetes.md`](../docs/kubernetes.md)):
+
+```yaml
+- id: sandbox-manager
+  config:
+    defaultProfile: standard
+    profiles:
+      standard:
+        backend: kas
+        warmPool: dsh-universal
+      large:
+        backend: kas
+        warmPool: dsh-large
+```
+
+Profiles may mix backends, for example one Docker profile beside Kubernetes
+ones. Every session record stores the profile name and backend it was
+provisioned with. Removing a profile from the configuration keeps its existing
+sessions readable, but they cannot wake until a profile with that name is
+restored on the same backend. A session whose pending choice was removed falls
+back to an error at its first prompt, asking the user to pick again.
 
 ### Search
 

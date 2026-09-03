@@ -206,6 +206,23 @@ injection:
 The settings must persist outside the repository checkout. Confirm the test did
 not create or modify an `AGENTS.md` file in the Workspace.
 
+### Verify sandbox profile selection
+
+Run this scenario for changes to profiles, provisioning, or the composer chip.
+It works against a Docker host too: give the `sandbox-manager` row two Docker
+profiles that differ only by name, for example `standard` and `large` both with
+`image: dsh-runner:dev`.
+
+1. Start a new session and confirm the profile chip is visible in the
+   composer's tool row and shows the default profile. It must be absent when
+   only one profile is configured.
+2. Pick the other profile and reload the page; the chip must still show it.
+3. Send a prompt that uses the shell. Before that prompt there must be no
+   sandbox for the session (`docker ps` or `kubectl get sandboxclaims`); after
+   it there must be exactly one, and `stateDir/sessions.json` must record the
+   picked profile on the session, with no entry left in `pendingProfiles`.
+4. Confirm the chip is now disabled and keeps showing the picked profile.
+
 For UI changes, record the browser state or capture a screenshot when useful,
 but also exercise the interaction and verify the resulting state. A screenshot
 alone does not prove persistence or model-context injection.

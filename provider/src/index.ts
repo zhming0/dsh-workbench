@@ -24,8 +24,9 @@ import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { RunnerClient } from "./runner-client.js";
 import { SessionStore } from "./state-store.js";
 import { TunnelServer, type RunnerGateway } from "./tunnel.js";
+import type { SessionProfileView } from "./session-profile-remote.js";
 import { SandboxNotFoundError } from "./types.js";
-import type { SandboxBackend, SessionRecord } from "./types.js";
+import type { SandboxBackend, SandboxProfile, SessionRecord } from "./types.js";
 import {
   createRepositoryAnchor,
   repositoryForAnchor,
@@ -42,8 +43,27 @@ const resumeLatency = meter.createHistogram("dsh.sandbox.resume.duration", {
 });
 const transitions = meter.createCounter("dsh.sandbox.lifecycle.transitions");
 
+/** A profile as written in the settings file: a backend plus its settings. */
+export type ProfileConfig =
+  | {
+      backend: "docker";
+      image?: string;
+      binary?: string;
+      hostUrl?: string;
+    }
+  | {
+      backend: "kas";
+      namespace?: string;
+      warmPool?: string;
+      readyTimeoutMs?: number;
+      kubeconfig?: string;
+    };
+
 export interface Config {
-  backend?: "docker" | "kas";
+  /** Named sandbox profiles a session can choose from before its first prompt. */
+  profiles: Record<string, ProfileConfig>;
+  /** Profile used when the session did not pick one. Defaults to the first. */
+  defaultProfile?: string;
   stateDir?: string;
   repository?: string;
   revision?: string;
@@ -56,21 +76,11 @@ export interface Config {
     port?: number;
     bind?: string;
   };
-  docker?: {
-    image?: string;
-    binary?: string;
-    hostUrl?: string;
-  };
-  kas?: {
-    namespace?: string;
-    warmPool?: string;
-    readyTimeoutMs?: number;
-    kubeconfig?: string;
-  };
 }
 
 interface ResolvedConfig {
-  backend: "docker" | "kas";
+  profiles: Record<string, SandboxProfile>;
+  defaultProfile: string;
   stateDir: string;
   repository?: string;
   revision: string;
@@ -80,17 +90,11 @@ interface ResolvedConfig {
   wipCommit: boolean;
   registrationToken?: string;
   tunnel: { port: number; bind: string };
-  docker: { image: string; binary?: string; hostUrl: string };
-  kas: {
-    namespace: string;
-    warmPool: string;
-    readyTimeoutMs: number;
-    kubeconfig?: string;
-  };
 }
 
 export interface ManagerDependencies {
-  backend?: SandboxBackend;
+  /** Replacement backends by profile name; a profile missing here gets one built from its settings. */
+  backends?: Record<string, SandboxBackend>;
   store?: SessionStore;
   broker?: CredentialBroker;
   gateway?: RunnerGateway;
@@ -112,8 +116,27 @@ declare module "@deepseek-ai/cordis" {
 /** Owns one durable sandbox record per dsh session. */
 export class SandboxManager extends TypertRemoteService {
   static inject = ["agents"];
-  static Config = z.object({
-    backend: z.union([z.const("docker"), z.const("kas")]).default("docker"),
+  static Config: Schemastery<Config> = z.object({
+    profiles: z
+      .dict(
+        z.union([
+          z.object({
+            backend: z.const("docker").required(),
+            image: z.string().default(DEFAULT_RUNNER_IMAGE),
+            binary: z.string(),
+            hostUrl: z.string(),
+          }),
+          z.object({
+            backend: z.const("kas").required(),
+            namespace: z.string().default("dsh-sandbox"),
+            warmPool: z.string().default("dsh-universal"),
+            readyTimeoutMs: z.number().min(1).default(180_000),
+            kubeconfig: z.string(),
+          }),
+        ]),
+      )
+      .required(),
+    defaultProfile: z.string(),
     stateDir: z.string(),
     repository: z.string(),
     revision: z.string().default(""),
@@ -132,22 +155,11 @@ export class SandboxManager extends TypertRemoteService {
       port: z.natural().min(1).max(65_535).default(8081),
       bind: z.string().default("0.0.0.0"),
     }),
-    docker: z.object({
-      image: z.string().default(DEFAULT_RUNNER_IMAGE),
-      binary: z.string(),
-      hostUrl: z.string(),
-    }),
-    kas: z.object({
-      namespace: z.string().default("dsh-sandbox"),
-      warmPool: z.string().default("dsh-universal"),
-      readyTimeoutMs: z.number().min(1).default(180_000),
-      kubeconfig: z.string(),
-    }),
   });
 
   readonly workspace: string;
   private readonly config: ResolvedConfig;
-  private readonly backend: SandboxBackend;
+  private readonly backends: Map<string, SandboxBackend>;
   private readonly store: SessionStore;
   private readonly broker: CredentialBroker;
   private readonly gateway: RunnerGateway;
@@ -171,7 +183,7 @@ export class SandboxManager extends TypertRemoteService {
 
   constructor(
     ctx: Context,
-    config: Config = {},
+    config: Config,
     dependencies: ManagerDependencies = {},
   ) {
     super(ctx, "sandboxManager");
@@ -185,12 +197,13 @@ export class SandboxManager extends TypertRemoteService {
       new CredentialBroker({
         path: join(this.config.stateDir, "broker.json"),
       });
+    const profiles = Object.values(this.config.profiles);
+    const missingBackends = profiles.filter(
+      (profile) => dependencies.backends?.[profile.name] === undefined,
+    );
     let tokens: string[] = [];
-    if (
-      dependencies.gateway === undefined ||
-      dependencies.backend === undefined
-    ) {
-      tokens = resolveRegistrationTokens(this.config);
+    if (dependencies.gateway === undefined || missingBackends.length > 0) {
+      tokens = resolveRegistrationTokens(this.config, profiles);
     }
     if (dependencies.gateway === undefined) {
       this.ownedTunnel = new TunnelServer({
@@ -203,8 +216,13 @@ export class SandboxManager extends TypertRemoteService {
     } else {
       this.gateway = dependencies.gateway;
     }
-    this.backend =
-      dependencies.backend ?? createBackend(this.config, tokens[0] as string);
+    this.backends = new Map(
+      profiles.map((profile) => [
+        profile.name,
+        dependencies.backends?.[profile.name] ??
+          createBackend(profile, tokens[0] as string),
+      ]),
+    );
     this.workspaceRegistry = dependencies.workspaceRegistry;
     this.instructions = new ManagedInstructions(ctx, {
       store:
@@ -233,14 +251,9 @@ export class SandboxManager extends TypertRemoteService {
       typertCtx.typert.register(workbenchHost);
     });
 
-    // Only a brand-new session provisions eagerly. Every UI action that
-    // resolves a cold session resumes it, and a resume must not schedule
-    // pods: real work wakes the sandbox at the first pre-step or tool call.
-    ctx.on("agent/session-start", ({ agent, source }) => {
-      if (source === "startup") {
-        void this.ensureRunning(agent);
-      }
-    });
+    // Provisioning waits for the first prompt: `agent/session-start` fires as
+    // soon as a blank session exists, before the user has picked a profile.
+    // ManagedInstructions.install() calls ensureRunning at `agent/pre-step`.
     this.instructions.install();
     ctx.on("agent/status", ({ agent, status }) => {
       if (status === "running") {
@@ -324,6 +337,72 @@ export class SandboxManager extends TypertRemoteService {
     return this.instructions.setWorkspace(repositoryUrl, content);
   }
 
+  /** Profile choices for the composer chip; `locked` once a sandbox exists. */
+  async getSessionProfile(sessionId: string): Promise<SessionProfileView> {
+    await this.ready;
+    return this.sessionProfileView(sessionId);
+  }
+
+  async setSessionProfile(
+    sessionId: string,
+    profile: string,
+  ): Promise<SessionProfileView> {
+    await this.ready;
+    if (this.config.profiles[profile] === undefined) {
+      throw new Error(`unknown sandbox profile: ${profile}`);
+    }
+    if (this.store.get(sessionId) !== undefined) {
+      throw new Error("this session already has a sandbox");
+    }
+    await this.store.setPendingProfile(sessionId, profile);
+    return this.sessionProfileView(sessionId);
+  }
+
+  private sessionProfileView(sessionId: string): SessionProfileView {
+    const record = this.store.get(sessionId);
+    return {
+      profiles: Object.values(this.config.profiles).map(
+        ({ name, backend }) => ({ name, backend }),
+      ),
+      selected:
+        record === undefined
+          ? this.pendingProfileFor(sessionId).name
+          : record.profile,
+      locked: record !== undefined,
+    };
+  }
+
+  /** The profile a session without a sandbox would be provisioned with. */
+  private pendingProfileFor(sessionId: string): SandboxProfile {
+    const name =
+      this.store.pendingProfile(sessionId) ?? this.config.defaultProfile;
+    const profile = this.config.profiles[name];
+    if (profile === undefined) {
+      throw new Error(
+        `sandbox profile ${name} is no longer configured; pick another profile`,
+      );
+    }
+    return profile;
+  }
+
+  /**
+   * The backend that owns a record's sandbox: the one built from the profile
+   * the record was provisioned with. A profile that was removed, or renamed
+   * onto another backend, cannot interpret the record's reference.
+   */
+  private findBackend(record: SessionRecord): SandboxBackend | undefined {
+    const backend = this.backends.get(record.profile);
+    return backend?.name === record.backend ? backend : undefined;
+  }
+
+  private backendFor(record: SessionRecord): SandboxBackend {
+    const backend = this.findBackend(record);
+    if (backend === undefined) {
+      throw new Error(orphanedRecordMessage(record));
+    }
+    return backend;
+  }
+
   async ensureRunning(agent: Agent): Promise<RunnerClient> {
     await this.ready;
     const sessionId = String(agent.id);
@@ -359,18 +438,19 @@ export class SandboxManager extends TypertRemoteService {
       return;
     }
 
+    const backend = this.backendFor(record);
     if (this.config.wipCommit) {
       await this.commitWorkInProgress(sessionId);
     }
     const deadline = new Date(Date.now() + this.config.expiresAfterMs);
     try {
-      if (this.backend.capabilities.supportsHibernate) {
-        await this.backend.hibernate(record.reference);
+      if (backend.capabilities.supportsHibernate) {
+        await backend.hibernate(record.reference);
         // Set the final deletion time after compute is suspended. If the
         // provider stops between these steps, the still-running local record
         // will recover and wake the same sandbox instead of leaving an active
         // sandbox with a hidden expiry.
-        await this.backend.expireAt(record.reference, deadline);
+        await backend.expireAt(record.reference, deadline);
         await this.store.set({
           ...record,
           state: "hibernated",
@@ -378,14 +458,14 @@ export class SandboxManager extends TypertRemoteService {
           updatedAt: new Date().toISOString(),
         });
         transitions.add(1, {
-          backend: this.backend.name,
+          backend: record.backend,
           transition: "hibernate",
         });
       } else {
-        await this.backend.destroy(record.reference);
+        await backend.destroy(record.reference);
         await this.store.delete(sessionId);
         transitions.add(1, {
-          backend: this.backend.name,
+          backend: record.backend,
           transition: "expire",
         });
       }
@@ -394,7 +474,7 @@ export class SandboxManager extends TypertRemoteService {
         throw error;
       }
       await this.store.delete(sessionId);
-      transitions.add(1, { backend: this.backend.name, transition: "missing" });
+      transitions.add(1, { backend: record.backend, transition: "missing" });
     }
     this.clients.delete(sessionId);
     this.gateway.drop(record.sandboxId);
@@ -408,6 +488,13 @@ export class SandboxManager extends TypertRemoteService {
       this.instructions.initialize(),
     ]);
     for (const record of this.store.values()) {
+      const backend = this.findBackend(record);
+      if (backend === undefined) {
+        // Keep the record: the operator may restore the profile and the
+        // sandbox may hold unpushed work. Its session fails clearly.
+        this.ctx.logger("sandbox").warn(orphanedRecordMessage(record));
+        continue;
+      }
       if (record.state === "running") {
         this.scheduleIdle(record.sessionId);
         continue;
@@ -419,12 +506,12 @@ export class SandboxManager extends TypertRemoteService {
         !Number.isFinite(deadline.getTime()) ||
         deadline.getTime() <= Date.now()
       ) {
-        await this.backend.destroy(record.reference);
+        await backend.destroy(record.reference);
         await this.store.delete(record.sessionId);
         continue;
       }
       try {
-        await this.backend.expireAt(record.reference, deadline);
+        await backend.expireAt(record.reference, deadline);
       } catch (error) {
         if (!(error instanceof SandboxNotFoundError)) {
           throw error;
@@ -443,11 +530,14 @@ export class SandboxManager extends TypertRemoteService {
       record?.expiresAt !== undefined &&
       new Date(record.expiresAt).getTime() <= Date.now()
     ) {
-      await this.backend.destroy(record.reference);
+      await this.backendFor(record).destroy(record.reference);
       this.gateway.drop(record.sandboxId);
       await this.store.delete(sessionId);
       record = undefined;
     }
+    // Resolve the profile before any network work so a stale choice fails fast.
+    let profile =
+      record === undefined ? this.pendingProfileFor(sessionId) : undefined;
 
     const repositoryUrl =
       record?.repositoryUrl ??
@@ -474,7 +564,7 @@ export class SandboxManager extends TypertRemoteService {
 
     const runningSandboxNeedsRecovery =
       record?.state === "running" &&
-      !(await this.backend.health(record.reference));
+      !(await this.backendFor(record).health(record.reference));
 
     await this.broker.refresh();
     const credentials = await this.broker.gitCredentials(repositoryUrl);
@@ -483,11 +573,12 @@ export class SandboxManager extends TypertRemoteService {
       record !== undefined &&
       (record.state === "hibernated" || runningSandboxNeedsRecovery)
     ) {
+      const backend = this.backendFor(record);
       try {
         const started = Date.now();
-        const handle = await this.backend.wake(record.reference);
+        const handle = await backend.wake(record.reference);
         resumeLatency.record(Date.now() - started, {
-          backend: this.backend.name,
+          backend: record.backend,
         });
         const { expiresAt: _expiredDeadline, ...durableRecord } = record;
         record = {
@@ -498,27 +589,36 @@ export class SandboxManager extends TypertRemoteService {
           updatedAt: new Date().toISOString(),
         };
         await this.store.set(record);
-        transitions.add(1, { backend: this.backend.name, transition: "wake" });
+        transitions.add(1, { backend: record.backend, transition: "wake" });
       } catch (error) {
         if (!(error instanceof SandboxNotFoundError)) {
           throw error;
         }
-        await this.backend.destroy(record.reference).catch(() => {});
+        await backend.destroy(record.reference).catch(() => {});
         await this.store.delete(sessionId);
+        // The lost sandbox is replaced under the same profile (which
+        // backendFor just proved is configured), so a session does not
+        // silently change size or backend.
+        profile = this.config.profiles[record.profile];
         record = undefined;
       }
     }
 
     if (record === undefined) {
+      if (profile === undefined) {
+        throw new Error("unreachable: no profile");
+      }
+      const backend = this.backends.get(profile.name);
+      if (backend === undefined) {
+        throw new Error(`unreachable: no backend for profile ${profile.name}`);
+      }
       const started = Date.now();
-      const handle = await this.backend.provision({
-        sessionId,
-        repositoryUrl,
-      });
-      claimLatency.record(Date.now() - started, { backend: this.backend.name });
+      const handle = await backend.provision({ sessionId, repositoryUrl });
+      claimLatency.record(Date.now() - started, { backend: profile.backend });
       record = {
         sessionId,
-        backend: this.backend.name,
+        backend: backend.name,
+        profile: profile.name,
         sandboxId: handle.sandboxId,
         reference: handle.reference,
         repositoryUrl,
@@ -527,7 +627,7 @@ export class SandboxManager extends TypertRemoteService {
       };
       await this.store.set(record);
       transitions.add(1, {
-        backend: this.backend.name,
+        backend: profile.backend,
         transition: "provision",
       });
     }
@@ -707,8 +807,25 @@ export class SandboxManager extends TypertRemoteService {
 function resolveConfig(config: Config): ResolvedConfig {
   const stateDir = config.stateDir ?? join(homedir(), ".dsh-sandbox");
   const tunnelPort = config.tunnel?.port ?? 8081;
+  const [firstProfile] = Object.keys(config.profiles);
+  if (firstProfile === undefined) {
+    throw new Error("sandbox-manager needs at least one profile");
+  }
+  const profiles = Object.fromEntries(
+    Object.entries(config.profiles).map(([name, profile]) => [
+      name,
+      resolveProfile(name, profile, tunnelPort),
+    ]),
+  );
+  const defaultProfile = config.defaultProfile ?? firstProfile;
+  if (profiles[defaultProfile] === undefined) {
+    throw new Error(
+      `defaultProfile ${defaultProfile} is not a configured profile`,
+    );
+  }
   const resolved: ResolvedConfig = {
-    backend: config.backend ?? "docker",
+    profiles,
+    defaultProfile,
     stateDir,
     ...(config.repository === undefined
       ? {}
@@ -725,24 +842,6 @@ function resolveConfig(config: Config): ResolvedConfig {
       port: tunnelPort,
       bind: config.tunnel?.bind ?? "0.0.0.0",
     },
-    docker: {
-      image: config.docker?.image ?? DEFAULT_RUNNER_IMAGE,
-      ...(config.docker?.binary === undefined
-        ? {}
-        : { binary: config.docker.binary }),
-      // host-gateway resolves the Docker host from inside a container on
-      // every Docker platform, so runners reach the host tunnel by default.
-      hostUrl:
-        config.docker?.hostUrl ?? `tcp://host.docker.internal:${tunnelPort}`,
-    },
-    kas: {
-      namespace: config.kas?.namespace ?? "dsh-sandbox",
-      warmPool: config.kas?.warmPool ?? "dsh-universal",
-      readyTimeoutMs: config.kas?.readyTimeoutMs ?? 180_000,
-      ...(config.kas?.kubeconfig === undefined
-        ? {}
-        : { kubeconfig: config.kas.kubeconfig }),
-    },
   };
   for (const [name, value] of [
     ["idleMs", resolved.idleMs],
@@ -758,13 +857,48 @@ function resolveConfig(config: Config): ResolvedConfig {
   return resolved;
 }
 
+function resolveProfile(
+  name: string,
+  profile: ProfileConfig,
+  tunnelPort: number,
+): SandboxProfile {
+  if (profile.backend === "docker") {
+    return {
+      name,
+      backend: "docker",
+      image: profile.image ?? DEFAULT_RUNNER_IMAGE,
+      ...(profile.binary === undefined ? {} : { binary: profile.binary }),
+      // host-gateway resolves the Docker host from inside a container on
+      // every Docker platform, so runners reach the host tunnel by default.
+      hostUrl: profile.hostUrl ?? `tcp://host.docker.internal:${tunnelPort}`,
+    };
+  }
+  return {
+    name,
+    backend: "kas",
+    namespace: profile.namespace ?? "dsh-sandbox",
+    warmPool: profile.warmPool ?? "dsh-universal",
+    readyTimeoutMs: profile.readyTimeoutMs ?? 180_000,
+    ...(profile.kubeconfig === undefined
+      ? {}
+      : { kubeconfig: profile.kubeconfig }),
+  };
+}
+
 function createBackend(
-  config: ResolvedConfig,
+  profile: SandboxProfile,
   registrationToken: string,
 ): SandboxBackend {
-  return config.backend === "docker"
-    ? new DockerBackend({ ...config.docker, registrationToken })
-    : new KasBackend(config.kas);
+  if (profile.backend === "docker") {
+    const { name: _name, backend: _backend, ...options } = profile;
+    return new DockerBackend({ ...options, registrationToken });
+  }
+  const { name: _name, backend: _backend, ...options } = profile;
+  return new KasBackend(options);
+}
+
+function orphanedRecordMessage(record: SessionRecord): string {
+  return `session ${record.sessionId} has a ${record.backend} sandbox from profile ${record.profile}, which is no longer configured on that backend`;
 }
 
 const TOKEN_ENV = "DSH_WORKBENCH_REGISTRATION_TOKEN";
@@ -774,7 +908,10 @@ const TOKEN_ENV = "DSH_WORKBENCH_REGISTRATION_TOKEN";
  * a comma-separated list so a rotation can admit old and new tokens at once;
  * new sandboxes always receive the first entry.
  */
-function resolveRegistrationTokens(config: ResolvedConfig): string[] {
+function resolveRegistrationTokens(
+  config: ResolvedConfig,
+  profiles: SandboxProfile[],
+): string[] {
   const configured = config.registrationToken ?? process.env[TOKEN_ENV];
   if (configured !== undefined) {
     const tokens = configured
@@ -786,9 +923,10 @@ function resolveRegistrationTokens(config: ResolvedConfig): string[] {
     }
     return tokens;
   }
-  if (config.backend !== "docker") {
+  const remote = profiles.find((profile) => profile.backend !== "docker");
+  if (remote !== undefined) {
     throw new Error(
-      `the ${config.backend} backend needs a registration token; set ${TOKEN_ENV} or the registrationToken config`,
+      `the ${remote.backend} backend needs a registration token; set ${TOKEN_ENV} or the registrationToken config`,
     );
   }
   // Docker development runs host and runners on one machine, so the provider

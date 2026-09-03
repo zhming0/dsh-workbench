@@ -11,6 +11,7 @@ import type { DirectoryFlowOwnerProps } from "@deepseek-ai/dsh-client-ui-workspa
 
 import { workbenchRemote } from "../remote-contributions.js";
 import { InstructionsSettings } from "./instructions.js";
+import { SandboxProfileChip } from "./profile.js";
 import { SecretsFooterAction } from "./secrets.js";
 
 interface RepositoryDirectoryFlowProps extends DirectoryFlowOwnerProps {
@@ -195,6 +196,32 @@ export async function apply(ctx: Context) {
             inject: injectedInstructions,
           },
           InstructionsSettings,
+        );
+      },
+    );
+    const injectedProfile = () => ({
+      getSessionProfile: async (sessionId: string) =>
+        unwrap(
+          await remoteCtx.remote.sandboxManager.getSessionProfile(sessionId),
+        ),
+      setSessionProfile: async (sessionId: string, profile: string) =>
+        unwrap(
+          await remoteCtx.remote.sandboxManager.setSessionProfile(
+            sessionId,
+            profile,
+          ),
+        ),
+    });
+    remoteCtx.slots.inject(
+      "conversation.input.left",
+      function* registerProfileChip() {
+        yield remoteCtx.slots.register(
+          {
+            name: "conversation.input.left",
+            id: "dsh-workbench.profile",
+            inject: injectedProfile,
+          },
+          SandboxProfileChip,
         );
       },
     );
