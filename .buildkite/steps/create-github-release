@@ -10,7 +10,9 @@ HOST_IMAGE="ghcr.io/zhming0/dsh-host"
 RUNNER_IMAGE="ghcr.io/zhming0/dsh-runner"
 
 echo "--- :git: Configuring HTTPS authentication"
-git config url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+# The push remote is HTTPS, and Buildkite's hosted git credentials do not
+# cover this repository, so the push carries the ambient token in its URL.
+git config url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 
 echo "--- :git: Tagging $TAG"
 git tag "$TAG"
