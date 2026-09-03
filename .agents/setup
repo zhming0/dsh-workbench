@@ -3,6 +3,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Older snapshots may still link gh to the mise shim. Amp writes its gh wrapper
+# through that link during activation, replacing the mise executable used by all
+# shims. Remove the stale link without touching Amp's regular wrapper file.
+[[ ! -L "$HOME/.local/bin/gh" ]] || rm "$HOME/.local/bin/gh"
+
 # Same bootstrap CI uses, so an agent and a build get identical tool versions.
 source "${ROOT_DIR}/.buildkite/steps/lib/mise.bash"
 ensure_tools

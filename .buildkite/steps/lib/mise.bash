@@ -31,17 +31,25 @@ install_mise() {
 
 # Put every tool that mise.toml pins on PATH, plus pnpm.
 ensure_tools() {
-  command -v mise >/dev/null 2>&1 || install_mise
+  local installed_version=""
+  if command -v mise >/dev/null 2>&1; then
+    installed_version="$(mise --version 2>/dev/null)" || true
+  fi
+  [[ "${installed_version%% *}" == "$MISE_VERSION" ]] || install_mise
 
-  echo "--- :recycle: Restoring the toolchain cache"
-  buildkite-agent cache restore --name mise
+  if command -v buildkite-agent >/dev/null 2>&1; then
+    echo "--- :recycle: Restoring the toolchain cache"
+    buildkite-agent cache restore --name mise
+  fi
 
   echo "--- :toolbox: Installing tools from mise.toml"
   local root
   root="$(git rev-parse --show-toplevel)"
   mise trust "${root}/mise.toml"
   mise install --cd "$root"
-  buildkite-agent cache save --name mise
+  if command -v buildkite-agent >/dev/null 2>&1; then
+    buildkite-agent cache save --name mise
+  fi
   eval "$(mise activate bash --shims)"
 
   # The `packageManager` field in package.json pins pnpm and corepack reads it,
