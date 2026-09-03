@@ -21,3 +21,6 @@ kubectl = "1.37.0"
 # Only the release pipeline needs the GitHub CLI. The aqua registry entry for it
 # fails attestation verification, so install it directly from GitHub instead.
 "github:cli/cli" = "2.87.2"
+
+# Contributors use the Buildkite CLI to inspect and manage CI builds.
+"aqua:buildkite/cli" = "3.55.0"
