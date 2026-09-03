@@ -85,8 +85,16 @@ details are in
 
 ### Start a session
 
-Open the host in the browser (before exposure is wired up:
-`kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000`), then:
+dsh prints a sign-in URL (`http://127.0.0.1:3000/?token=…`) when it starts;
+the browser exchanges the token for a cookie that lasts 30 days. Get it from
+the host log, open it through the address you use to reach the host (for a
+port-forward, `http://localhost:3000/?token=…`), then start a session:
+
+```sh
+kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'
+# before exposure is wired up:
+kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
+```
 
 1. Open **New session**, then **Add workspace…**.
 2. Enter a repository URL such as `https://github.com/owner/repository`.

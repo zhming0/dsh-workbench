@@ -1,6 +1,9 @@
-# The distribution fronts dsh with oauth2-proxy: dsh ships no user
-# authentication and binds pod loopback, so the proxy port (4180) is the thing
-# you expose — with a Service, Ingress, LoadBalancer, or Gateway of your own.
+# The distribution fronts dsh with oauth2-proxy: dsh binds pod loopback and
+# its only browser authentication is the startup `?token=` URL, which anyone
+# who can reach the port can use once they read the log. The proxy port (4180)
+# is the thing you expose — with a Service, Ingress, LoadBalancer, or Gateway
+# of your own. Users still open the tokenized URL once, through the external
+# hostname; see docs/kubernetes.md.
 #
 # This kustomize patch adds the proxy next to dsh, forwarding to it over
 # pod-local loopback, and hands dsh the external hostname as `--trusted-host`:

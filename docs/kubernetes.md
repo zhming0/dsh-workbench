@@ -218,6 +218,20 @@ explicitly trusted — its defense against DNS rebinding. The proxy passes the
 browser's Host through, so the external hostname is handed to dsh as
 `--trusted-host`. If you change the hostname, change it there too.
 
+Behind the proxy, dsh still asks each browser for its own sign-in token. dsh
+prints the URL at startup and the cookie it mints is bound to the hostname the
+browser used, so read the token from the host log and open it once through the
+external hostname:
+
+```sh
+kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'
+# prints http://127.0.0.1:3000/?token=…; open https://dsh.example.com/?token=…
+```
+
+The cookie lasts 30 days and its signing secret lives on the data volume, so a
+host restart does not sign browsers out. A new browser, or a cookie that has
+expired, needs the current token; each restart mints a new one.
+
 For yourself, a port-forward always works, with or without the proxy
 configured:
 
@@ -225,8 +239,8 @@ configured:
 kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
 ```
 
-then open `http://localhost:3000`. Loopback is trusted, so no extra flags are
-needed.
+then open `http://localhost:3000/?token=…` with the same token. Loopback is
+trusted, so no extra flags are needed.
 
 The proxy authenticates users; it does not isolate them from each other. One
 dsh host is one trust domain — everyone the issuer lets through shares the

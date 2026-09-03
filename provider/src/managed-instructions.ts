@@ -167,7 +167,7 @@ function managedInstructionMessage(text: string) {
 
 function latestManagedInstructions(agent: Agent): string | undefined {
   for (const sequence of agent.session.surface.nodes.toReversed()) {
-    const event = agent.session.events[sequence];
+    const event = agent.session.eventAt(sequence);
     if (event?.type !== "user/message") {
       continue;
     }
