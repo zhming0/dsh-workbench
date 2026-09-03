@@ -33,15 +33,11 @@ install_mise() {
 ensure_tools() {
   command -v mise >/dev/null 2>&1 || install_mise
 
-  echo "--- :recycle: Restoring the toolchain cache"
-  buildkite-agent cache restore --name mise
-
   echo "--- :toolbox: Installing tools from mise.toml"
   local root
   root="$(git rev-parse --show-toplevel)"
   mise trust "${root}/mise.toml"
   mise install --cd "$root"
-  buildkite-agent cache save --name mise
   eval "$(mise activate bash --shims)"
 
   # The `packageManager` field in package.json pins pnpm and corepack reads it,

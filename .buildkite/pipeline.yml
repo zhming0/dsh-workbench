@@ -3,7 +3,6 @@ agents:
   queue: hosted-amd64-small
 
 steps:
-  # Hosted agents are single-use; reusable state goes through .buildkite/cache.yml.
   # Every step installs its toolchain from mise.toml, so the image only has to
   # supply git, curl, and a C compiler, the last of which `go test -race` needs.
   # Pinning a language image here would put a second version of Go or Node next
