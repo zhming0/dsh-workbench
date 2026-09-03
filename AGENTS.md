@@ -142,6 +142,18 @@ likely to mislead you.
   from. Do not reintroduce a version in a pipeline image, a step script, or the
   README. pnpm is the exception: `packageManager` in `package.json` pins it.
 
+## Inspect Buildkite CI
+
+Use `bk`, pinned in `mise.toml`, to inspect this repository's CI in the
+`zhming0` organization and `dsh-workbench` pipeline. Prefer the pre-provisioned
+`BUILDKITE_API_TOKEN`; it takes precedence over the credential store and legacy
+config, and `BUILDKITE_ORGANIZATION_SLUG` selects the organization, so no login
+is needed when they are set. Do not run `bk auth login --device` or any
+interactive login unless the user explicitly asks. If the token is absent,
+report that and stop. When explicitly asked to log in from a headless sandbox,
+run `bk auth login --device --credential-store shm`; then confirm with
+`bk auth status`.
+
 ## Test the affected path
 
 For TypeScript or protobuf changes, run:
