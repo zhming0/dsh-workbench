@@ -20,7 +20,9 @@ export class SessionStore {
       const parsed = JSON.parse(await readFile(this.path, "utf8")) as unknown;
       this.state = parseState(parsed);
     } catch (error) {
-      if (!isNotFound(error)) throw error;
+      if (!isNotFound(error)) {
+        throw error;
+      }
     }
   }
 

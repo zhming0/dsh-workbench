@@ -160,6 +160,7 @@ For TypeScript or protobuf changes, run:
 
 ```sh
 pnpm check
+pnpm lint
 pnpm format:check
 pnpm test
 pnpm build
@@ -168,7 +169,7 @@ pnpm build
 For runner changes, also run:
 
 ```sh
-(cd runner && go test -race ./... && go vet ./... && go build ./...)
+(cd runner && go test -race ./... && golangci-lint run && go build ./...)
 ```
 
 Run `pnpm test:docker` for Docker lifecycle, runner protocol, setup, credential,

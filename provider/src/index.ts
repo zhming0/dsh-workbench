@@ -237,11 +237,15 @@ export class SandboxManager extends TypertRemoteService {
     // resolves a cold session resumes it, and a resume must not schedule
     // pods: real work wakes the sandbox at the first pre-step or tool call.
     ctx.on("agent/session-start", ({ agent, source }) => {
-      if (source === "startup") this.ensureRunning(agent);
+      if (source === "startup") {
+        void this.ensureRunning(agent);
+      }
     });
     this.instructions.install();
     ctx.on("agent/status", ({ agent, status }) => {
-      if (status === "running") this.markActive(String(agent.id));
+      if (status === "running") {
+        this.markActive(String(agent.id));
+      }
     });
     ctx.on("session/event", (session, event) => {
       if (event.type === "turn/start") {
@@ -252,7 +256,9 @@ export class SandboxManager extends TypertRemoteService {
       }
     });
     ctx.effect(() => () => {
-      for (const timer of this.idleTimers.values()) clearTimeout(timer);
+      for (const timer of this.idleTimers.values()) {
+        clearTimeout(timer);
+      }
       this.idleTimers.clear();
       void this.ownedTunnel?.close();
     });
@@ -349,9 +355,13 @@ export class SandboxManager extends TypertRemoteService {
 
   private async hibernateUnlocked(sessionId: string): Promise<void> {
     const record = this.store.get(sessionId);
-    if (record === undefined || record.state === "hibernated") return;
+    if (record === undefined || record.state === "hibernated") {
+      return;
+    }
 
-    if (this.config.wipCommit) await this.commitWorkInProgress(sessionId);
+    if (this.config.wipCommit) {
+      await this.commitWorkInProgress(sessionId);
+    }
     const deadline = new Date(Date.now() + this.config.expiresAfterMs);
     try {
       if (this.backend.capabilities.supportsHibernate) {
@@ -380,7 +390,9 @@ export class SandboxManager extends TypertRemoteService {
         });
       }
     } catch (error) {
-      if (!(error instanceof SandboxNotFoundError)) throw error;
+      if (!(error instanceof SandboxNotFoundError)) {
+        throw error;
+      }
       await this.store.delete(sessionId);
       transitions.add(1, { backend: this.backend.name, transition: "missing" });
     }
@@ -414,7 +426,9 @@ export class SandboxManager extends TypertRemoteService {
       try {
         await this.backend.expireAt(record.reference, deadline);
       } catch (error) {
-        if (!(error instanceof SandboxNotFoundError)) throw error;
+        if (!(error instanceof SandboxNotFoundError)) {
+          throw error;
+        }
         // A missing backend object means its external garbage collection won.
         // Remove the stale local record so the next turn provisions cleanly.
         await this.store.delete(record.sessionId);
@@ -443,8 +457,9 @@ export class SandboxManager extends TypertRemoteService {
     if (cached !== undefined && record?.state === "running") {
       try {
         const health = await cached.health({ timeoutMs: 5_000 });
-        if (health.sandboxId !== record.sandboxId)
+        if (health.sandboxId !== record.sandboxId) {
           throw new Error("runner identity changed");
+        }
         await this.broker.refresh();
         const credentials = await this.broker.gitCredentials(
           record.repositoryUrl,
@@ -485,7 +500,9 @@ export class SandboxManager extends TypertRemoteService {
         await this.store.set(record);
         transitions.add(1, { backend: this.backend.name, transition: "wake" });
       } catch (error) {
-        if (!(error instanceof SandboxNotFoundError)) throw error;
+        if (!(error instanceof SandboxNotFoundError)) {
+          throw error;
+        }
         await this.backend.destroy(record.reference).catch(() => {});
         await this.store.delete(sessionId);
         record = undefined;
@@ -558,9 +575,13 @@ export class SandboxManager extends TypertRemoteService {
     const cwd = agent.session.header.cwd;
     if (cwd !== undefined) {
       const repository = await repositoryForAnchor(this.config.stateDir, cwd);
-      if (repository !== undefined) return repository;
+      if (repository !== undefined) {
+        return repository;
+      }
     }
-    if (this.config.repository !== undefined) return this.config.repository;
+    if (this.config.repository !== undefined) {
+      return this.config.repository;
+    }
     if (cwd === undefined) {
       throw new Error(
         "sandbox repository is not configured and the dsh session has no cwd",
@@ -575,7 +596,9 @@ export class SandboxManager extends TypertRemoteService {
         "origin",
       ]);
       const repository = stdout.trim();
-      if (repository.length === 0) throw new Error("origin is empty");
+      if (repository.length === 0) {
+        throw new Error("origin is empty");
+      }
       return repository;
     } catch (error) {
       throw new Error(
@@ -611,7 +634,9 @@ export class SandboxManager extends TypertRemoteService {
   ): Promise<void> {
     await this.ready;
     await this.serialize(sessionId, async () => {
-      if ((this.activity.get(sessionId) ?? 0) !== expectedActivity) return;
+      if ((this.activity.get(sessionId) ?? 0) !== expectedActivity) {
+        return;
+      }
       // A live turn holds no countdown of its own, and a timer this wake
       // re-armed must not suspend under it: retry until turn/end re-arms.
       if (this.liveTurns.has(sessionId)) {
@@ -629,7 +654,9 @@ export class SandboxManager extends TypertRemoteService {
 
   private cancelIdle(sessionId: string): void {
     const timer = this.idleTimers.get(sessionId);
-    if (timer !== undefined) clearTimeout(timer);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
     this.idleTimers.delete(sessionId);
   }
 
@@ -645,15 +672,18 @@ export class SandboxManager extends TypertRemoteService {
     );
     this.operations.set(sessionId, tail);
     void tail.finally(() => {
-      if (this.operations.get(sessionId) === tail)
+      if (this.operations.get(sessionId) === tail) {
         this.operations.delete(sessionId);
+      }
     });
     return result;
   }
 
   private async commitWorkInProgress(sessionId: string): Promise<void> {
     const client = this.clients.get(sessionId);
-    if (client === undefined) return;
+    if (client === undefined) {
+      return;
+    }
     const stream = client.exec({
       argv: [
         "/bin/bash",
@@ -718,11 +748,13 @@ function resolveConfig(config: Config): ResolvedConfig {
     ["idleMs", resolved.idleMs],
     ["expiresAfterMs", resolved.expiresAfterMs],
   ] as const) {
-    if (!Number.isFinite(value) || value <= 0)
+    if (!Number.isFinite(value) || value <= 0) {
       throw new Error(`${name} must be positive`);
+    }
   }
-  if (!resolved.workspace.startsWith("/"))
+  if (!resolved.workspace.startsWith("/")) {
     throw new Error("workspace must be an absolute Linux path");
+  }
   return resolved;
 }
 
@@ -765,9 +797,13 @@ function resolveRegistrationTokens(config: ResolvedConfig): string[] {
   const path = join(config.stateDir, "registration-token");
   try {
     const existing = readFileSync(path, "utf8").trim();
-    if (existing !== "") return [existing];
+    if (existing !== "") {
+      return [existing];
+    }
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
   }
   mkdirSync(config.stateDir, { recursive: true, mode: 0o700 });
   const token = randomBytes(32).toString("hex");

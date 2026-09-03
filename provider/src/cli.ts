@@ -12,16 +12,20 @@ async function main(arguments_: string[]): Promise<void> {
   const [command, subcommand, name] = arguments_;
   if (command === "secret" && subcommand === "list") {
     const broker = await openBroker();
-    for (const secretName of broker.secretNames())
+    for (const secretName of broker.secretNames()) {
       process.stdout.write(`${secretName}\n`);
+    }
     return;
   }
 
   if (command === "secret" && subcommand === "set" && name !== undefined) {
-    if (process.stdin.isTTY)
+    if (process.stdin.isTTY) {
       throw new Error("pipe the secret value on standard input");
+    }
     const chunks: Buffer[] = [];
-    for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+    for await (const chunk of process.stdin as AsyncIterable<Buffer>) {
+      chunks.push(Buffer.from(chunk));
+    }
     const value = Buffer.concat(chunks)
       .toString("utf8")
       .replace(/\r?\n$/, "");
@@ -43,7 +47,9 @@ async function main(arguments_: string[]): Promise<void> {
   printf '%s' VALUE | dsh-workbench secret set NAME
   dsh-workbench secret delete NAME
 `);
-  if (command !== undefined) process.exitCode = 2;
+  if (command !== undefined) {
+    process.exitCode = 2;
+  }
 }
 
 async function openBroker(): Promise<CredentialBroker> {

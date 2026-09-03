@@ -23,7 +23,7 @@ func TestHelperGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	var out bytes.Buffer
 	if err := Helper(path, "get", strings.NewReader("protocol=https\nhost=example.com\n\n"), &out); err != nil {
 		t.Fatal(err)

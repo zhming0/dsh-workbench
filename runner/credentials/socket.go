@@ -22,7 +22,7 @@ func Serve(path string, s *service.Service) (net.Listener, error) {
 		return nil, err
 	}
 	if err = os.Chmod(path, 0600); err != nil {
-		listener.Close()
+		_ = listener.Close()
 		return nil, err
 	}
 	go func() {
@@ -37,13 +37,15 @@ func Serve(path string, s *service.Service) (net.Listener, error) {
 	return listener, nil
 }
 func handle(connection net.Conn, s *service.Service) {
-	defer connection.Close()
+	defer func() { _ = connection.Close() }()
 	fields := readFields(connection)
 	if fields["action"] != "get" {
 		return
 	}
 	if credential, ok := s.Credential(fields["host"]); ok {
-		fmt.Fprintf(connection, "username=%s\npassword=%s\n\n", credential.Username, credential.Password)
+		// The peer is a short-lived git credential helper; if it is gone
+		// there is nothing left to report the write failure to.
+		_, _ = fmt.Fprintf(connection, "username=%s\npassword=%s\n\n", credential.Username, credential.Password)
 	}
 }
 func readFields(r io.Reader) map[string]string {
@@ -68,13 +70,19 @@ func Helper(path, action string, in io.Reader, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer connection.Close()
-	fmt.Fprintln(connection, "action=get")
+	defer func() { _ = connection.Close() }()
+	if _, err := fmt.Fprintln(connection, "action=get"); err != nil {
+		return err
+	}
 	fields := readFields(in)
 	for key, value := range fields {
-		fmt.Fprintf(connection, "%s=%s\n", key, value)
+		if _, err := fmt.Fprintf(connection, "%s=%s\n", key, value); err != nil {
+			return err
+		}
 	}
-	fmt.Fprintln(connection)
+	if _, err := fmt.Fprintln(connection); err != nil {
+		return err
+	}
 	if unixConnection, ok := connection.(*net.UnixConn); ok {
 		_ = unixConnection.CloseWrite()
 	}

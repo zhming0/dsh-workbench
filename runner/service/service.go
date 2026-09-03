@@ -81,9 +81,10 @@ func version(info os.FileInfo) string {
 	stat, _ := info.Sys().(*syscall.Stat_t)
 	hash := sha256.New()
 	if stat == nil {
-		fmt.Fprintf(hash, "%d:%d:%d", info.Size(), info.ModTime().UnixNano(), info.Mode())
+		// A hash never reports a write failure.
+		_, _ = fmt.Fprintf(hash, "%d:%d:%d", info.Size(), info.ModTime().UnixNano(), info.Mode())
 	} else {
-		fmt.Fprintf(hash, "%d:%d:%d:%d:%d", stat.Dev, stat.Ino, info.Size(), info.ModTime().UnixNano(), info.Mode())
+		_, _ = fmt.Fprintf(hash, "%d:%d:%d:%d:%d", stat.Dev, stat.Ino, info.Size(), info.ModTime().UnixNano(), info.Mode())
 	}
 	return hex.EncodeToString(hash.Sum(nil))
 }
@@ -325,7 +326,7 @@ func (s *Service) ReadFile(_ context.Context, request *connect.Request[v1.ReadFi
 	if err != nil {
 		return nil, cerr(connect.CodeNotFound, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	content, err := io.ReadAll(io.LimitReader(file, limit+1))
 	if err != nil {
 		return nil, cerr(connect.CodeInternal, err)
@@ -342,7 +343,9 @@ func atomicWrite(path string, content []byte, mode os.FileMode) error {
 		return err
 	}
 	temporaryPath := file.Name()
-	defer os.Remove(temporaryPath)
+	// The rename below replaces the temporary file on success; removing an
+	// already-renamed path is expected to fail.
+	defer func() { _ = os.Remove(temporaryPath) }()
 	if err = file.Chmod(mode); err == nil {
 		_, err = file.Write(content)
 	}

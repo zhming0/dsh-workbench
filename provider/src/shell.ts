@@ -55,7 +55,9 @@ export class SandboxShellExecutor extends ShellExecutor {
       outputMaxBytes: config.outputMaxBytes ?? 1024 * 1024,
     };
     ctx.effect(() => async () => {
-      for (const process of this.live) process.kill();
+      for (const process of this.live) {
+        process.kill();
+      }
       await Promise.all([...this.live].map((process) => process.done));
     });
   }
@@ -65,8 +67,9 @@ export class SandboxShellExecutor extends ShellExecutor {
       request.timeoutMs ?? this.config.timeoutMs,
       this.config.maxTimeoutMs,
     );
-    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
       throw new Error("shell timeout must be positive");
+    }
     const sessionWorkspace =
       this.ctx.agents.requireInitiator().session.header.cwd;
     return {
@@ -110,7 +113,9 @@ export class SandboxShellExecutor extends ShellExecutor {
         stderr: stderr.collected(),
       };
     } catch (error) {
-      if (!combined.aborted) throw error;
+      if (!combined.aborted) {
+        throw error;
+      }
       return {
         exitCode: null,
         signal: "SIGTERM",
@@ -172,10 +177,11 @@ async function runShell(
     | { exitCode: number | null; signal: NodeJS.Signals | null }
     | undefined;
   for await (const response of stream) {
-    if (response.event.case === "stdout") stdout.append(response.event.value);
-    else if (response.event.case === "stderr")
+    if (response.event.case === "stdout") {
+      stdout.append(response.event.value);
+    } else if (response.event.case === "stderr") {
       stderr.append(response.event.value);
-    else if (response.event.case === "exited") {
+    } else if (response.event.case === "exited") {
       outcome = {
         exitCode:
           response.event.value.signal === ""
@@ -188,8 +194,9 @@ async function runShell(
       };
     }
   }
-  if (outcome === undefined)
+  if (outcome === undefined) {
     throw new Error("runner exec stream ended without an exit status");
+  }
   return outcome;
 }
 
@@ -277,7 +284,9 @@ class RemoteShellProcess implements ShellProcess {
   }
 
   kill(): boolean {
-    if (this.status !== "running") return false;
+    if (this.status !== "running") {
+      return false;
+    }
     this.controller.abort(new Error("background process killed"));
     return true;
   }

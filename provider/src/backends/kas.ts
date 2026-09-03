@@ -52,8 +52,11 @@ export class KasBackend implements SandboxBackend {
   ) {
     if (api === undefined) {
       const config = new KubeConfig();
-      if (options.kubeconfig === undefined) config.loadFromDefault();
-      else config.loadFromFile(options.kubeconfig);
+      if (options.kubeconfig === undefined) {
+        config.loadFromDefault();
+      } else {
+        config.loadFromFile(options.kubeconfig);
+      }
       this.api = config.makeApiClient(CustomObjectsApi);
     } else {
       this.api = api;
@@ -82,7 +85,9 @@ export class KasBackend implements SandboxBackend {
     } catch (error) {
       // The provider may have stopped after creating the claim but before
       // saving its local record. Its deterministic name makes that recoverable.
-      if (!isKubernetesStatus(error, 409)) throw error;
+      if (!isKubernetesStatus(error, 409)) {
+        throw error;
+      }
     }
     const claim = await this.waitForClaim(claimName);
     const sandboxId = claim.status?.sandbox?.name;
@@ -141,7 +146,9 @@ export class KasBackend implements SandboxBackend {
         propagationPolicy: "Foreground",
       });
     } catch (error) {
-      if (!isKubernetesNotFound(error)) throw error;
+      if (!isKubernetesNotFound(error)) {
+        throw error;
+      }
     }
   }
 
@@ -190,7 +197,9 @@ export class KasBackend implements SandboxBackend {
       })) as SandboxObject;
       return conditionIsTrue(sandbox.status?.conditions, "Ready");
     } catch (error) {
-      if (isKubernetesStatus(error, 404)) return false;
+      if (isKubernetesStatus(error, 404)) {
+        return false;
+      }
       throw error;
     }
   }
@@ -221,7 +230,9 @@ export class KasBackend implements SandboxBackend {
 
   private async clearExpiry(name: string): Promise<void> {
     const claim = await this.getClaim(name);
-    if (claim.spec?.lifecycle === undefined) return;
+    if (claim.spec?.lifecycle === undefined) {
+      return;
+    }
     await this.api.patchNamespacedCustomObject({
       group: EXTENSION_GROUP,
       version: API_VERSION,
@@ -308,7 +319,9 @@ async function poll<T>(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const value = await operation();
-    if (value !== undefined) return value;
+    if (value !== undefined) {
+      return value;
+    }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   throw new Error(message);

@@ -30,8 +30,11 @@ export class CredentialBroker {
         JSON.parse(await readFile(this.options.path, "utf8")),
       );
     } catch (error) {
-      if (isNotFound(error)) this.state = { version: 1, secrets: {} };
-      else throw error;
+      if (isNotFound(error)) {
+        this.state = { version: 1, secrets: {} };
+      } else {
+        throw error;
+      }
     }
   }
 
@@ -64,9 +67,13 @@ export class CredentialBroker {
     repositoryUrl: string,
   ): Promise<Array<{ host: string; username: string; password: string }>> {
     const host = repositoryHost(repositoryUrl);
-    if (host !== "github.com") return [];
+    if (host !== "github.com") {
+      return [];
+    }
     const token = this.state.secrets["GITHUB_TOKEN"];
-    if (token === undefined) return [];
+    if (token === undefined) {
+      return [];
+    }
     return [{ host, username: "x-access-token", password: token }];
   }
 
@@ -84,7 +91,9 @@ export class CredentialBroker {
 
 function repositoryHost(url: string): string | undefined {
   const scpStyle = /^[^@]+@([^:]+):/.exec(url);
-  if (scpStyle?.[1] !== undefined) return scpStyle[1].toLowerCase();
+  if (scpStyle?.[1] !== undefined) {
+    return scpStyle[1].toLowerCase();
+  }
   try {
     return new URL(url).hostname.toLowerCase();
   } catch {
@@ -94,7 +103,9 @@ function repositoryHost(url: string): string | undefined {
 
 export function normalizeRepositoryUrl(url: string): string {
   const scpStyle = /^git@github\.com:(.+)$/.exec(url);
-  if (scpStyle?.[1] !== undefined) return `https://github.com/${scpStyle[1]}`;
+  if (scpStyle?.[1] !== undefined) {
+    return `https://github.com/${scpStyle[1]}`;
+  }
   try {
     const parsed = new URL(url);
     if (

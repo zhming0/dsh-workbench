@@ -33,10 +33,12 @@ function fakeRunnerClient(
   return {
     resolveExecutable({ command }: { command: string }) {
       resolves.push(command);
-      if ((options.existing ?? []).includes(command))
+      if ((options.existing ?? []).includes(command)) {
         return Promise.resolve({ path: command });
-      if ((options.onPath ?? {})[command] !== undefined)
+      }
+      if ((options.onPath ?? {})[command] !== undefined) {
         return Promise.resolve({ path: options.onPath![command]! });
+      }
       return Promise.reject(new Error("executable not found"));
     },
     // RemoteProcess consumes one request per exec and only needs the exit.

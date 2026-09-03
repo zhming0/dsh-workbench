@@ -51,9 +51,13 @@ export class ManagedInstructions {
       }
       const rendered = this.renderFor(agent);
       const previous = latestManagedInstructions(agent);
-      if (rendered === "" && previous === undefined) return decision;
+      if (rendered === "" && previous === undefined) {
+        return decision;
+      }
       const text = rendered === "" ? CLEARED_INSTRUCTIONS : rendered;
-      if (previous === text) return decision;
+      if (previous === text) {
+        return decision;
+      }
       const lastClaimedIndex = decision.messages.findLastIndex((message) =>
         messages.includes(message),
       );
@@ -125,7 +129,9 @@ export class ManagedInstructions {
 
   private async workspaces(): Promise<InstructionWorkspaceView[]> {
     const registry = this.dependencies.workspaceRegistry();
-    if (registry === undefined) return [];
+    if (registry === undefined) {
+      return [];
+    }
     const workspaces = await Promise.all(
       registry.list().map(async (workspace) => {
         const repositoryUrl = await repositoryForAnchor(
@@ -162,9 +168,13 @@ function managedInstructionMessage(text: string) {
 function latestManagedInstructions(agent: Agent): string | undefined {
   for (const sequence of agent.session.surface.nodes.toReversed()) {
     const event = agent.session.events[sequence];
-    if (event?.type !== "user/message") continue;
+    if (event?.type !== "user/message") {
+      continue;
+    }
     const text = managedInstructionText(event.data);
-    if (text !== undefined) return text;
+    if (text !== undefined) {
+      return text;
+    }
   }
 }
 
@@ -186,7 +196,9 @@ function renderManagedInstructions(
   workspace: string,
   repositoryUrl?: string,
 ): string {
-  if (global === "" && workspace === "") return "";
+  if (global === "" && workspace === "") {
+    return "";
+  }
   const sections: string[] = [];
   if (global !== "") {
     sections.push(

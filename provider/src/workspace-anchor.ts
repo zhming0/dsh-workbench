@@ -47,7 +47,9 @@ export async function createRepositoryAnchor(
   try {
     existing = await readAnchorMetadata(metadataPath);
   } catch (error) {
-    if (!isNotFound(error)) throw error;
+    if (!isNotFound(error)) {
+      throw error;
+    }
     const temporary = `${metadataPath}.${process.pid}.${randomUUID()}.tmp`;
     try {
       await writeFile(temporary, `${JSON.stringify(metadata, null, 2)}\n`, {
@@ -80,7 +82,9 @@ export async function repositoryForAnchor(
       realpath(cwd),
     ]);
   } catch (error) {
-    if (isNotFound(error)) return undefined;
+    if (isNotFound(error)) {
+      return undefined;
+    }
     throw error;
   }
 
@@ -88,13 +92,17 @@ export async function repositoryForAnchor(
   if (child.length === 0 || child.startsWith("..") || isAbsolute(child)) {
     return undefined;
   }
-  if (child.includes("/") || child.includes("\\")) return undefined;
+  if (child.includes("/") || child.includes("\\")) {
+    return undefined;
+  }
 
   let metadata: AnchorMetadata;
   try {
     metadata = await readAnchorMetadata(join(path, METADATA_FILE));
   } catch (error) {
-    if (isNotFound(error)) return undefined;
+    if (isNotFound(error)) {
+      return undefined;
+    }
     throw error;
   }
 
@@ -105,8 +113,9 @@ export async function repositoryForAnchor(
       repositoryTitle(metadata.repositoryUrl),
     ),
   );
-  if (expected !== path)
+  if (expected !== path) {
     throw new Error("repository anchor metadata is invalid");
+  }
   return metadata.repositoryUrl;
 }
 
@@ -124,7 +133,9 @@ export function normalizeWorkspaceRepositoryUrl(input: string): string {
       throw new Error("Repository URL must not contain a query or fragment");
     }
     const path = normalizeRepositoryPath(rawPath!);
-    if (path.length === 0) throw new Error("Repository URL has no path");
+    if (path.length === 0) {
+      throw new Error("Repository URL has no path");
+    }
     return `${user!}@${host!.toLowerCase()}:${path}`;
   }
 
@@ -150,7 +161,9 @@ export function normalizeWorkspaceRepositoryUrl(input: string): string {
     throw new Error("Repository URL must not contain a query or fragment");
   }
   const path = normalizeRepositoryPath(parsed.pathname);
-  if (path.length === 0) throw new Error("Repository URL has no path");
+  if (path.length === 0) {
+    throw new Error("Repository URL has no path");
+  }
   parsed.pathname = `/${path}`;
   repositoryUrl = parsed.toString();
   return repositoryUrl.endsWith("/")

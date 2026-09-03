@@ -14,7 +14,9 @@ it("pins every @deepseek-ai/dsh-* dependency to one version", () => {
   const pins = new Map<string, string>();
   for (const group of ["dependencies", "devDependencies", "peerDependencies"]) {
     for (const [name, range] of Object.entries(manifest[group] ?? {})) {
-      if (!name.startsWith("@deepseek-ai/dsh-")) continue;
+      if (!name.startsWith("@deepseek-ai/dsh-")) {
+        continue;
+      }
       pins.set(`${group} > ${name}`, range.replace(/^\^/, ""));
     }
   }

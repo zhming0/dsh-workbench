@@ -17,7 +17,9 @@ export interface SandboxSecretsRemote {
 
 const stringSchema: TypertSchema<string> = {
   parse(value: unknown): string {
-    if (typeof value !== "string") throw new TypeError("expected a string");
+    if (typeof value !== "string") {
+      throw new TypeError("expected a string");
+    }
     return value;
   },
 };
