@@ -1,0 +1,12 @@
+version: "2"
+
+# The default linter set matches what this project wants checked: errcheck for
+# ignored errors, govet, staticcheck for suspicious constructs, ineffassign
+# and unused for dead code. Grow it one linter at a time, only when a rule
+# catches something real here; never enable stylistic or "simplify this" rules.
+linters:
+  default: standard
+
+formatters:
+  enable:
+    - gofmt

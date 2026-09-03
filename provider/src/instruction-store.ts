@@ -23,7 +23,9 @@ export class InstructionStore {
         JSON.parse(await readFile(this.path, "utf8")),
       );
     } catch (error) {
-      if (!isNotFound(error)) throw error;
+      if (!isNotFound(error)) {
+        throw error;
+      }
     }
   }
 
@@ -47,8 +49,11 @@ export class InstructionStore {
   async setWorkspace(repositoryUrl: string, content: string): Promise<void> {
     const normalized = normalizeContent(content);
     assertWithinLimit(this.state.global, normalized);
-    if (normalized === "") delete this.state.workspaces[repositoryUrl];
-    else this.state.workspaces[repositoryUrl] = normalized;
+    if (normalized === "") {
+      delete this.state.workspaces[repositoryUrl];
+    } else {
+      this.state.workspaces[repositoryUrl] = normalized;
+    }
     await this.persist();
   }
 

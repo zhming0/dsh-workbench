@@ -9,8 +9,8 @@ cd runner
 echo "--- :golang: Restoring the Go cache"
 buildkite-agent cache restore --name go
 
-echo "--- :golang: Vetting"
-go vet ./...
+echo "--- :golang: Linting"
+golangci-lint run
 
 echo "--- :hammer: Building"
 go build ./...

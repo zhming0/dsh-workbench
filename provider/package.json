@@ -66,6 +66,8 @@
     "prepack": "tsc -p tsconfig.build.json && tsdown",
     "build": "tsc -p tsconfig.build.json && tsdown",
     "check": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx}' 'tests/**/*.ts' '*.ts' '*.md'",
     "format:check": "prettier --check 'src/**/*.{ts,tsx}' 'tests/**/*.ts' '*.ts' '*.md'",
     "test": "vitest run"
@@ -85,13 +87,16 @@
     "@deepseek-ai/dsh-client-ui-sidebar": "0.1.1-rc.2",
     "@deepseek-ai/dsh-client-ui-workspace": "0.1.1-rc.2",
     "@deepseek-ai/dsh-typert-registry": "0.1.1-rc.2",
+    "@eslint/js": "10.0.1",
     "@types/node": "24.3.0",
     "@types/react": "18.3.1",
+    "eslint": "10.9.1",
     "prettier": "3.6.2",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "tsdown": "0.22.2",
     "typescript": "5.9.2",
+    "typescript-eslint": "8.69.0",
     "vitest": "4.1.11"
   },
   "peerDependencies": {

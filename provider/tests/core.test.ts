@@ -695,6 +695,8 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
           content: [
             {
               type: "text",
+              // vitest types stringMatching as `any`.
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               text: expect.stringMatching(
                 /Use concise answers[\s\S]*Run the repository tests/,
               ),
@@ -767,7 +769,9 @@ class FakeRunnerClient {
   secrets: Record<string, string> = {};
 
   async health() {
-    if (!this.healthy) throw new Error("runner is unavailable");
+    if (!this.healthy) {
+      throw new Error("runner is unavailable");
+    }
     return { sandboxId: "sandbox-one", setupComplete: this.setups > 0 };
   }
 
@@ -853,7 +857,9 @@ function openTunnel(
       socket.pause();
       const newline = chunk.indexOf(0x0a);
       const rest = chunk.subarray(newline + 1);
-      if (rest.length > 0) socket.unshift(rest);
+      if (rest.length > 0) {
+        socket.unshift(rest);
+      }
       resolve({
         socket,
         reply: JSON.parse(chunk.subarray(0, newline).toString("utf8")),

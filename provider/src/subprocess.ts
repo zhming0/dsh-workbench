@@ -21,7 +21,9 @@ export class SandboxSubprocessRuntime extends SubprocessRuntime {
   constructor(ctx: Context) {
     super(ctx);
     ctx.effect(() => async () => {
-      for (const process of this.live) process.terminate();
+      for (const process of this.live) {
+        process.terminate();
+      }
       await Promise.allSettled([...this.live].map((process) => process.done));
     });
   }
@@ -120,13 +122,15 @@ class RemoteProcess implements SubprocessHandle {
         ? new CollectedBuffer(spec.stdio.stderr.maxBytes)
         : undefined;
     if (spec.signal !== undefined) {
-      if (spec.signal.aborted) this.controller.abort(spec.signal.reason);
-      else
+      if (spec.signal.aborted) {
+        this.controller.abort(spec.signal.reason);
+      } else {
         spec.signal.addEventListener(
           "abort",
           () => this.controller.abort(spec.signal!.reason),
           { once: true },
         );
+      }
     }
     this.done = this.run(client);
   }
@@ -163,7 +167,9 @@ class RemoteProcess implements SubprocessHandle {
       await this.done.catch(() => {});
       return true;
     }
-    if (signal.aborted) return false;
+    if (signal.aborted) {
+      return false;
+    }
     return Promise.race([
       this.done.then(
         () => true,
@@ -204,13 +210,13 @@ class RemoteProcess implements SubprocessHandle {
     );
     try {
       for await (const response of stream) {
-        if (response.event.case === "started")
+        if (response.event.case === "started") {
           this.processId = Number(response.event.value.pid);
-        else if (response.event.case === "stdout")
+        } else if (response.event.case === "stdout") {
           this.writeOutput("stdout", response.event.value);
-        else if (response.event.case === "stderr")
+        } else if (response.event.case === "stderr") {
           this.writeOutput("stderr", response.event.value);
-        else if (response.event.case === "exited") {
+        } else if (response.event.case === "exited") {
           return {
             exitCode:
               response.event.value.signal === ""
@@ -301,15 +307,16 @@ class RemoteProcess implements SubprocessHandle {
 
   private writeOutput(stream: "stdout" | "stderr", chunk: Uint8Array): void {
     const mode = this.spec.stdio[stream];
-    if (mode === "inherit")
+    if (mode === "inherit") {
       (stream === "stdout" ? process.stdout : process.stderr).write(chunk);
-    else if (mode === "pipe")
+    } else if (mode === "pipe") {
       (stream === "stdout" ? this.stdoutPipe : this.stderrPipe)?.write(chunk);
-    else
+    } else {
       (stream === "stdout"
         ? this.stdoutCollection
         : this.stderrCollection
       )?.append(chunk);
+    }
   }
 }
 

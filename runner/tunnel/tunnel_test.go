@@ -38,7 +38,7 @@ func acceptOne(t *testing.T, listener net.Listener, accept bool) (net.Conn, hell
 		t.Fatalf("write reply: %v", err)
 	}
 	if !accept {
-		conn.Close()
+		_ = conn.Close()
 	}
 	return bufferedConn{Conn: conn, reader: reader}, request
 }
@@ -48,7 +48,7 @@ func TestServesRPCsOverRunnerInitiatedConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -60,7 +60,7 @@ func TestServesRPCsOverRunnerInitiatedConnection(t *testing.T) {
 			SandboxID: "sandbox-one",
 			Token:     "token-one",
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				io.WriteString(w, "hello "+r.URL.Path)
+				_, _ = io.WriteString(w, "hello "+r.URL.Path)
 			}),
 		})
 	}()
@@ -82,7 +82,7 @@ func TestServesRPCsOverRunnerInitiatedConnection(t *testing.T) {
 		t.Fatalf("request over tunnel: %v", err)
 	}
 	body, _ := io.ReadAll(response.Body)
-	response.Body.Close()
+	_ = response.Body.Close()
 	if string(body) != "hello /health" {
 		t.Fatalf("unexpected body %q", body)
 	}
@@ -100,16 +100,18 @@ func TestRejectedRegistrationRedials(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go Run(ctx, Config{
-		HostURL:   "tcp://" + listener.Addr().String(),
-		SandboxID: "sandbox-one",
-		Token:     "wrong",
-		Handler:   http.NewServeMux(),
-	})
+	go func() {
+		_ = Run(ctx, Config{
+			HostURL:   "tcp://" + listener.Addr().String(),
+			SandboxID: "sandbox-one",
+			Token:     "wrong",
+			Handler:   http.NewServeMux(),
+		})
+	}()
 
 	// A rejected runner must come back on its own.
 	acceptOne(t, listener, false)
@@ -121,21 +123,23 @@ func TestAcceptedRegistrationRedialsAfterClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go Run(ctx, Config{
-		HostURL:   "tcp://" + listener.Addr().String(),
-		SandboxID: "sandbox-one",
-		Token:     "token-one",
-		Handler:   http.NewServeMux(),
-	})
+	go func() {
+		_ = Run(ctx, Config{
+			HostURL:   "tcp://" + listener.Addr().String(),
+			SandboxID: "sandbox-one",
+			Token:     "token-one",
+			Handler:   http.NewServeMux(),
+		})
+	}()
 
 	conn, _ := acceptOne(t, listener, true)
-	conn.Close()
+	_ = conn.Close()
 	conn, _ = acceptOne(t, listener, true)
-	conn.Close()
+	_ = conn.Close()
 }
 
 func TestServeOnceBoundsDialAttempt(t *testing.T) {

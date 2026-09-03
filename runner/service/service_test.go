@@ -33,7 +33,7 @@ func TestExecEmptyStdinMeansIgnore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer stream.Close()
+		defer func() { _ = stream.Close() }()
 		for stream.Receive() {
 			if exited := stream.Msg().GetExited(); exited != nil {
 				return int(exited.GetExitCode())

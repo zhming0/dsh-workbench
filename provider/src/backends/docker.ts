@@ -68,17 +68,22 @@ export class DockerBackend implements SandboxBackend {
       try {
         const { stdout } = await this.command(["inspect", sandboxId]);
         const existing = parseInspect(stdout);
-        if (existing.sessionId !== spec.sessionId) throw provisionError;
-        if (existing.status !== "running")
+        if (existing.sessionId !== spec.sessionId) {
+          throw provisionError;
+        }
+        if (existing.status !== "running") {
           await this.command(["start", existing.containerId]);
+        }
         return {
           sandboxId,
           reference: { containerId: existing.containerId, sandboxId },
         };
       } catch (recoveryError) {
-        if (recoveryError === provisionError) throw provisionError;
+        if (recoveryError === provisionError) {
+          throw provisionError;
+        }
         throw new Error(`could not create Docker sandbox ${sandboxId}`, {
-          cause: provisionError,
+          cause: recoveryError,
         });
       }
     }
@@ -102,7 +107,9 @@ export class DockerBackend implements SandboxBackend {
   async wake(reference: BackendReference): Promise<SandboxHandle> {
     const ref = dockerReference(reference);
     const timer = this.expiryTimers.get(ref.containerId);
-    if (timer !== undefined) clearTimeout(timer);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
     this.expiryTimers.delete(ref.containerId);
     try {
       await this.command(["start", ref.containerId]);
@@ -123,19 +130,25 @@ export class DockerBackend implements SandboxBackend {
   async destroy(reference: BackendReference): Promise<void> {
     const ref = dockerReference(reference);
     const timer = this.expiryTimers.get(ref.containerId);
-    if (timer !== undefined) clearTimeout(timer);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
     this.expiryTimers.delete(ref.containerId);
     try {
       await this.command(["rm", "--force", "--volumes", ref.containerId]);
     } catch (error) {
-      if (!String(error).includes("No such container")) throw error;
+      if (!String(error).includes("No such container")) {
+        throw error;
+      }
     }
   }
 
   async expireAt(reference: BackendReference, deadline: Date): Promise<void> {
     const ref = dockerReference(reference);
     const prior = this.expiryTimers.get(ref.containerId);
-    if (prior !== undefined) clearTimeout(prior);
+    if (prior !== undefined) {
+      clearTimeout(prior);
+    }
     const delay = Math.max(0, deadline.getTime() - Date.now());
     const timer = setTimeout(
       () => void this.destroy(ref).catch(() => {}),
@@ -156,7 +169,9 @@ export class DockerBackend implements SandboxBackend {
       ]);
       return stdout.trim() === "running";
     } catch (error) {
-      if (isMissingContainer(error)) return false;
+      if (isMissingContainer(error)) {
+        return false;
+      }
       throw error;
     }
   }

@@ -96,7 +96,9 @@ export function runnerClientForSocket(socket: Duplex): RunnerClient {
     httpVersion: "2",
     nodeOptions: {
       createConnection: () => {
-        if (used) throw new Error("runner tunnel is closed");
+        if (used) {
+          throw new Error("runner tunnel is closed");
+        }
         used = true;
         return socket;
       },

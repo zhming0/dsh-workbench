@@ -19,7 +19,9 @@ export function pathInSandbox(
   }
 
   const childPath = relative(sessionWorkspace, path);
-  if (childPath === "") return sandboxWorkspace;
+  if (childPath === "") {
+    return sandboxWorkspace;
+  }
   if (
     childPath === ".." ||
     childPath.startsWith(`..${sep}`) ||
@@ -35,7 +37,9 @@ export function isInsideSandboxWorkspace(
   path: string,
   sandboxWorkspace: string,
 ): boolean {
-  if (!posix.isAbsolute(path)) return false;
+  if (!posix.isAbsolute(path)) {
+    return false;
+  }
   const childPath = posix.relative(sandboxWorkspace, path);
   return (
     childPath === "" ||

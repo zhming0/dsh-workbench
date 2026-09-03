@@ -4,9 +4,9 @@ import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { SidebarFooterActionOwnerProps } from "@deepseek-ai/dsh-client-ui-sidebar/client";
 
 interface SecretsActions {
-  listSecrets(): Promise<string[]>;
-  setSecret(name: string, value: string): Promise<string[]>;
-  deleteSecret(name: string): Promise<string[]>;
+  listSecrets: () => Promise<string[]>;
+  setSecret: (name: string, value: string) => Promise<string[]>;
+  deleteSecret: (name: string) => Promise<string[]>;
 }
 
 interface SecretsFooterActionProps
@@ -72,7 +72,7 @@ function KeyIcon() {
 }
 
 interface SecretsModalProps extends SecretsActions {
-  onClose(): void;
+  onClose: () => void;
 }
 
 /** Name/value CRUD over the host credential broker. Values are write-only. */
@@ -109,7 +109,9 @@ function SecretsModal({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = name.trim();
-    if (pending || trimmed === "" || value === "") return;
+    if (pending || trimmed === "" || value === "") {
+      return;
+    }
     if (await run(() => setSecret(trimmed, value))) {
       setName("");
       setValue("");

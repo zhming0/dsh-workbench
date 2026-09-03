@@ -29,7 +29,9 @@ export interface SandboxInstructionsRemote {
 
 const stringSchema: TypertSchema<string> = {
   parse(value: unknown): string {
-    if (typeof value !== "string") throw new TypeError("expected a string");
+    if (typeof value !== "string") {
+      throw new TypeError("expected a string");
+    }
     return value;
   },
 };
@@ -43,7 +45,8 @@ const settingsSchema: TypertSchema<InstructionSettingsView> = {
       typeof value.global !== "string" ||
       !("workspaces" in value) ||
       !Array.isArray(value.workspaces) ||
-      value.workspaces.some(
+      // Array.isArray narrows to any[]; widen so the entry checks stay typed.
+      (value.workspaces as unknown[]).some(
         (entry) =>
           typeof entry !== "object" ||
           entry === null ||

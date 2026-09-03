@@ -11,6 +11,7 @@
     "check": "pnpm proto:check && pnpm --filter @zhming0/dsh-workbench check",
     "format": "pnpm --filter @zhming0/dsh-workbench format",
     "format:check": "pnpm --filter @zhming0/dsh-workbench format:check",
+    "lint": "pnpm --filter @zhming0/dsh-workbench lint && (cd runner && golangci-lint run)",
     "proto:check": "buf lint && buf format --diff --exit-code",
     "proto:generate": "buf generate",
     "test": "pnpm --filter @zhming0/dsh-workbench test",

@@ -92,7 +92,7 @@ func serveOnce(ctx context.Context, dial dialer, config Config) (registered bool
 	if err != nil {
 		return false, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	deadline := time.Now().Add(handshakeTimeout)
 	if err := conn.SetDeadline(deadline); err != nil {
@@ -127,7 +127,7 @@ func serveOnce(ctx context.Context, dial dialer, config Config) (registered bool
 	go func() {
 		select {
 		case <-ctx.Done():
-			conn.Close()
+			_ = conn.Close()
 		case <-done:
 		}
 	}()

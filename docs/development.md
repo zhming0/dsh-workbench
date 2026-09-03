@@ -17,9 +17,9 @@ release. For what the project is and how to deploy it, start with the
 
 ## Build and test
 
-[`mise.toml`](../mise.toml) pins Node, Go, and the protobuf plugins. CI
-installs from the same file, so a build and a laptop agree by construction.
-Install [mise](https://mise.jdx.dev), then:
+[`mise.toml`](../mise.toml) pins Node, Go, the protobuf plugins, and the
+linter binaries. CI installs from the same file, so a build and a laptop agree
+by construction. Install [mise](https://mise.jdx.dev), then:
 
 ```sh
 mise install
@@ -33,10 +33,11 @@ needed for the end-to-end local test.
 ```sh
 pnpm install
 pnpm check
+pnpm lint
 pnpm test
 pnpm build
 
-(cd runner && go test -race ./... && go vet ./... && go build ./cmd/dsh-runner)
+(cd runner && go test -race ./... && go build ./cmd/dsh-runner)
 docker buildx bake dev --load
 pnpm test:docker
 docker buildx bake dev host-dev --load
@@ -50,6 +51,13 @@ first-run setup, and file survival across stop/start. The Kubernetes test
 creates a disposable kind cluster and checks the provider-to-runner tunnel,
 forced reconnection, hibernate/wake, warm adoption, volume persistence, and
 expiry.
+
+`pnpm lint` lints both sides: ESLint with type-aware rules for the provider
+([`provider/eslint.config.mjs`](../provider/eslint.config.mjs)) and
+golangci-lint for the runner ([`runner/.golangci.yml`](../runner/.golangci.yml),
+which includes gofmt). Both restrict themselves to rules that catch real
+defects — unchecked errors and promises, dead code, suspicious constructs —
+and leave expression style to prettier and gofmt.
 
 To regenerate code after editing the protobuf file:
 

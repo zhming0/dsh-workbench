@@ -20,7 +20,9 @@ export function fallbackRandomUUID(): `${string}-${string}-${string}-${string}-$
  * dsh release containing deepseek-harness commit 0bee546.
  */
 export function installRandomUUIDFallback(): void {
-  if (typeof globalThis.crypto.randomUUID === "function") return;
+  if (typeof globalThis.crypto.randomUUID === "function") {
+    return;
+  }
   Object.defineProperty(globalThis.crypto, "randomUUID", {
     value: fallbackRandomUUID,
     configurable: true,

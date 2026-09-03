@@ -12,7 +12,7 @@ import { InstructionsSettings } from "./instructions.js";
 import { SecretsFooterAction } from "./secrets.js";
 
 interface RepositoryDirectoryFlowProps extends DirectoryFlowOwnerProps {
-  createWorkspaceAnchor(repositoryUrl: string): Promise<string>;
+  createWorkspaceAnchor: (repositoryUrl: string) => Promise<string>;
 }
 
 /** Repository URL dialog occupying dsh's two Workspace directory-flow slots. */
@@ -40,7 +40,9 @@ export function RepositoryDirectoryFlow({
   const disabled = pending || busy;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (disabled) return;
+    if (disabled) {
+      return;
+    }
     setPending(true);
     setError(undefined);
     try {
@@ -56,7 +58,9 @@ export function RepositoryDirectoryFlow({
     <Modal
       open={open}
       onClose={() => {
-        if (!disabled) onCancel();
+        if (!disabled) {
+          onCancel();
+        }
       }}
       title="Add repository"
       description="Create an isolated workspace from a Git repository."
@@ -132,7 +136,9 @@ export async function apply(ctx: ClientContext) {
 
   ctx.inject(["remote.sandboxManager"], (remoteCtx) => {
     const unwrap = <T,>(result: RemoteResult<T>): T => {
-      if (!result.ok) throw new Error(result.error.message);
+      if (!result.ok) {
+        throw new Error(result.error.message);
+      }
       return result.value;
     };
     const injected = () => ({
@@ -198,7 +204,9 @@ export async function apply(ctx: ClientContext) {
         await remoteCtx.remote.sandboxManager.createRepositoryWorkspace(
           repositoryUrl,
         );
-      if (!result.ok) throw new Error(result.error.message);
+      if (!result.ok) {
+        throw new Error(result.error.message);
+      }
       return result.value;
     };
     const injected = () => ({ createWorkspaceAnchor });
@@ -227,6 +235,6 @@ export async function apply(ctx: ClientContext) {
   });
 
   return () => {
-    disposeRemote();
+    void disposeRemote();
   };
 }

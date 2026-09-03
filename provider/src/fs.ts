@@ -30,8 +30,9 @@ export class SandboxFileSystem extends FileSystem {
     path: string,
     options?: { cwd?: string; signal?: AbortSignal },
   ): Promise<FsTarget> {
-    if (path.trim().length === 0)
+    if (path.trim().length === 0) {
       throw new FsError("file path must not be empty", "FS_NOT_FOUND");
+    }
     try {
       const sessionWorkspace =
         this.ctx.agents.requireInitiator().session.header.cwd;
@@ -88,7 +89,9 @@ export class SandboxFileSystem extends FileSystem {
         { path: this.processPath(target), followSymlinks: true },
         signalOptions(signal),
       );
-      if (!result.exists) return undefined;
+      if (!result.exists) {
+        return undefined;
+      }
       return {
         version: FsVersion(result.version),
         type: fsType(result.type),
@@ -116,7 +119,9 @@ export class SandboxFileSystem extends FileSystem {
         { path: target.displayPath, followSymlinks: false },
         signalOptions(signal),
       );
-      if (!result.exists) return undefined;
+      if (!result.exists) {
+        return undefined;
+      }
       return {
         version: FsVersion(result.version),
         type: pathType(result.type),
@@ -264,25 +269,32 @@ function mapFileError(
   path: string,
   signal?: AbortSignal,
 ): FsError {
-  if (error instanceof FsError) return error;
-  if (signal?.aborted === true)
+  if (error instanceof FsError) {
+    return error;
+  }
+  if (signal?.aborted === true) {
     return new FsError(`${operation} aborted`, "FS_ABORTED", { cause: error });
+  }
   const connect = ConnectError.from(error);
   const message = connect.rawMessage.toLowerCase();
   let code: ConstructorParameters<typeof FsError>[1] = "FS_IO_ERROR";
-  if (connect.code === Code.NotFound)
+  if (connect.code === Code.NotFound) {
     code = message.includes("old_string")
       ? "FS_EDIT_NOT_FOUND"
       : "FS_NOT_FOUND";
-  else if (connect.code === Code.PermissionDenied)
+  } else if (connect.code === Code.PermissionDenied) {
     code = "FS_PERMISSION_DENIED";
-  else if (connect.code === Code.ResourceExhausted) code = "FS_TOO_LARGE";
-  else if (connect.code === Code.AlreadyExists) code = "FS_NOT_OBSERVED";
-  else if (connect.code === Code.FailedPrecondition) {
+  } else if (connect.code === Code.ResourceExhausted) {
+    code = "FS_TOO_LARGE";
+  } else if (connect.code === Code.AlreadyExists) {
+    code = "FS_NOT_OBSERVED";
+  } else if (connect.code === Code.FailedPrecondition) {
     code = message.includes("ambiguous")
       ? "FS_AMBIGUOUS_EDIT"
       : "FS_STALE_VERSION";
-  } else if (connect.code === Code.Canceled) code = "FS_ABORTED";
+  } else if (connect.code === Code.Canceled) {
+    code = "FS_ABORTED";
+  }
   return new FsError(
     `cannot ${operation} "${path}": ${connect.rawMessage}`,
     code,
@@ -304,13 +316,19 @@ function decodeText(bytes: Uint8Array, path: string): string {
 }
 
 function fsType(type: FileType): "file" | "directory" | "other" {
-  if (type === FileType.REGULAR) return "file";
-  if (type === FileType.DIRECTORY) return "directory";
+  if (type === FileType.REGULAR) {
+    return "file";
+  }
+  if (type === FileType.DIRECTORY) {
+    return "directory";
+  }
   return "other";
 }
 
 function pathType(type: FileType): "file" | "directory" | "symlink" | "other" {
-  if (type === FileType.SYMLINK) return "symlink";
+  if (type === FileType.SYMLINK) {
+    return "symlink";
+  }
   return fsType(type);
 }
 

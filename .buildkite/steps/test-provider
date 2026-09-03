@@ -12,6 +12,9 @@ buildkite-agent cache save --name pnpm
 echo "--- :mag: Type check and protobuf lint"
 pnpm check
 
+echo "--- :mag: Lint"
+pnpm lint
+
 echo "--- :art: Format check"
 pnpm format:check
 

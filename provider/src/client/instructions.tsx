@@ -8,12 +8,12 @@ import type { InstructionSettingsView } from "../instructions-remote.js";
 const GLOBAL_SCOPE = "__global__";
 
 interface InstructionActions {
-  getInstructions(): Promise<InstructionSettingsView>;
-  setGlobalInstructions(content: string): Promise<InstructionSettingsView>;
-  setWorkspaceInstructions(
+  getInstructions: () => Promise<InstructionSettingsView>;
+  setGlobalInstructions: (content: string) => Promise<InstructionSettingsView>;
+  setWorkspaceInstructions: (
     repositoryUrl: string,
     content: string,
-  ): Promise<InstructionSettingsView>;
+  ) => Promise<InstructionSettingsView>;
 }
 
 interface InstructionsSettingsProps
@@ -46,7 +46,9 @@ export function InstructionsSettings({
   const saved = contentFor(settings, scope);
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (pending || settings === undefined) return;
+    if (pending || settings === undefined) {
+      return;
+    }
     setPending(true);
     setStatus(undefined);
     setError(undefined);
@@ -237,8 +239,12 @@ function contentFor(
   settings: InstructionSettingsView | undefined,
   scope: string,
 ): string {
-  if (settings === undefined) return "";
-  if (scope === GLOBAL_SCOPE) return settings.global;
+  if (settings === undefined) {
+    return "";
+  }
+  if (scope === GLOBAL_SCOPE) {
+    return settings.global;
+  }
   return (
     settings.workspaces.find((workspace) => workspace.repositoryUrl === scope)
       ?.content ?? ""

@@ -68,14 +68,17 @@ export class TunnelServer implements RunnerGateway {
   /** The bound port; useful when constructed with port 0 in tests. */
   port(): number {
     const address = this.server.address();
-    if (address === null || typeof address === "string")
+    if (address === null || typeof address === "string") {
       throw new Error("tunnel server is not listening");
+    }
     return address.port;
   }
 
   async close(): Promise<void> {
     for (const waiterSet of this.waiters.values()) {
-      for (const waiter of waiterSet) clearTimeout(waiter.timer);
+      for (const waiter of waiterSet) {
+        clearTimeout(waiter.timer);
+      }
     }
     this.waiters.clear();
     for (const registration of this.registrations.values()) {
@@ -111,7 +114,9 @@ export class TunnelServer implements RunnerGateway {
 
   drop(sandboxId: string): void {
     const registration = this.registrations.get(sandboxId);
-    if (registration === undefined) return;
+    if (registration === undefined) {
+      return;
+    }
     this.registrations.delete(sandboxId);
     registration.socket.destroy();
   }
@@ -168,7 +173,9 @@ export class TunnelServer implements RunnerGateway {
 
     socket.write('{"ok":true}\n');
     // Bytes read past the handshake line belong to the HTTP/2 stream.
-    if (rest.length > 0) socket.unshift(rest);
+    if (rest.length > 0) {
+      socket.unshift(rest);
+    }
     const registration: Registration = {
       socket,
       client: runnerClientForSocket(socket),
@@ -213,12 +220,19 @@ function parseHello(
 ): { sandboxId: string; token: string } | undefined {
   try {
     const parsed = JSON.parse(line.toString("utf8")) as unknown;
-    if (typeof parsed !== "object" || parsed === null) return undefined;
-    const { sandboxId, token } = parsed as Record<string, unknown>;
-    if (typeof sandboxId !== "string" || typeof token !== "string")
+    if (typeof parsed !== "object" || parsed === null) {
       return undefined;
-    if (sandboxId.length === 0 || sandboxId.length > 256) return undefined;
-    if (token.length === 0) return undefined;
+    }
+    const { sandboxId, token } = parsed as Record<string, unknown>;
+    if (typeof sandboxId !== "string" || typeof token !== "string") {
+      return undefined;
+    }
+    if (sandboxId.length === 0 || sandboxId.length > 256) {
+      return undefined;
+    }
+    if (token.length === 0) {
+      return undefined;
+    }
     return { sandboxId, token };
   } catch {
     return undefined;

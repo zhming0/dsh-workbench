@@ -24,3 +24,7 @@ kubectl = "1.37.0"
 
 # Contributors use the Buildkite CLI to inspect and manage CI builds.
 "aqua:buildkite/cli" = "3.55.0"
+
+# Lints the runner module. Prebuilt binary from the aqua registry, so CI steps
+# do not spend minutes compiling it from source.
+"aqua:golangci/golangci-lint" = "2.13.2"
