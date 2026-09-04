@@ -1,8 +1,10 @@
-import "./crypto-compat.js";
-
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { Context } from "@deepseek-ai/cordis";
+// These two type-only imports load the declaration merges that put `remote`
+// and `slots` on the browser Context.
+import type {} from "@deepseek-ai/dsh-api-remotes/client";
+import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { RemoteResult } from "@deepseek-ai/dsh-typert-protocol";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { DirectoryFlowOwnerProps } from "@deepseek-ai/dsh-client-ui-workspace/client";
@@ -131,7 +133,7 @@ export const inject = ["remote", "slots"];
 
 /** Mount the Remote endpoints, replace folder picking with repository entry,
  * and add the Secrets manager beside Settings at the sidebar foot. */
-export async function apply(ctx: ClientContext) {
+export async function apply(ctx: Context) {
   const disposeRemote = await ctx.remote.$mount(workbenchRemote);
 
   ctx.inject(["remote.sandboxManager"], (remoteCtx) => {

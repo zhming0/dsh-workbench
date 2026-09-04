@@ -12,14 +12,14 @@ READMEs are unusually detailed and precise. Read them directly:
 
 ```sh
 cd "$(mktemp -d)"
-npm pack @deepseek-ai/dsh-base@0.1.1-rc.2
+npm pack @deepseek-ai/dsh-base@0.1.2-rc.1
 tar xzf *.tgz
 # package/README.md is the spec. package/lib/*.js is the built source, which is
 # readable and worth grepping when a README leaves a detail open. A bundle also
 # carries package/cordis.patch.yml, the rows it contributes.
 ```
 
-This repository pins `0.1.1-rc.2`. Match it, because the surface moves between
+This repository pins `0.1.2-rc.1`. Match it, because the surface moves between
 release candidates.
 
 ### The model
@@ -49,7 +49,7 @@ tools use a sandbox without knowing one exists.
 | Per-session compositions                          | `@deepseek-ai/dsh-agent-presets`                        |
 | User settings document and namespaces             | `@deepseek-ai/dsh-settings`                             |
 | The interfaces this repo implements               | `@deepseek-ai/dsh-fs`, `-shell`, `-subprocess`          |
-| How a Web session is created, including its `cwd` | `@deepseek-ai/dsh-host-apiproxy`                        |
+| How a Web session is created, including its `cwd` | `@deepseek-ai/dsh-api-session-controller`               |
 
 ### Verified facts that contradict a reasonable guess
 
@@ -63,6 +63,10 @@ likely to mislead you.
   merge, so an override must restate every field it keeps.
 - `dsh web` starts a server and prints a URL. It does not start a session;
   sessions are created from the browser.
+- The printed URL carries a per-process `?token=`. `GET /` without it, or
+  without the cookie it mints, returns 401; static assets stay public. The
+  cookie is bound to the `Host` the browser used and is signed with a secret
+  kept in `$DSH_HOME/.credentials.yaml`, so it survives host restarts.
 - A session's working directory falls back through selected workspace, then
   request payload, then `process.cwd()`. It is always set, and dsh creates the
   directory if it is missing.

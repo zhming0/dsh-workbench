@@ -60,6 +60,21 @@ its host anchor path, which does not exist inside the sandbox; the model only
 ever needs sandbox paths, and it finds its working directory the way any shell
 user does.
 
+One module is not part of the bundle patch:
+`@zhming0/dsh-workbench/launch-token`. Mounted as a row, it serves
+`GET /launch-token`, which redirects the browser to dsh's tokenized login URL so
+users behind an authenticating proxy never read the token from the host log. It
+is not a sign-in: anyone who reaches dsh's port can use it, so the row is off by
+default. The host image mounts it only when `DSH_HOST_LAUNCH_TOKEN_ROUTE=1`,
+which the Kubernetes oauth2-proxy manifest sets. To mount it yourself, insert
+the row in a patch layer:
+
+```yaml
+- insert:
+    - id: sandbox-launch-token
+      name: "@zhming0/dsh-workbench/launch-token"
+```
+
 The default backend uses Docker on the same machine as dsh. The Kubernetes
 backend uses Kubernetes SIG agent-sandbox. Runners connect out to the host's
 tunnel listener, so the host never dials into a sandbox; it only needs to be

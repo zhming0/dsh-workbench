@@ -73,7 +73,7 @@ checks the controller lifecycle against it. See
 ## Running from a checkout (laptop + Docker)
 
 Instead of the released images, a checkout installs into a dsh you run
-yourself. This needs `@deepseek-ai/dsh` 0.1.1-rc.2 on your PATH. Build first,
+yourself. This needs `@deepseek-ai/dsh` 0.1.2-rc.1 on your PATH. Build first,
 then install the provider directory:
 
 ```sh
@@ -84,7 +84,8 @@ dsh plugin --profile web add "$PWD/provider"
 
 With no `backend` configured the provider selects Docker, which is a complete
 working configuration by itself. Point the manager at the locally built runner
-image in your profile layer, then run `dsh web`:
+image in your profile layer, then run `dsh web` and open the `?token=` URL it
+prints:
 
 ```yaml
 - id: sandbox-manager

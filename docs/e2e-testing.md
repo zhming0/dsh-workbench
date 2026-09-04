@@ -159,8 +159,16 @@ its cluster when it finishes.
    kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
    ```
 
-3. Open `http://localhost:3000`, choose the configured model, select **New
-   session**, and add a disposable public repository as a Workspace.
+3. Open `http://localhost:3000/launch-token`, which redirects to the tokenized
+   URL when the host runs with `DSH_HOST_LAUNCH_TOKEN_ROUTE=1` (the oauth2-proxy
+   patch sets it). Otherwise read the token from the host log and open it
+   through the port-forward. Then choose the configured model, select **New
+   session**, and add a disposable public repository as a Workspace:
+
+   ```sh
+   kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'
+   # prints http://127.0.0.1:3000/?token=…; open http://localhost:3000/?token=…
+   ```
 4. Ask the model to use its shell and file tools to:
    - print `uname -a` and the working directory;
    - read a known file from the repository;
@@ -179,7 +187,8 @@ and the independently read file must contain the expected text. A chat answer
 alone is not evidence that the tool ran in the sandbox.
 
 If the host Deployment restarts, restart `kubectl port-forward`; it targets a
-specific pod and does not follow the replacement.
+specific pod and does not follow the replacement. The browser cookie survives
+the restart; only a new browser needs the new token from the log.
 
 ### Verify UI-managed instructions
 

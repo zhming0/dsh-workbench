@@ -1,6 +1,9 @@
-# The distribution fronts dsh with oauth2-proxy: dsh ships no user
-# authentication and binds pod loopback, so the proxy port (4180) is the thing
-# you expose — with a Service, Ingress, LoadBalancer, or Gateway of your own.
+# The distribution fronts dsh with oauth2-proxy: dsh binds pod loopback and
+# its only browser authentication is the startup `?token=` URL, which anyone
+# who can reach the port can use once they read the log. The proxy port (4180)
+# is the thing you expose — with a Service, Ingress, LoadBalancer, or Gateway
+# of your own. Users who pass the proxy open https://<hostname>/launch-token,
+# which redirects to the tokenized URL for them; see docs/kubernetes.md.
 #
 # This kustomize patch adds the proxy next to dsh, forwarding to it over
 # pod-local loopback, and hands dsh the external hostname as `--trusted-host`:
@@ -8,6 +11,12 @@
 # rejects any /api request whose Host is neither loopback nor an explicitly
 # trusted authority (its defense against DNS rebinding). The entry is a bare
 # host, no scheme.
+#
+# DSH_HOST_LAUNCH_TOKEN_ROUTE turns on the /launch-token route. It is not a
+# sign-in: it hands dsh's login token to anyone who reaches port 3000, which
+# here is only the proxy (and your own port-forward), so the proxy's decision
+# is the one that counts. Do not set it on a host whose port 3000 is exposed
+# without a front like this.
 #
 # Replace dsh.example.com with your hostname (twice below), then create the
 # credentials the proxy reads:
@@ -34,6 +43,9 @@ spec:
           args:
             - --trusted-host
             - dsh.example.com
+          env:
+            - name: DSH_HOST_LAUNCH_TOKEN_ROUTE
+              value: '1'
         - name: oauth2-proxy
           image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.4
           env:

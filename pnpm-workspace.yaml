@@ -6,3 +6,8 @@ overrides:
 
 allowBuilds:
   '@bufbuild/buf': true
+
+# This repository pins each dsh release candidate as soon as it is published,
+# which is inside pnpm's default 24-hour minimumReleaseAge window.
+minimumReleaseAgeExclude:
+  - '@deepseek-ai/*'

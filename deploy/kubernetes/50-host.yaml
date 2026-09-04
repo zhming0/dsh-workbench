@@ -10,11 +10,15 @@
 #   kubectl -n dsh-sandbox create secret generic dsh-registration-token \
 #     --from-literal=token=$(openssl rand -hex 32)
 #
-# dsh binds loopback by design and ships no user authentication. For yourself,
-# reach it with `kubectl port-forward deploy/dsh-host 3000:3000 -n dsh-sandbox`.
-# For real exposure, the kustomization applies host-oidc.yaml, which puts an
-# oauth2-proxy in front of dsh; expose the proxy's port however suits your
-# cluster.
+# dsh binds loopback by design. Its only browser authentication is the
+# `?token=` URL it prints at startup (`kubectl -n dsh-sandbox logs
+# deploy/dsh-host | grep 'dsh web:'`), which the browser exchanges for a
+# cookie. For yourself, reach it with
+# `kubectl port-forward deploy/dsh-host 3000:3000 -n dsh-sandbox`. For real
+# exposure, the kustomization applies host-oidc.yaml, which puts an
+# oauth2-proxy in front of dsh and enables a /launch-token route that does the
+# token exchange for users the proxy admits; expose the proxy's port however
+# suits your cluster.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -92,12 +96,14 @@ spec:
               protocol: TCP
           # The server binds 127.0.0.1:3000, so a TCP probe against the pod IP
           # cannot reach it; probe over loopback from inside the container.
+          # An unauthenticated GET / answers 401 once dsh is serving, so that
+          # status counts as ready.
           readinessProbe:
             exec:
               command:
                 - node
                 - -e
-                - "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+                - "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok || r.status === 401 ? 0 : 1), () => process.exit(1))"
             initialDelaySeconds: 3
             periodSeconds: 10
           securityContext:

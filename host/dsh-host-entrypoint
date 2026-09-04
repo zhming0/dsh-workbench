@@ -4,4 +4,12 @@
 set -eu
 
 dsh-host-seed
-exec dsh --profile web --port "${DSH_WEB_PORT:-3000}" --no-open "$@"
+
+set -- --port "${DSH_WEB_PORT:-3000}" --no-open "$@"
+# DSH_HOST_LAUNCH_TOKEN_ROUTE=1 mounts GET /launch-token (see
+# launch-token.patch.yml). The overlay is a launcher flag, so it goes before
+# the web app's arguments.
+if [ "${DSH_HOST_LAUNCH_TOKEN_ROUTE:-0}" = 1 ]; then
+  set -- --patch /opt/dsh-host/launch-token.patch.yml "$@"
+fi
+exec dsh --profile web "$@"

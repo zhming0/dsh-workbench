@@ -218,6 +218,31 @@ explicitly trusted — its defense against DNS rebinding. The proxy passes the
 browser's Host through, so the external hostname is handed to dsh as
 `--trusted-host`. If you change the hostname, change it there too.
 
+Behind the proxy, dsh still asks each browser for its own launch token, the one
+it prints at startup. The patch sets `DSH_HOST_LAUNCH_TOKEN_ROUTE=1` on the dsh
+container, which mounts a `/launch-token` route that redirects the browser to
+the tokenized URL, so once the proxy lets a user through they open
+
+```
+https://dsh.example.com/launch-token
+```
+
+and land signed in. The redirect keeps the hostname the browser used, which is
+the one dsh binds the cookie to. The route is not a sign-in of its own: it
+hands the token to anyone who can reach port 3000, which in this pod is only
+the proxy and your own port-forward; do not enable it on a host whose port 3000
+is exposed some other way. Without the variable the route does not exist and
+the token has to come from the host log:
+
+```sh
+kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'
+# prints http://127.0.0.1:3000/?token=…; open https://dsh.example.com/?token=…
+```
+
+The cookie lasts 30 days and its signing secret lives on the data volume, so a
+host restart does not sign browsers out. A new browser, or a cookie that has
+expired, goes through `/launch-token` again.
+
 For yourself, a port-forward always works, with or without the proxy
 configured:
 
@@ -225,8 +250,8 @@ configured:
 kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
 ```
 
-then open `http://localhost:3000`. Loopback is trusted, so no extra flags are
-needed.
+then open `http://localhost:3000/launch-token`, or `http://localhost:3000/?token=…`
+with the token from the log. Loopback is trusted, so no extra flags are needed.
 
 The proxy authenticates users; it does not isolate them from each other. One
 dsh host is one trust domain — everyone the issuer lets through shares the

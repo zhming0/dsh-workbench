@@ -45,14 +45,6 @@ export default tseslint.config(
       "@typescript-eslint/require-await": "off",
     },
   },
-  // dsh-client-runtime 0.1.1-rc.2 types `slots.register` through
-  // @deepseek-ai/dsh-client-ui-slots without declaring it, so the liner sees
-  // an error type where tsc (via skipLibCheck) sees nothing. Remove this
-  // override when the upstream dependency declaration lands.
-  {
-    files: ["src/client/index.tsx"],
-    rules: { "@typescript-eslint/no-unsafe-call": "off" },
-  },
   // Config files carry no types, so switch off the type-aware rules for them.
   { files: ["**/*.js", "**/*.mjs", "**/*.cjs"], ...tseslint.configs.disableTypeChecked },
 );

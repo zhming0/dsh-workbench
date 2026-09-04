@@ -1,0 +1,9 @@
+# Applied as a --patch overlay by dsh-host-entrypoint when
+# DSH_HOST_LAUNCH_TOKEN_ROUTE=1. It mounts GET /launch-token, which redirects
+# the browser to dsh's tokenized login URL, so a deployment that authenticates
+# users in front of dsh (host-oidc.yaml) never has to read the token from the
+# host log. The route bypasses dsh's only browser check for anyone who can
+# reach dsh's port, so leave it off unless the port sits behind such a front.
+- insert:
+    - id: sandbox-launch-token
+      name: '@zhming0/dsh-workbench/launch-token'
