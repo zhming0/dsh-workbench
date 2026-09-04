@@ -75,7 +75,8 @@ then verifies:
    the reversed HTTP/2 tunnel;
 2. secrets reach commands, and the runner's bundled tools are installed,
    including Python, Node.js, jq, yq, and the Docker client without its daemon;
-3. `.dsh/setup.sh` runs exactly once;
+3. `.agents/setup` runs exactly once (marked in `.git/.agents-setup-done`), and
+   `.agents/resume` runs on wake;
 4. hibernate/wake reconnects the runner and preserves its setup marker,
    workspace files, and mise-managed tools.
 

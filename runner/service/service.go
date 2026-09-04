@@ -96,7 +96,7 @@ func stat(path string, follow bool) (os.FileInfo, error) {
 }
 
 func (s *Service) Health(_ context.Context, _ *connect.Request[v1.HealthRequest]) (*connect.Response[v1.HealthResponse], error) {
-	_, err := os.Stat(filepath.Join(defaultWorkspace, ".dsh-setup-done"))
+	_, err := os.Stat(setupMarkerPath(defaultWorkspace))
 	return connect.NewResponse(&v1.HealthResponse{SandboxId: s.sandboxID, SetupComplete: err == nil}), nil
 }
 

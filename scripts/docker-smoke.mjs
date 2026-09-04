@@ -35,7 +35,7 @@ try {
     'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version && python --version && uv --version && uvx --version && node --version && npm --version && jq --version && yq --version && docker --version && docker buildx version && docker compose version && for command in cc make pkg-config unzip zip xz file patch ssh rsync ps gh pnpm yarn; do command -v "$command" || exit 1; done && ! command -v pip && ! command -v dockerd && ! command -v containerd',
   ]);
 
-  await run(client, ["mkdir", "-p", `${workspace}/.git`, `${workspace}/.dsh`]);
+  await run(client, ["mkdir", "-p", `${workspace}/.git`, `${workspace}/.agents`]);
   await client.writeFile({
     path: `${workspace}/mise.toml`,
     content: new TextEncoder().encode('[tools]\nnode = "24.19.0"\n'),
@@ -47,13 +47,20 @@ try {
     throw new Error(`mise installed unexpected Node version: ${nodeVersion.trim()}`);
   }
   await client.writeFile({
-    path: `${workspace}/.dsh/setup.sh`,
+    path: `${workspace}/.agents/setup`,
     content: new TextEncoder().encode(
       `#!/bin/sh\nset -eu\nprintf 'workspace survived' > ${workspace}/sentinel\n`,
     ),
     guard: { case: "createIfAbsent", value: true },
   });
-  await run(client, ["chmod", "+x", `${workspace}/.dsh/setup.sh`]);
+  await client.writeFile({
+    path: `${workspace}/.agents/resume`,
+    content: new TextEncoder().encode(
+      `#!/bin/sh\nset -eu\nprintf 'resumed' > ${workspace}/resumed\n`,
+    ),
+    guard: { case: "createIfAbsent", value: true },
+  });
+  await run(client, ["chmod", "+x", `${workspace}/.agents/setup`, `${workspace}/.agents/resume`]);
   const firstSetup = await client.setup({
     repositoryUrl: "https://github.com/example/unused.git",
     revision: "",
@@ -71,7 +78,14 @@ try {
     revision: "",
     workspace,
   });
-  if (secondSetup.ran) throw new Error("setup marker did not survive hibernation");
+  if (!secondSetup.ran) throw new Error("resume hook did not run after wake");
+  const resumed = await client.readFile({
+    path: `${workspace}/resumed`,
+    maxBytes: 1024n,
+  });
+  if (new TextDecoder().decode(resumed.content) !== "resumed") {
+    throw new Error("resume hook did not run after wake");
+  }
   const sentinel = await client.readFile({
     path: `${workspace}/sentinel`,
     maxBytes: 1024n,

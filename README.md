@@ -105,7 +105,8 @@ Then start a session:
 3. Choose the resulting Workspace and start the session.
 
 The session claims a warm sandbox, clones the repository into
-`/workspace/repository`, and runs `.dsh/setup.sh` if the repository has one.
+`/workspace/repository`, runs the repository's one-time `.agents/setup` hook,
+and re-runs its idempotent `.agents/resume` hook on every wake.
 The parent `/workspace` is the persistent volume root, so storage metadata such
 as `lost+found` remains outside the checkout. Every session gets its own
 sandbox; two sessions never share files.
