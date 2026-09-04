@@ -118,8 +118,9 @@ otherwise — so the Deployment runs a small init container that restores mode
 `0600` after the walk and before dsh starts. Nothing to configure; if you
 inspect the pod, the init container is expected.
 
-The seeded configuration already selects `backend: kas` with this namespace and
-warm pool, and the provider talks to the API server with the automounted
+The seeded configuration already declares one `standard` profile on the `kas`
+backend with this namespace and warm pool, and the provider talks to the API
+server with the automounted
 `dsh-provider` ServiceAccount token, so the host needs no further wiring. Edit
 settings in place — the file is watched, no restart needed:
 
@@ -127,6 +128,32 @@ settings in place — the file is watched, no restart needed:
 kubectl -n dsh-sandbox exec -it deploy/dsh-host -- \
   vi /data/.dsh/profiles/web/cordis.patch.yml
 ```
+
+**Several pod sizes.** A sandbox's resources come from its warm pool's
+template, so a second size is a second `SandboxTemplate` and `SandboxWarmPool`
+pair: copy [`20-sandbox-template.yaml`](../deploy/kubernetes/20-sandbox-template.yaml)
+and [`30-warm-pool.yaml`](../deploy/kubernetes/30-warm-pool.yaml) under a new
+name such as `dsh-large`, change the container `resources` and the volume
+request, and apply them. Then list both pools as sandbox profiles in the
+provider settings; the composer shows a profile chip when more than one exists:
+
+```yaml
+- id: sandbox-manager
+  config:
+    defaultProfile: standard
+    profiles:
+      standard:
+        backend: kas
+        namespace: dsh-sandbox
+        warmPool: dsh-universal
+      large:
+        backend: kas
+        namespace: dsh-sandbox
+        warmPool: dsh-large
+```
+
+The same cluster still owns every template; a repository or a session picks
+among the pools the operator published and nothing else.
 
 **The registration token** authenticates every runner tunnel. The host reads
 it from `DSH_WORKBENCH_REGISTRATION_TOKEN` and each runner pod reads it from

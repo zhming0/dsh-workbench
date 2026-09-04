@@ -6,10 +6,15 @@ import type { SessionRecord } from "./types.js";
 interface StateFile {
   version: 1;
   sessions: Record<string, SessionRecord>;
+  /**
+   * Profile picked in the browser for a session that has no sandbox yet. The
+   * choice moves onto the session record when the sandbox is provisioned.
+   */
+  pendingProfiles: Record<string, string>;
 }
 
 export class SessionStore {
-  private state: StateFile = { version: 1, sessions: {} };
+  private state: StateFile = { version: 1, sessions: {}, pendingProfiles: {} };
   private writeChain: Promise<void> = Promise.resolve();
 
   constructor(private readonly path: string) {}
@@ -36,11 +41,21 @@ export class SessionStore {
 
   async set(record: SessionRecord): Promise<void> {
     this.state.sessions[record.sessionId] = record;
+    delete this.state.pendingProfiles[record.sessionId];
     await this.persist();
   }
 
   async delete(sessionId: string): Promise<void> {
     delete this.state.sessions[sessionId];
+    await this.persist();
+  }
+
+  pendingProfile(sessionId: string): string | undefined {
+    return this.state.pendingProfiles[sessionId];
+  }
+
+  async setPendingProfile(sessionId: string, profile: string): Promise<void> {
+    this.state.pendingProfiles[sessionId] = profile;
     await this.persist();
   }
 
@@ -68,7 +83,17 @@ function parseState(value: unknown): StateFile {
   ) {
     throw new Error("sandbox session state has an unsupported format");
   }
-  return value as StateFile;
+  const pendingProfiles =
+    "pendingProfiles" in value &&
+    typeof value.pendingProfiles === "object" &&
+    value.pendingProfiles !== null
+      ? (value.pendingProfiles as Record<string, string>)
+      : {};
+  return {
+    version: 1,
+    sessions: value.sessions as Record<string, SessionRecord>,
+    pendingProfiles,
+  };
 }
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {

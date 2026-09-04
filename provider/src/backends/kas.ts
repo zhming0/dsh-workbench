@@ -79,7 +79,9 @@ export class KasBackend implements SandboxBackend {
             name: claimName,
             labels: { "dsh/session": safeLabel(spec.sessionId) },
           },
-          spec: { warmPoolRef: { name: this.options.warmPool } },
+          spec: {
+            warmPoolRef: { name: this.options.warmPool },
+          },
         },
       });
     } catch (error) {

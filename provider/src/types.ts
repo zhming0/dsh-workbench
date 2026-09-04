@@ -1,5 +1,34 @@
 export type BackendReference = Record<string, unknown>;
 
+export type BackendName = "docker" | "kas";
+
+/**
+ * One operator-defined way to run a sandbox: a backend and everything that
+ * backend needs, fully resolved. A profile is self-contained, so two profiles
+ * on the same backend may point at different clusters or Docker hosts.
+ */
+export type SandboxProfile = DockerProfile | KasProfile;
+
+export interface DockerProfile {
+  name: string;
+  backend: "docker";
+  /** Runner image; its size limits are whatever Docker gives a container. */
+  image: string;
+  binary?: string;
+  /** The tunnel endpoint runners dial, such as tcp://host.docker.internal:8081. */
+  hostUrl: string;
+}
+
+export interface KasProfile {
+  name: string;
+  backend: "kas";
+  namespace: string;
+  /** Warm pool to claim from; its template fixes the pod resources. */
+  warmPool: string;
+  readyTimeoutMs: number;
+  kubeconfig?: string;
+}
+
 export interface SandboxSpec {
   sessionId: string;
   repositoryUrl: string;
@@ -41,6 +70,8 @@ export type SandboxState = "running" | "hibernated";
 export interface SessionRecord {
   sessionId: string;
   backend: string;
+  /** Profile the sandbox was provisioned with. */
+  profile: string;
   sandboxId: string;
   reference: BackendReference;
   repositoryUrl: string;

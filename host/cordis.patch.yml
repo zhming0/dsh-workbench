@@ -6,4 +6,6 @@
 # https://github.com/zhming0/dsh-workbench/blob/main/provider/README.md#settings
 - id: sandbox-manager
   config:
-    backend: kas
+    profiles:
+      standard:
+        backend: kas

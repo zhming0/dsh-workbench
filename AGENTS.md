@@ -130,8 +130,9 @@ likely to mislead you.
   deliberate exception is the shared registration token: warm pods must hold
   it before any session exists, so it lives in the `dsh-registration-token`
   Secret. It only lets a runner register a tunnel; it grants nothing else.
-- The Kubernetes backend uses one cluster-owned template and warm pool. Do not
-  let repositories select pod privileges or arbitrary templates.
+- The Kubernetes backend uses cluster-owned templates and warm pools. The
+  operator publishes them as named sandbox profiles; a session picks a profile,
+  never pod privileges or an arbitrary template.
 
 ## Protect credentials and generated code
 

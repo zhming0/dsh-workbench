@@ -162,7 +162,9 @@ merging into it, so restate every field you want to keep:
 ```yaml
 - id: sandbox-manager
   config:
-    backend: kas
+    profiles:
+      standard:
+        backend: kas
     idleMs: 300000 # hibernate after 5 minutes instead of 10
 ```
 

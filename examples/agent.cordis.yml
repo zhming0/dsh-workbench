@@ -44,10 +44,12 @@
   config:
     - id: sandbox-manager
       name: '@zhming0/dsh-workbench'
-      # Defaults to the runner image released with this package. Point it at
-      # dsh-runner:dev to test a locally built image.
+      # Defaults to the runner image released with this package. Set the
+      # profile's image to dsh-runner:dev to test a locally built image.
       config:
-        backend: docker
+        profiles:
+          standard:
+            backend: docker
 
     - id: sandbox-subprocess
       name: '@zhming0/dsh-workbench/subprocess'
