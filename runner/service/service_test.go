@@ -119,7 +119,7 @@ func TestSetupRestoresGitCredentialHelperAfterWake(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(workspace, ".git"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(workspace, ".dsh-setup-done"), []byte("complete\n"), 0644); err != nil {
+	if err := os.WriteFile(setupMarkerPath(workspace), []byte("complete\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -128,8 +128,9 @@ func TestSetupRestoresGitCredentialHelperAfterWake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A completed setup with no resume hook is a quiet wake: nothing re-runs.
 	if response.Msg.Ran {
-		t.Fatal("setup ran again despite its durable marker")
+		t.Fatal("resume hook ran when none is present")
 	}
 	config, err := os.ReadFile(filepath.Join(home, ".gitconfig"))
 	if err != nil {
@@ -137,6 +138,85 @@ func TestSetupRestoresGitCredentialHelperAfterWake(t *testing.T) {
 	}
 	if !strings.Contains(string(config), "dsh-runner git-credential") {
 		t.Fatalf("credential helper was not restored: %s", config)
+	}
+}
+
+func TestSetupRunsResumeHookOnWake(t *testing.T) {
+	home := t.TempDir()
+	workspace := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.Mkdir(filepath.Join(workspace, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(workspace, ".agents"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(setupMarkerPath(workspace), []byte("complete\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(workspace, ".agents", "resume"),
+		[]byte("#!/bin/sh\nprintf resumed > .resumed\n"),
+		0755,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	s := New("box")
+	response, err := s.Setup(context.Background(), connect.NewRequest(&v1.SetupRequest{Workspace: workspace}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !response.Msg.Ran {
+		t.Fatal("resume hook did not run")
+	}
+	if _, err := os.Stat(filepath.Join(workspace, ".resumed")); err != nil {
+		t.Fatalf("resume hook did not run: %v", err)
+	}
+}
+
+func TestSetupRunsSetupOnceAndSkipsOnResume(t *testing.T) {
+	home := t.TempDir()
+	workspace := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.Mkdir(filepath.Join(workspace, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(workspace, ".agents"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	setup := filepath.Join(workspace, ".agents", "setup")
+	if err := os.WriteFile(setup, []byte("#!/bin/sh\nprintf 'x' >> .setup-count\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	s := New("box")
+	first, err := s.Setup(context.Background(), connect.NewRequest(&v1.SetupRequest{Workspace: workspace}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !first.Msg.Ran {
+		t.Fatal("setup did not run on a fresh workspace")
+	}
+	if _, err := os.Stat(setupMarkerPath(workspace)); err != nil {
+		t.Fatalf("setup marker was not written: %v", err)
+	}
+
+	second, err := s.Setup(context.Background(), connect.NewRequest(&v1.SetupRequest{Workspace: workspace}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// No .agents/resume exists, so the second call is a quiet resume that must
+	// not re-run the one-time setup.
+	if second.Msg.Ran {
+		t.Fatal("setup re-ran on resume")
+	}
+	count, err := os.ReadFile(filepath.Join(workspace, ".setup-count"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(count) != "x" {
+		t.Fatalf("setup ran %d times, want 1", len(count))
 	}
 }
 

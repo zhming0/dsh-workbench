@@ -16,7 +16,10 @@ from a mode-0600 Unix socket at `CREDENTIAL_SOCKET` (default
 `/run/dsh/credentials.sock`) through `dsh-runner git-credential`.
 
 Setup defaults to `/workspace/repository`, preserves an already initialized
-workspace, and uses `.dsh-setup-done` as its durable completion marker. Keeping
+workspace, runs the repository's one-time `.agents/setup` hook and the
+idempotent `.agents/resume` hook on wake, and records setup completion in
+`.git/.agents-setup-done`. The completion marker lives inside the repository's
+own `.git` directory so it never appears as an untracked file. Keeping
 the checkout beneath the persistent volume root prevents filesystem metadata
 such as `lost+found` from entering the repository. The file APIs operate with
 the container user's permissions; they are not a filesystem sandbox. Run the

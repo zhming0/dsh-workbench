@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Idempotent re-warm on every resume: make the toolchain and dependencies match
+# this repository, which may have changed while the session was away.
+# `.agents/setup` is already idempotent (mise install + pnpm install), so resume
+# simply re-runs it. A repository that wants a lighter or different resume hook
+# should implement its own `.agents/resume` instead of delegating.
+exec "${ROOT_DIR}/.agents/setup"

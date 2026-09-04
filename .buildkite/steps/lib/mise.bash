@@ -33,15 +33,25 @@ install_mise() {
 ensure_tools() {
   command -v mise >/dev/null 2>&1 || install_mise
 
-  echo "--- :recycle: Restoring the toolchain cache"
-  buildkite-agent cache restore --name mise
-
-  echo "--- :toolbox: Installing tools from mise.toml"
   local root
   root="$(git rev-parse --show-toplevel)"
+
+  # The buildkite-agent cache speeds up `mise install` across CI builds, but
+  # buildkite-agent is not present in a session's sandbox (or in `.agents/setup`
+  # and `.agents/resume` runs). Guard both halves so the bootstrap is not
+  # coupled to CI while still using the cache when it is available.
+  if command -v buildkite-agent >/dev/null 2>&1; then
+    echo "--- :recycle: Restoring the toolchain cache"
+    buildkite-agent cache restore --name mise
+  fi
+
+  echo "--- :toolbox: Installing tools from mise.toml"
   mise trust "${root}/mise.toml"
   mise install --cd "$root"
-  buildkite-agent cache save --name mise
+
+  if command -v buildkite-agent >/dev/null 2>&1; then
+    buildkite-agent cache save --name mise
+  fi
   eval "$(mise activate bash --shims)"
 
   # The `packageManager` field in package.json pins pnpm and corepack reads it,
