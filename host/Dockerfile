@@ -67,7 +67,7 @@ RUN DSH_HOME=/opt/dsh-host/seed dsh plugin --profile web add /opt/dsh-host/dsh-w
     && rm -rf /opt/dsh-host/seed \
     && cp /opt/dsh-host/meta/version /opt/dsh-host/version
 
-COPY host/cordis.patch.yml /opt/dsh-host/cordis.patch.yml
+COPY host/cordis.patch.yml host/launch-token.patch.yml /opt/dsh-host/
 COPY host/dsh-host-seed host/dsh-host-entrypoint host/dsh-workbench /usr/local/bin/
 
 # The node base image reserves uid 1000 for its unused `node` user; take it

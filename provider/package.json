@@ -31,6 +31,10 @@
       "types": "./dist/subprocess.d.ts",
       "default": "./dist/subprocess.js"
     },
+    "./launch-token": {
+      "types": "./dist/launch-token.d.ts",
+      "default": "./dist/launch-token.js"
+    },
     "./client": {
       "types": "./dist/client/index.d.ts",
       "default": "./dist/client.js"
@@ -84,6 +88,7 @@
     "@deepseek-ai/dsh-agent": "0.1.2-rc.1",
     "@deepseek-ai/dsh-api-gateway": "0.1.2-rc.1",
     "@deepseek-ai/dsh-api-remotes": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-connection": "0.1.2-rc.1",
     "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-rc.1",
     "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-rc.1",
     "@deepseek-ai/dsh-client-ui-settings": "0.1.2-rc.1",
@@ -91,6 +96,7 @@
     "@deepseek-ai/dsh-client-ui-slots": "0.1.2-rc.1",
     "@deepseek-ai/dsh-client-ui-workspace": "0.1.2-rc.1",
     "@deepseek-ai/dsh-fs": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "0.1.2-rc.1",
     "@deepseek-ai/dsh-llm": "0.1.2-rc.1",
     "@deepseek-ai/dsh-session": "0.1.2-rc.1",
     "@deepseek-ai/dsh-shell": "0.1.2-rc.1",

@@ -85,16 +85,20 @@ details are in
 
 ### Start a session
 
-dsh prints a sign-in URL (`http://127.0.0.1:3000/?token=…`) when it starts;
-the browser exchanges the token for a cookie that lasts 30 days. Get it from
-the host log, open it through the address you use to reach the host (for a
-port-forward, `http://localhost:3000/?token=…`), then start a session:
+dsh signs a browser in with a per-process token; the browser exchanges it for
+a cookie that lasts 30 days. The proxy has already authenticated you, so the
+host hands the token over: open `/launch-token` through the address you use to
+reach the host (`https://dsh.example.com/launch-token`, or
+`http://localhost:3000/launch-token` over a port-forward) and it redirects you
+to the tokenized URL. The token itself is also in the host log:
 
 ```sh
 kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'
 # before exposure is wired up:
 kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
 ```
+
+Then start a session:
 
 1. Open **New session**, then **Add workspace…**.
 2. Enter a repository URL such as `https://github.com/owner/repository`.

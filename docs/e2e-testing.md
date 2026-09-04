@@ -159,9 +159,11 @@ its cluster when it finishes.
    kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
    ```
 
-3. Read the sign-in token from the host log and open it through the
-   port-forward, then choose the configured model, select **New session**, and
-   add a disposable public repository as a Workspace:
+3. Open `http://localhost:3000/launch-token`, which redirects to the tokenized
+   URL when the host runs with `DSH_HOST_LAUNCH_TOKEN_ROUTE=1` (the oauth2-proxy
+   patch sets it). Otherwise read the token from the host log and open it
+   through the port-forward. Then choose the configured model, select **New
+   session**, and add a disposable public repository as a Workspace:
 
    ```sh
    kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'

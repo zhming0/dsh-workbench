@@ -16,8 +16,9 @@
 # cookie. For yourself, reach it with
 # `kubectl port-forward deploy/dsh-host 3000:3000 -n dsh-sandbox`. For real
 # exposure, the kustomization applies host-oidc.yaml, which puts an
-# oauth2-proxy in front of dsh; expose the proxy's port however suits your
-# cluster.
+# oauth2-proxy in front of dsh and enables a /launch-token route that does the
+# token exchange for users the proxy admits; expose the proxy's port however
+# suits your cluster.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
