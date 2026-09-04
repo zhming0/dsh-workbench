@@ -44,6 +44,25 @@ Workspace named `owner/repo`, and returns that path through dsh's normal picker
 contract. dsh therefore sets the immutable session `cwd` before creation and
 groups its history normally, while repository files remain inside the sandbox.
 
+The Web profile also replaces dsh's stock `@` file discovery
+(`file-reference-local`). The stock row walks the session `cwd` on the host
+filesystem, which here is the anchor directory above — it holds only
+`repository.json`, so `@` would never see repository files. A
+`sandbox-file-reference` row answers the same `fileReferences` service by
+asking the runner to walk the sandbox workspace (one recursive `Tree` RPC per
+refresh), and returns the same workspace-relative candidates with the same
+exclusions and ranking as the stock provider. The listing is cached per
+session and refreshed after the next tool result.
+
+Typing `@` does not wake a hibernated sandbox. As a sandbox hibernates, the
+manager walks its workspace once and saves the listing under
+`<stateDir>/file-index/<session>.json`; a hibernated workspace cannot change,
+because every write goes through a tool call that first wakes the sandbox, so
+that saved listing is exact until the next wake. `@` on a hibernated session
+reads it, and the file is removed with the session record. If no index exists
+(the host restarted while the sandbox was running, or the walk failed), `@`
+falls back to waking the sandbox.
+
 The Web profile also gains a **Secrets** manager at the sidebar foot, beside
 Settings. It edits the same broker store as the CLI: the browser sends names
 and values in and receives only names back, never a value.

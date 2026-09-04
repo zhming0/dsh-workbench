@@ -19,6 +19,12 @@ import {
   type Config,
   type ResolvedConfig,
 } from "./config.js";
+import {
+  captureFileIndex,
+  FileIndexStore,
+  type FileIndex,
+  type FileIndexOptions,
+} from "./file-index.js";
 import { InstructionStore } from "./instruction-store.js";
 import type { InstructionSettingsView } from "./instructions-remote.js";
 import { ManagedInstructions } from "./managed-instructions.js";
@@ -123,6 +129,9 @@ export class SandboxManager extends TypertRemoteService {
   private readonly ready: Promise<void>;
   private readonly operations = new Map<string, Promise<void>>();
   private readonly clients = new Map<string, RunnerClient>();
+  private readonly fileIndexes: FileIndexStore;
+  /** Set by the "@" file-reference row; absent means no index is captured. */
+  private fileIndexOptions: FileIndexOptions | undefined;
   private readonly idleTimers = new Map<string, NodeJS.Timeout>();
   private readonly activity = new Map<string, number>();
   /**
@@ -151,6 +160,9 @@ export class SandboxManager extends TypertRemoteService {
       new CredentialBroker({
         path: join(this.config.stateDir, "broker.json"),
       });
+    this.fileIndexes = new FileIndexStore(
+      join(this.config.stateDir, "file-index"),
+    );
     const profiles = Object.values(this.config.profiles);
     const missingBackends = profiles.filter(
       (profile) => dependencies.backends?.[profile.name] === undefined,
@@ -386,6 +398,27 @@ export class SandboxManager extends TypertRemoteService {
     await this.serialize(sessionId, () => this.hibernateUnlocked(sessionId));
   }
 
+  /**
+   * Save a workspace file index as each sandbox hibernates, so "@" discovery
+   * can answer for a hibernated session without waking it.
+   */
+  indexFilesOnHibernate(options: FileIndexOptions): void {
+    this.fileIndexOptions = options;
+  }
+
+  /**
+   * The file index saved when this session hibernated. Undefined while the
+   * sandbox is running (ask the runner instead), or when no index was saved.
+   */
+  async hibernatedFileIndex(agent: Agent): Promise<FileIndex | undefined> {
+    await this.ready;
+    const sessionId = String(agent.id);
+    if (this.store.get(sessionId)?.state !== "hibernated") {
+      return undefined;
+    }
+    return this.fileIndexes.load(sessionId);
+  }
+
   private async hibernateUnlocked(sessionId: string): Promise<void> {
     const record = this.store.get(sessionId);
     if (record === undefined || record.state === "hibernated") {
@@ -399,6 +432,10 @@ export class SandboxManager extends TypertRemoteService {
     const deadline = new Date(Date.now() + this.config.expiresAfterMs);
     try {
       if (backend.capabilities.supportsHibernate) {
+        // Index while the runner can still answer. Only a hibernated session
+        // has a workspace to describe: the destroy branch below forgets the
+        // session, and its next turn starts from a fresh clone.
+        await this.saveFileIndex(sessionId);
         await backend.hibernate(record.reference);
         // Set the final deletion time after compute is suspended. If the
         // provider stops between these steps, the still-running local record
@@ -417,7 +454,7 @@ export class SandboxManager extends TypertRemoteService {
         });
       } else {
         await backend.destroy(record.reference);
-        await this.store.delete(sessionId);
+        await this.forgetSession(sessionId);
         transitions.add(1, {
           backend: record.backend,
           transition: "expire",
@@ -427,7 +464,7 @@ export class SandboxManager extends TypertRemoteService {
       if (!(error instanceof SandboxNotFoundError)) {
         throw error;
       }
-      await this.store.delete(sessionId);
+      await this.forgetSession(sessionId);
       transitions.add(1, { backend: record.backend, transition: "missing" });
     }
     this.clients.delete(sessionId);
@@ -461,7 +498,7 @@ export class SandboxManager extends TypertRemoteService {
         deadline.getTime() <= Date.now()
       ) {
         await backend.destroy(record.reference);
-        await this.store.delete(record.sessionId);
+        await this.forgetSession(record.sessionId);
         continue;
       }
       try {
@@ -472,7 +509,7 @@ export class SandboxManager extends TypertRemoteService {
         }
         // A missing backend object means its external garbage collection won.
         // Remove the stale local record so the next turn provisions cleanly.
-        await this.store.delete(record.sessionId);
+        await this.forgetSession(record.sessionId);
       }
     }
   }
@@ -486,7 +523,7 @@ export class SandboxManager extends TypertRemoteService {
     ) {
       await this.backendFor(record).destroy(record.reference);
       this.gateway.drop(record.sandboxId);
-      await this.store.delete(sessionId);
+      await this.forgetSession(sessionId);
       record = undefined;
     }
     // Resolve the profile before any network work so a stale choice fails fast.
@@ -549,7 +586,7 @@ export class SandboxManager extends TypertRemoteService {
           throw error;
         }
         await backend.destroy(record.reference).catch(() => {});
-        await this.store.delete(sessionId);
+        await this.forgetSession(sessionId);
         // The lost sandbox is replaced under the same profile (which
         // backendFor just proved is configured), so a session does not
         // silently change size or backend.
@@ -731,6 +768,39 @@ export class SandboxManager extends TypertRemoteService {
       }
     });
     return result;
+  }
+
+  /** Drop the session record and everything derived from it. */
+  private async forgetSession(sessionId: string): Promise<void> {
+    await this.store.delete(sessionId);
+    await this.fileIndexes.remove(sessionId);
+  }
+
+  /**
+   * Index the workspace through the still-running runner. A failure here only
+   * costs the fast path ("@" then wakes the sandbox), so it never blocks
+   * hibernation.
+   */
+  private async saveFileIndex(sessionId: string): Promise<void> {
+    const client = this.clients.get(sessionId);
+    if (client === undefined || this.fileIndexOptions === undefined) {
+      return;
+    }
+    try {
+      const index = await captureFileIndex(
+        client,
+        this.config.workspace,
+        this.fileIndexOptions,
+      );
+      await this.fileIndexes.save(sessionId, index);
+    } catch (error) {
+      await this.fileIndexes.remove(sessionId).catch(() => {});
+      this.ctx
+        .logger("sandbox")
+        .warn(
+          `could not index files for ${sessionId} before hibernation: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
   }
 
   private async commitWorkInProgress(sessionId: string): Promise<void> {

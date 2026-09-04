@@ -44,6 +44,14 @@
 - id: directory-picker
   disabled: true
 
+# The stock "@" file-discovery provider walks the session cwd on the host
+# filesystem. That cwd is this package's bookkeeping anchor directory, which
+# holds no repository content — the files live inside the sandbox — so the
+# stock row can never see them. The sandbox-file-reference row below lists the
+# sandbox workspace through the runner instead. Web-only, like directory-picker.
+- id: file-reference-local
+  disabled: true
+
 - insert:
     # Owns one sandbox per dsh session: provision, idle hibernate, wake, expiry,
     # and the credential broker. Every default works as-is against local Docker.
@@ -58,3 +66,6 @@
 
     - id: sandbox-subprocess
       name: '@zhming0/dsh-workbench/subprocess'
+
+    - id: sandbox-file-reference
+      name: '@zhming0/dsh-workbench/file-reference'

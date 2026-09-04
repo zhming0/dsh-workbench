@@ -53,6 +53,8 @@ const (
 	RunnerServiceStatProcedure = "/dsh.sandbox.v1.RunnerService/Stat"
 	// RunnerServiceListProcedure is the fully-qualified name of the RunnerService's List RPC.
 	RunnerServiceListProcedure = "/dsh.sandbox.v1.RunnerService/List"
+	// RunnerServiceTreeProcedure is the fully-qualified name of the RunnerService's Tree RPC.
+	RunnerServiceTreeProcedure = "/dsh.sandbox.v1.RunnerService/Tree"
 	// RunnerServiceSetSecretsProcedure is the fully-qualified name of the RunnerService's SetSecrets
 	// RPC.
 	RunnerServiceSetSecretsProcedure = "/dsh.sandbox.v1.RunnerService/SetSecrets"
@@ -74,6 +76,7 @@ type RunnerServiceClient interface {
 	EditFile(context.Context, *connect.Request[v1.EditFileRequest]) (*connect.Response[v1.EditFileResponse], error)
 	Stat(context.Context, *connect.Request[v1.StatRequest]) (*connect.Response[v1.StatResponse], error)
 	List(context.Context, *connect.Request[v1.ListRequest]) (*connect.Response[v1.ListResponse], error)
+	Tree(context.Context, *connect.Request[v1.TreeRequest]) (*connect.Response[v1.TreeResponse], error)
 	SetSecrets(context.Context, *connect.Request[v1.SetSecretsRequest]) (*connect.Response[v1.SetSecretsResponse], error)
 	SetGitCredentials(context.Context, *connect.Request[v1.SetGitCredentialsRequest]) (*connect.Response[v1.SetGitCredentialsResponse], error)
 	Setup(context.Context, *connect.Request[v1.SetupRequest]) (*connect.Response[v1.SetupResponse], error)
@@ -144,6 +147,12 @@ func NewRunnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(runnerServiceMethods.ByName("List")),
 			connect.WithClientOptions(opts...),
 		),
+		tree: connect.NewClient[v1.TreeRequest, v1.TreeResponse](
+			httpClient,
+			baseURL+RunnerServiceTreeProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("Tree")),
+			connect.WithClientOptions(opts...),
+		),
 		setSecrets: connect.NewClient[v1.SetSecretsRequest, v1.SetSecretsResponse](
 			httpClient,
 			baseURL+RunnerServiceSetSecretsProcedure,
@@ -176,6 +185,7 @@ type runnerServiceClient struct {
 	editFile          *connect.Client[v1.EditFileRequest, v1.EditFileResponse]
 	stat              *connect.Client[v1.StatRequest, v1.StatResponse]
 	list              *connect.Client[v1.ListRequest, v1.ListResponse]
+	tree              *connect.Client[v1.TreeRequest, v1.TreeResponse]
 	setSecrets        *connect.Client[v1.SetSecretsRequest, v1.SetSecretsResponse]
 	setGitCredentials *connect.Client[v1.SetGitCredentialsRequest, v1.SetGitCredentialsResponse]
 	setup             *connect.Client[v1.SetupRequest, v1.SetupResponse]
@@ -226,6 +236,11 @@ func (c *runnerServiceClient) List(ctx context.Context, req *connect.Request[v1.
 	return c.list.CallUnary(ctx, req)
 }
 
+// Tree calls dsh.sandbox.v1.RunnerService.Tree.
+func (c *runnerServiceClient) Tree(ctx context.Context, req *connect.Request[v1.TreeRequest]) (*connect.Response[v1.TreeResponse], error) {
+	return c.tree.CallUnary(ctx, req)
+}
+
 // SetSecrets calls dsh.sandbox.v1.RunnerService.SetSecrets.
 func (c *runnerServiceClient) SetSecrets(ctx context.Context, req *connect.Request[v1.SetSecretsRequest]) (*connect.Response[v1.SetSecretsResponse], error) {
 	return c.setSecrets.CallUnary(ctx, req)
@@ -252,6 +267,7 @@ type RunnerServiceHandler interface {
 	EditFile(context.Context, *connect.Request[v1.EditFileRequest]) (*connect.Response[v1.EditFileResponse], error)
 	Stat(context.Context, *connect.Request[v1.StatRequest]) (*connect.Response[v1.StatResponse], error)
 	List(context.Context, *connect.Request[v1.ListRequest]) (*connect.Response[v1.ListResponse], error)
+	Tree(context.Context, *connect.Request[v1.TreeRequest]) (*connect.Response[v1.TreeResponse], error)
 	SetSecrets(context.Context, *connect.Request[v1.SetSecretsRequest]) (*connect.Response[v1.SetSecretsResponse], error)
 	SetGitCredentials(context.Context, *connect.Request[v1.SetGitCredentialsRequest]) (*connect.Response[v1.SetGitCredentialsResponse], error)
 	Setup(context.Context, *connect.Request[v1.SetupRequest]) (*connect.Response[v1.SetupResponse], error)
@@ -318,6 +334,12 @@ func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(runnerServiceMethods.ByName("List")),
 		connect.WithHandlerOptions(opts...),
 	)
+	runnerServiceTreeHandler := connect.NewUnaryHandler(
+		RunnerServiceTreeProcedure,
+		svc.Tree,
+		connect.WithSchema(runnerServiceMethods.ByName("Tree")),
+		connect.WithHandlerOptions(opts...),
+	)
 	runnerServiceSetSecretsHandler := connect.NewUnaryHandler(
 		RunnerServiceSetSecretsProcedure,
 		svc.SetSecrets,
@@ -356,6 +378,8 @@ func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOp
 			runnerServiceStatHandler.ServeHTTP(w, r)
 		case RunnerServiceListProcedure:
 			runnerServiceListHandler.ServeHTTP(w, r)
+		case RunnerServiceTreeProcedure:
+			runnerServiceTreeHandler.ServeHTTP(w, r)
 		case RunnerServiceSetSecretsProcedure:
 			runnerServiceSetSecretsHandler.ServeHTTP(w, r)
 		case RunnerServiceSetGitCredentialsProcedure:
@@ -405,6 +429,10 @@ func (UnimplementedRunnerServiceHandler) Stat(context.Context, *connect.Request[
 
 func (UnimplementedRunnerServiceHandler) List(context.Context, *connect.Request[v1.ListRequest]) (*connect.Response[v1.ListResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dsh.sandbox.v1.RunnerService.List is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) Tree(context.Context, *connect.Request[v1.TreeRequest]) (*connect.Response[v1.TreeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dsh.sandbox.v1.RunnerService.Tree is not implemented"))
 }
 
 func (UnimplementedRunnerServiceHandler) SetSecrets(context.Context, *connect.Request[v1.SetSecretsRequest]) (*connect.Response[v1.SetSecretsResponse], error) {

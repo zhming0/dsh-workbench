@@ -1,3 +1,4 @@
+import { FileType } from "../src/gen/dsh/sandbox/v1/runner_pb.js";
 import type { RunnerClient } from "../src/runner-client.js";
 import type { RunnerGateway } from "../src/tunnel.js";
 import type {
@@ -27,6 +28,7 @@ export class FakeRunnerClient {
   setups = 0;
   healthy = true;
   secrets: Record<string, string> = {};
+  readonly treeRequests: unknown[] = [];
 
   async health() {
     if (!this.healthy) {
@@ -43,6 +45,18 @@ export class FakeRunnerClient {
   async setup() {
     this.setups += 1;
     return { ran: this.setups === 1 };
+  }
+
+  async tree(request: unknown) {
+    this.treeRequests.push(request);
+    return {
+      entries: [
+        { relativePath: "src", type: FileType.DIRECTORY },
+        { relativePath: "src/index.ts", type: FileType.REGULAR },
+        { relativePath: "link", type: FileType.UNSPECIFIED },
+      ],
+      truncated: false,
+    };
   }
 }
 

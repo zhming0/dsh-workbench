@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file dsh/sandbox/v1/runner.proto.
  */
 export const file_dsh_sandbox_v1_runner: GenFile = /*@__PURE__*/
-  fileDesc("Chtkc2gvc2FuZGJveC92MS9ydW5uZXIucHJvdG8SDmRzaC5zYW5kYm94LnYxIg8KDUhlYWx0aFJlcXVlc3QiPAoOSGVhbHRoUmVzcG9uc2USEgoKc2FuZGJveF9pZBgBIAEoCRIWCg5zZXR1cF9jb21wbGV0ZRgCIAEoCCKWAQoLRXhlY1JlcXVlc3QSDAoEYXJndhgBIAMoCRILCgNjd2QYAiABKAkSMQoDZW52GAMgAygLMiQuZHNoLnNhbmRib3gudjEuRXhlY1JlcXVlc3QuRW52RW50cnkSDQoFc3RkaW4YBCABKAwaKgoIRW52RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKZAQoMRXhlY1Jlc3BvbnNlEi4KB3N0YXJ0ZWQYASABKAsyGy5kc2guc2FuZGJveC52MS5FeGVjU3RhcnRlZEgAEhAKBnN0ZG91dBgCIAEoDEgAEhAKBnN0ZGVychgDIAEoDEgAEiwKBmV4aXRlZBgEIAEoCzIaLmRzaC5zYW5kYm94LnYxLkV4ZWNFeGl0ZWRIAEIHCgVldmVudCIaCgtFeGVjU3RhcnRlZBILCgNwaWQYASABKAMiLwoKRXhlY0V4aXRlZBIRCglleGl0X2NvZGUYASABKAUSDgoGc2lnbmFsGAIgASgJIpcBChhSZXNvbHZlRXhlY3V0YWJsZVJlcXVlc3QSDwoHY29tbWFuZBgBIAEoCRI+CgNlbnYYAiADKAsyMS5kc2guc2FuZGJveC52MS5SZXNvbHZlRXhlY3V0YWJsZVJlcXVlc3QuRW52RW50cnkaKgoIRW52RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIpChlSZXNvbHZlRXhlY3V0YWJsZVJlc3BvbnNlEgwKBHBhdGgYASABKAkiLwoSUmVzb2x2ZVBhdGhSZXF1ZXN0EgwKBHBhdGgYASABKAkSCwoDY3dkGAIgASgJIkMKE1Jlc29sdmVQYXRoUmVzcG9uc2USFgoOY2Fub25pY2FsX3BhdGgYASABKAkSFAoMZGlzcGxheV9wYXRoGAIgASgJIjIKD1JlYWRGaWxlUmVxdWVzdBIMCgRwYXRoGAEgASgJEhEKCW1heF9ieXRlcxgCIAEoAyIjChBSZWFkRmlsZVJlc3BvbnNlEg8KB2NvbnRlbnQYASABKAwicgoQV3JpdGVGaWxlUmVxdWVzdBIMCgRwYXRoGAEgASgJEg8KB2NvbnRlbnQYAiABKAwSGgoQY3JlYXRlX2lmX2Fic2VudBgDIAEoCEgAEhoKEGV4cGVjdGVkX3ZlcnNpb24YBCABKAlIAEIHCgVndWFyZCJZChFXcml0ZUZpbGVSZXNwb25zZRIPCgdjcmVhdGVkGAEgASgIEhIKCmhhZF9iZWZvcmUYAiABKAgSDgoGYmVmb3JlGAMgASgMEg8KB3ZlcnNpb24YBCABKAkidgoPRWRpdEZpbGVSZXF1ZXN0EgwKBHBhdGgYASABKAkSEgoKb2xkX3N0cmluZxgCIAEoCRISCgpuZXdfc3RyaW5nGAMgASgJEhMKC3JlcGxhY2VfYWxsGAQgASgIEhgKEGV4cGVjdGVkX3ZlcnNpb24YBSABKAkiQgoQRWRpdEZpbGVSZXNwb25zZRIOCgZiZWZvcmUYASABKAwSDQoFYWZ0ZXIYAiABKAwSDwoHdmVyc2lvbhgDIAEoCSI0CgtTdGF0UmVxdWVzdBIMCgRwYXRoGAEgASgJEhcKD2ZvbGxvd19zeW1saW5rcxgCIAEoCCJlCgxTdGF0UmVzcG9uc2USDgoGZXhpc3RzGAEgASgIEiYKBHR5cGUYAiABKA4yGC5kc2guc2FuZGJveC52MS5GaWxlVHlwZRIMCgRzaXplGAMgASgDEg8KB3ZlcnNpb24YBCABKAkiGwoLTGlzdFJlcXVlc3QSDAoEcGF0aBgBIAEoCSJ4CglMaXN0RW50cnkSDAoEbmFtZRgBIAEoCRIWCg5jYW5vbmljYWxfcGF0aBgCIAEoCRImCgR0eXBlGAMgASgOMhguZHNoLnNhbmRib3gudjEuRmlsZVR5cGUSDAoEc2l6ZRgEIAEoAxIPCgd2ZXJzaW9uGAUgASgJIjoKDExpc3RSZXNwb25zZRIqCgdlbnRyaWVzGAEgAygLMhkuZHNoLnNhbmRib3gudjEuTGlzdEVudHJ5IoQBChFTZXRTZWNyZXRzUmVxdWVzdBI/CgdzZWNyZXRzGAEgAygLMi4uZHNoLnNhbmRib3gudjEuU2V0U2VjcmV0c1JlcXVlc3QuU2VjcmV0c0VudHJ5Gi4KDFNlY3JldHNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIhQKElNldFNlY3JldHNSZXNwb25zZSJBCg1HaXRDcmVkZW50aWFsEgwKBGhvc3QYASABKAkSEAoIdXNlcm5hbWUYAiABKAkSEAoIcGFzc3dvcmQYAyABKAkiTgoYU2V0R2l0Q3JlZGVudGlhbHNSZXF1ZXN0EjIKC2NyZWRlbnRpYWxzGAEgAygLMh0uZHNoLnNhbmRib3gudjEuR2l0Q3JlZGVudGlhbCIbChlTZXRHaXRDcmVkZW50aWFsc1Jlc3BvbnNlIksKDFNldHVwUmVxdWVzdBIWCg5yZXBvc2l0b3J5X3VybBgBIAEoCRIQCghyZXZpc2lvbhgCIAEoCRIRCgl3b3Jrc3BhY2UYAyABKAkiHAoNU2V0dXBSZXNwb25zZRILCgNyYW4YASABKAgqgQEKCEZpbGVUeXBlEhkKFUZJTEVfVFlQRV9VTlNQRUNJRklFRBAAEhUKEUZJTEVfVFlQRV9SRUdVTEFSEAESFwoTRklMRV9UWVBFX0RJUkVDVE9SWRACEhUKEUZJTEVfVFlQRV9TWU1MSU5LEAMSEwoPRklMRV9UWVBFX09USEVSEAQy2gcKDVJ1bm5lclNlcnZpY2USRwoGSGVhbHRoEh0uZHNoLnNhbmRib3gudjEuSGVhbHRoUmVxdWVzdBoeLmRzaC5zYW5kYm94LnYxLkhlYWx0aFJlc3BvbnNlEkMKBEV4ZWMSGy5kc2guc2FuZGJveC52MS5FeGVjUmVxdWVzdBocLmRzaC5zYW5kYm94LnYxLkV4ZWNSZXNwb25zZTABEmgKEVJlc29sdmVFeGVjdXRhYmxlEiguZHNoLnNhbmRib3gudjEuUmVzb2x2ZUV4ZWN1dGFibGVSZXF1ZXN0GikuZHNoLnNhbmRib3gudjEuUmVzb2x2ZUV4ZWN1dGFibGVSZXNwb25zZRJWCgtSZXNvbHZlUGF0aBIiLmRzaC5zYW5kYm94LnYxLlJlc29sdmVQYXRoUmVxdWVzdBojLmRzaC5zYW5kYm94LnYxLlJlc29sdmVQYXRoUmVzcG9uc2USTQoIUmVhZEZpbGUSHy5kc2guc2FuZGJveC52MS5SZWFkRmlsZVJlcXVlc3QaIC5kc2guc2FuZGJveC52MS5SZWFkRmlsZVJlc3BvbnNlElAKCVdyaXRlRmlsZRIgLmRzaC5zYW5kYm94LnYxLldyaXRlRmlsZVJlcXVlc3QaIS5kc2guc2FuZGJveC52MS5Xcml0ZUZpbGVSZXNwb25zZRJNCghFZGl0RmlsZRIfLmRzaC5zYW5kYm94LnYxLkVkaXRGaWxlUmVxdWVzdBogLmRzaC5zYW5kYm94LnYxLkVkaXRGaWxlUmVzcG9uc2USQQoEU3RhdBIbLmRzaC5zYW5kYm94LnYxLlN0YXRSZXF1ZXN0GhwuZHNoLnNhbmRib3gudjEuU3RhdFJlc3BvbnNlEkEKBExpc3QSGy5kc2guc2FuZGJveC52MS5MaXN0UmVxdWVzdBocLmRzaC5zYW5kYm94LnYxLkxpc3RSZXNwb25zZRJTCgpTZXRTZWNyZXRzEiEuZHNoLnNhbmRib3gudjEuU2V0U2VjcmV0c1JlcXVlc3QaIi5kc2guc2FuZGJveC52MS5TZXRTZWNyZXRzUmVzcG9uc2USaAoRU2V0R2l0Q3JlZGVudGlhbHMSKC5kc2guc2FuZGJveC52MS5TZXRHaXRDcmVkZW50aWFsc1JlcXVlc3QaKS5kc2guc2FuZGJveC52MS5TZXRHaXRDcmVkZW50aWFsc1Jlc3BvbnNlEkQKBVNldHVwEhwuZHNoLnNhbmRib3gudjEuU2V0dXBSZXF1ZXN0Gh0uZHNoLnNhbmRib3gudjEuU2V0dXBSZXNwb25zZUJEWkJnaXRodWIuY29tL3pobWluZzAvZHNoLXNhbmRib3gvcnVubmVyL2dlbi9kc2gvc2FuZGJveC92MTtzYW5kYm94djFiBnByb3RvMw");
+  fileDesc("Chtkc2gvc2FuZGJveC92MS9ydW5uZXIucHJvdG8SDmRzaC5zYW5kYm94LnYxIg8KDUhlYWx0aFJlcXVlc3QiPAoOSGVhbHRoUmVzcG9uc2USEgoKc2FuZGJveF9pZBgBIAEoCRIWCg5zZXR1cF9jb21wbGV0ZRgCIAEoCCKWAQoLRXhlY1JlcXVlc3QSDAoEYXJndhgBIAMoCRILCgNjd2QYAiABKAkSMQoDZW52GAMgAygLMiQuZHNoLnNhbmRib3gudjEuRXhlY1JlcXVlc3QuRW52RW50cnkSDQoFc3RkaW4YBCABKAwaKgoIRW52RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKZAQoMRXhlY1Jlc3BvbnNlEi4KB3N0YXJ0ZWQYASABKAsyGy5kc2guc2FuZGJveC52MS5FeGVjU3RhcnRlZEgAEhAKBnN0ZG91dBgCIAEoDEgAEhAKBnN0ZGVychgDIAEoDEgAEiwKBmV4aXRlZBgEIAEoCzIaLmRzaC5zYW5kYm94LnYxLkV4ZWNFeGl0ZWRIAEIHCgVldmVudCIaCgtFeGVjU3RhcnRlZBILCgNwaWQYASABKAMiLwoKRXhlY0V4aXRlZBIRCglleGl0X2NvZGUYASABKAUSDgoGc2lnbmFsGAIgASgJIpcBChhSZXNvbHZlRXhlY3V0YWJsZVJlcXVlc3QSDwoHY29tbWFuZBgBIAEoCRI+CgNlbnYYAiADKAsyMS5kc2guc2FuZGJveC52MS5SZXNvbHZlRXhlY3V0YWJsZVJlcXVlc3QuRW52RW50cnkaKgoIRW52RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIpChlSZXNvbHZlRXhlY3V0YWJsZVJlc3BvbnNlEgwKBHBhdGgYASABKAkiLwoSUmVzb2x2ZVBhdGhSZXF1ZXN0EgwKBHBhdGgYASABKAkSCwoDY3dkGAIgASgJIkMKE1Jlc29sdmVQYXRoUmVzcG9uc2USFgoOY2Fub25pY2FsX3BhdGgYASABKAkSFAoMZGlzcGxheV9wYXRoGAIgASgJIjIKD1JlYWRGaWxlUmVxdWVzdBIMCgRwYXRoGAEgASgJEhEKCW1heF9ieXRlcxgCIAEoAyIjChBSZWFkRmlsZVJlc3BvbnNlEg8KB2NvbnRlbnQYASABKAwicgoQV3JpdGVGaWxlUmVxdWVzdBIMCgRwYXRoGAEgASgJEg8KB2NvbnRlbnQYAiABKAwSGgoQY3JlYXRlX2lmX2Fic2VudBgDIAEoCEgAEhoKEGV4cGVjdGVkX3ZlcnNpb24YBCABKAlIAEIHCgVndWFyZCJZChFXcml0ZUZpbGVSZXNwb25zZRIPCgdjcmVhdGVkGAEgASgIEhIKCmhhZF9iZWZvcmUYAiABKAgSDgoGYmVmb3JlGAMgASgMEg8KB3ZlcnNpb24YBCABKAkidgoPRWRpdEZpbGVSZXF1ZXN0EgwKBHBhdGgYASABKAkSEgoKb2xkX3N0cmluZxgCIAEoCRISCgpuZXdfc3RyaW5nGAMgASgJEhMKC3JlcGxhY2VfYWxsGAQgASgIEhgKEGV4cGVjdGVkX3ZlcnNpb24YBSABKAkiQgoQRWRpdEZpbGVSZXNwb25zZRIOCgZiZWZvcmUYASABKAwSDQoFYWZ0ZXIYAiABKAwSDwoHdmVyc2lvbhgDIAEoCSI0CgtTdGF0UmVxdWVzdBIMCgRwYXRoGAEgASgJEhcKD2ZvbGxvd19zeW1saW5rcxgCIAEoCCJlCgxTdGF0UmVzcG9uc2USDgoGZXhpc3RzGAEgASgIEiYKBHR5cGUYAiABKA4yGC5kc2guc2FuZGJveC52MS5GaWxlVHlwZRIMCgRzaXplGAMgASgDEg8KB3ZlcnNpb24YBCABKAkiGwoLTGlzdFJlcXVlc3QSDAoEcGF0aBgBIAEoCSJ4CglMaXN0RW50cnkSDAoEbmFtZRgBIAEoCRIWCg5jYW5vbmljYWxfcGF0aBgCIAEoCRImCgR0eXBlGAMgASgOMhguZHNoLnNhbmRib3gudjEuRmlsZVR5cGUSDAoEc2l6ZRgEIAEoAxIPCgd2ZXJzaW9uGAUgASgJIjoKDExpc3RSZXNwb25zZRIqCgdlbnRyaWVzGAEgAygLMhkuZHNoLnNhbmRib3gudjEuTGlzdEVudHJ5Ik4KC1RyZWVSZXF1ZXN0EgwKBHBhdGgYASABKAkSHAoUZXhjbHVkZWRfZGlyZWN0b3JpZXMYAiADKAkSEwoLbWF4X2VudHJpZXMYAyABKAMiSgoJVHJlZUVudHJ5EhUKDXJlbGF0aXZlX3BhdGgYASABKAkSJgoEdHlwZRgCIAEoDjIYLmRzaC5zYW5kYm94LnYxLkZpbGVUeXBlIk0KDFRyZWVSZXNwb25zZRIqCgdlbnRyaWVzGAEgAygLMhkuZHNoLnNhbmRib3gudjEuVHJlZUVudHJ5EhEKCXRydW5jYXRlZBgCIAEoCCKEAQoRU2V0U2VjcmV0c1JlcXVlc3QSPwoHc2VjcmV0cxgBIAMoCzIuLmRzaC5zYW5kYm94LnYxLlNldFNlY3JldHNSZXF1ZXN0LlNlY3JldHNFbnRyeRouCgxTZWNyZXRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIUChJTZXRTZWNyZXRzUmVzcG9uc2UiQQoNR2l0Q3JlZGVudGlhbBIMCgRob3N0GAEgASgJEhAKCHVzZXJuYW1lGAIgASgJEhAKCHBhc3N3b3JkGAMgASgJIk4KGFNldEdpdENyZWRlbnRpYWxzUmVxdWVzdBIyCgtjcmVkZW50aWFscxgBIAMoCzIdLmRzaC5zYW5kYm94LnYxLkdpdENyZWRlbnRpYWwiGwoZU2V0R2l0Q3JlZGVudGlhbHNSZXNwb25zZSJLCgxTZXR1cFJlcXVlc3QSFgoOcmVwb3NpdG9yeV91cmwYASABKAkSEAoIcmV2aXNpb24YAiABKAkSEQoJd29ya3NwYWNlGAMgASgJIhwKDVNldHVwUmVzcG9uc2USCwoDcmFuGAEgASgIKoEBCghGaWxlVHlwZRIZChVGSUxFX1RZUEVfVU5TUEVDSUZJRUQQABIVChFGSUxFX1RZUEVfUkVHVUxBUhABEhcKE0ZJTEVfVFlQRV9ESVJFQ1RPUlkQAhIVChFGSUxFX1RZUEVfU1lNTElOSxADEhMKD0ZJTEVfVFlQRV9PVEhFUhAEMp0ICg1SdW5uZXJTZXJ2aWNlEkcKBkhlYWx0aBIdLmRzaC5zYW5kYm94LnYxLkhlYWx0aFJlcXVlc3QaHi5kc2guc2FuZGJveC52MS5IZWFsdGhSZXNwb25zZRJDCgRFeGVjEhsuZHNoLnNhbmRib3gudjEuRXhlY1JlcXVlc3QaHC5kc2guc2FuZGJveC52MS5FeGVjUmVzcG9uc2UwARJoChFSZXNvbHZlRXhlY3V0YWJsZRIoLmRzaC5zYW5kYm94LnYxLlJlc29sdmVFeGVjdXRhYmxlUmVxdWVzdBopLmRzaC5zYW5kYm94LnYxLlJlc29sdmVFeGVjdXRhYmxlUmVzcG9uc2USVgoLUmVzb2x2ZVBhdGgSIi5kc2guc2FuZGJveC52MS5SZXNvbHZlUGF0aFJlcXVlc3QaIy5kc2guc2FuZGJveC52MS5SZXNvbHZlUGF0aFJlc3BvbnNlEk0KCFJlYWRGaWxlEh8uZHNoLnNhbmRib3gudjEuUmVhZEZpbGVSZXF1ZXN0GiAuZHNoLnNhbmRib3gudjEuUmVhZEZpbGVSZXNwb25zZRJQCglXcml0ZUZpbGUSIC5kc2guc2FuZGJveC52MS5Xcml0ZUZpbGVSZXF1ZXN0GiEuZHNoLnNhbmRib3gudjEuV3JpdGVGaWxlUmVzcG9uc2USTQoIRWRpdEZpbGUSHy5kc2guc2FuZGJveC52MS5FZGl0RmlsZVJlcXVlc3QaIC5kc2guc2FuZGJveC52MS5FZGl0RmlsZVJlc3BvbnNlEkEKBFN0YXQSGy5kc2guc2FuZGJveC52MS5TdGF0UmVxdWVzdBocLmRzaC5zYW5kYm94LnYxLlN0YXRSZXNwb25zZRJBCgRMaXN0EhsuZHNoLnNhbmRib3gudjEuTGlzdFJlcXVlc3QaHC5kc2guc2FuZGJveC52MS5MaXN0UmVzcG9uc2USQQoEVHJlZRIbLmRzaC5zYW5kYm94LnYxLlRyZWVSZXF1ZXN0GhwuZHNoLnNhbmRib3gudjEuVHJlZVJlc3BvbnNlElMKClNldFNlY3JldHMSIS5kc2guc2FuZGJveC52MS5TZXRTZWNyZXRzUmVxdWVzdBoiLmRzaC5zYW5kYm94LnYxLlNldFNlY3JldHNSZXNwb25zZRJoChFTZXRHaXRDcmVkZW50aWFscxIoLmRzaC5zYW5kYm94LnYxLlNldEdpdENyZWRlbnRpYWxzUmVxdWVzdBopLmRzaC5zYW5kYm94LnYxLlNldEdpdENyZWRlbnRpYWxzUmVzcG9uc2USRAoFU2V0dXASHC5kc2guc2FuZGJveC52MS5TZXR1cFJlcXVlc3QaHS5kc2guc2FuZGJveC52MS5TZXR1cFJlc3BvbnNlQkRaQmdpdGh1Yi5jb20vemhtaW5nMC9kc2gtc2FuZGJveC9ydW5uZXIvZ2VuL2RzaC9zYW5kYm94L3YxO3NhbmRib3h2MWIGcHJvdG8z");
 
 /**
  * @generated from message dsh.sandbox.v1.HealthRequest
@@ -542,6 +542,90 @@ export const ListResponseSchema: GenMessage<ListResponse> = /*@__PURE__*/
   messageDesc(file_dsh_sandbox_v1_runner, 20);
 
 /**
+ * Recursive workspace listing for host-side file-reference discovery ("@"
+ * completion). The runner owns the walk so the host never needs the tree.
+ *
+ * @generated from message dsh.sandbox.v1.TreeRequest
+ */
+export type TreeRequest = Message<"dsh.sandbox.v1.TreeRequest"> & {
+  /**
+   * Absolute root directory to walk. Entries are returned relative to it.
+   *
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * Directory basenames never traversed or offered (e.g. "node_modules").
+   *
+   * @generated from field: repeated string excluded_directories = 2;
+   */
+  excludedDirectories: string[];
+
+  /**
+   * Cap on returned entries; walk stops once it is reached.
+   *
+   * @generated from field: int64 max_entries = 3;
+   */
+  maxEntries: bigint;
+};
+
+/**
+ * Describes the message dsh.sandbox.v1.TreeRequest.
+ * Use `create(TreeRequestSchema)` to create a new message.
+ */
+export const TreeRequestSchema: GenMessage<TreeRequest> = /*@__PURE__*/
+  messageDesc(file_dsh_sandbox_v1_runner, 21);
+
+/**
+ * @generated from message dsh.sandbox.v1.TreeEntry
+ */
+export type TreeEntry = Message<"dsh.sandbox.v1.TreeEntry"> & {
+  /**
+   * Path relative to the requested root, forward-slash separated.
+   *
+   * @generated from field: string relative_path = 1;
+   */
+  relativePath: string;
+
+  /**
+   * @generated from field: dsh.sandbox.v1.FileType type = 2;
+   */
+  type: FileType;
+};
+
+/**
+ * Describes the message dsh.sandbox.v1.TreeEntry.
+ * Use `create(TreeEntrySchema)` to create a new message.
+ */
+export const TreeEntrySchema: GenMessage<TreeEntry> = /*@__PURE__*/
+  messageDesc(file_dsh_sandbox_v1_runner, 22);
+
+/**
+ * @generated from message dsh.sandbox.v1.TreeResponse
+ */
+export type TreeResponse = Message<"dsh.sandbox.v1.TreeResponse"> & {
+  /**
+   * @generated from field: repeated dsh.sandbox.v1.TreeEntry entries = 1;
+   */
+  entries: TreeEntry[];
+
+  /**
+   * True when traversal stopped at max_entries before covering the tree.
+   *
+   * @generated from field: bool truncated = 2;
+   */
+  truncated: boolean;
+};
+
+/**
+ * Describes the message dsh.sandbox.v1.TreeResponse.
+ * Use `create(TreeResponseSchema)` to create a new message.
+ */
+export const TreeResponseSchema: GenMessage<TreeResponse> = /*@__PURE__*/
+  messageDesc(file_dsh_sandbox_v1_runner, 23);
+
+/**
  * @generated from message dsh.sandbox.v1.SetSecretsRequest
  */
 export type SetSecretsRequest = Message<"dsh.sandbox.v1.SetSecretsRequest"> & {
@@ -556,7 +640,7 @@ export type SetSecretsRequest = Message<"dsh.sandbox.v1.SetSecretsRequest"> & {
  * Use `create(SetSecretsRequestSchema)` to create a new message.
  */
 export const SetSecretsRequestSchema: GenMessage<SetSecretsRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_sandbox_v1_runner, 21);
+  messageDesc(file_dsh_sandbox_v1_runner, 24);
 
 /**
  * @generated from message dsh.sandbox.v1.SetSecretsResponse
@@ -569,7 +653,7 @@ export type SetSecretsResponse = Message<"dsh.sandbox.v1.SetSecretsResponse"> & 
  * Use `create(SetSecretsResponseSchema)` to create a new message.
  */
 export const SetSecretsResponseSchema: GenMessage<SetSecretsResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_sandbox_v1_runner, 22);
+  messageDesc(file_dsh_sandbox_v1_runner, 25);
 
 /**
  * @generated from message dsh.sandbox.v1.GitCredential
@@ -596,7 +680,7 @@ export type GitCredential = Message<"dsh.sandbox.v1.GitCredential"> & {
  * Use `create(GitCredentialSchema)` to create a new message.
  */
 export const GitCredentialSchema: GenMessage<GitCredential> = /*@__PURE__*/
-  messageDesc(file_dsh_sandbox_v1_runner, 23);
+  messageDesc(file_dsh_sandbox_v1_runner, 26);
 
 /**
  * @generated from message dsh.sandbox.v1.SetGitCredentialsRequest
@@ -613,7 +697,7 @@ export type SetGitCredentialsRequest = Message<"dsh.sandbox.v1.SetGitCredentials
  * Use `create(SetGitCredentialsRequestSchema)` to create a new message.
  */
 export const SetGitCredentialsRequestSchema: GenMessage<SetGitCredentialsRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_sandbox_v1_runner, 24);
+  messageDesc(file_dsh_sandbox_v1_runner, 27);
 
 /**
  * @generated from message dsh.sandbox.v1.SetGitCredentialsResponse
@@ -626,7 +710,7 @@ export type SetGitCredentialsResponse = Message<"dsh.sandbox.v1.SetGitCredential
  * Use `create(SetGitCredentialsResponseSchema)` to create a new message.
  */
 export const SetGitCredentialsResponseSchema: GenMessage<SetGitCredentialsResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_sandbox_v1_runner, 25);
+  messageDesc(file_dsh_sandbox_v1_runner, 28);
 
 /**
  * @generated from message dsh.sandbox.v1.SetupRequest
@@ -653,7 +737,7 @@ export type SetupRequest = Message<"dsh.sandbox.v1.SetupRequest"> & {
  * Use `create(SetupRequestSchema)` to create a new message.
  */
 export const SetupRequestSchema: GenMessage<SetupRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_sandbox_v1_runner, 26);
+  messageDesc(file_dsh_sandbox_v1_runner, 29);
 
 /**
  * @generated from message dsh.sandbox.v1.SetupResponse
@@ -670,7 +754,7 @@ export type SetupResponse = Message<"dsh.sandbox.v1.SetupResponse"> & {
  * Use `create(SetupResponseSchema)` to create a new message.
  */
 export const SetupResponseSchema: GenMessage<SetupResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_sandbox_v1_runner, 27);
+  messageDesc(file_dsh_sandbox_v1_runner, 30);
 
 /**
  * @generated from enum dsh.sandbox.v1.FileType
@@ -783,6 +867,14 @@ export const RunnerService: GenService<{
     methodKind: "unary";
     input: typeof ListRequestSchema;
     output: typeof ListResponseSchema;
+  },
+  /**
+   * @generated from rpc dsh.sandbox.v1.RunnerService.Tree
+   */
+  tree: {
+    methodKind: "unary";
+    input: typeof TreeRequestSchema;
+    output: typeof TreeResponseSchema;
   },
   /**
    * @generated from rpc dsh.sandbox.v1.RunnerService.SetSecrets
