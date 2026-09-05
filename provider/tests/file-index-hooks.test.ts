@@ -74,9 +74,10 @@ describe("file index at hibernation", () => {
     expect(backend.wakes).toBe(1);
     expect(await manager.hibernatedFileIndex(agent)).toBeUndefined();
 
-    // Destroying the session removes its index file too.
-    backend.capabilities.supportsHibernate = false;
+    // Releasing the session removes its index file too.
     await manager.hibernate("session-one");
+    await expect(stat(indexPath)).resolves.toBeDefined();
+    await manager.release("session-one");
     await expect(stat(indexPath)).rejects.toThrow();
   });
 });

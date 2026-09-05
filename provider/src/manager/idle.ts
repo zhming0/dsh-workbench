@@ -12,6 +12,8 @@ export interface IdleScheduleHooks {
    * hibernate answers false.
    */
   hibernate(sessionId: string, guard?: () => boolean): Promise<boolean>;
+  /** A suspend attempt failed and will be retried after another idle delay. */
+  warn(message: string): void;
 }
 
 /**
@@ -48,7 +50,12 @@ export class IdleSchedule {
     const activity = this.activity.get(sessionId) ?? 0;
     const timer = setTimeout(
       () =>
-        void this.tick(sessionId, activity).catch(() => {
+        void this.tick(sessionId, activity).catch((error: unknown) => {
+          // Say so: a push that keeps failing would otherwise keep the
+          // sandbox running in silence.
+          this.hooks.warn(
+            `could not suspend ${sessionId}, retrying after the idle delay: ${error instanceof Error ? error.message : String(error)}`,
+          );
           if ((this.activity.get(sessionId) ?? 0) === activity) {
             this.schedule(sessionId);
           }
