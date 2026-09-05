@@ -6,7 +6,7 @@ import { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SandboxManager } from "../src/manager.js";
+import { SandboxManager } from "../src/manager/index.js";
 import { SessionStore } from "../src/state-store.js";
 import { FakeBackend, gatewayFor } from "./fakes.js";
 

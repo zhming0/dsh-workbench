@@ -135,7 +135,6 @@ Configuration is YAML in the profile's own layer,
 | `idleMs`            | 10 minutes              | Idle delay after the last turn or wake before hibernating        |
 | `expiresAfterMs`    | 7 days                  | How long a hibernated workspace is retained                      |
 | `stateDir`          | `~/.dsh-sandbox`        | Records, broker data, token, instructions, and Workspace anchors |
-| `wipCommit`         | `false`                 | Make a local safety commit before hibernating                    |
 | `registrationToken` | see below               | Token(s) runners must present, comma-separated                   |
 | `tunnel.port`       | `8081`                  | Port the host listens on for runner tunnels                      |
 | `tunnel.bind`       | `0.0.0.0`               | Address the tunnel listener binds to                             |
