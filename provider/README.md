@@ -95,7 +95,8 @@ the row in a patch layer:
 ```
 
 The default backend uses Docker on the same machine as dsh. The Kubernetes
-backend uses Kubernetes SIG agent-sandbox. Runners connect out to the host's
+backend uses Kubernetes SIG agent-sandbox. The Buildkite backend runs each
+sandbox as one build on a pipeline you create. Runners connect out to the host's
 tunnel listener, so the host never dials into a sandbox; it only needs to be
 reachable by the runners it manages.
 
@@ -144,16 +145,28 @@ Each profile carries the settings of its own backend. Profiles do not share
 settings with each other, so two Kubernetes profiles in one namespace both
 name that namespace.
 
-| Profile field    | Backend  | Default                | Meaning                                        |
-| ---------------- | -------- | ---------------------- | ---------------------------------------------- |
-| `backend`        | both     | required               | `docker` or `kas`                              |
-| `image`          | `docker` | matching release tag   | Runner image                                   |
-| `binary`         | `docker` | `docker`               | Docker-compatible command                      |
-| `hostUrl`        | `docker` | `host.docker.internal` | `HOST_URL` runners dial, `tcp://` or `tls://`  |
-| `namespace`      | `kas`    | `dsh-sandbox`          | Namespace containing claims and warm sandboxes |
-| `warmPool`       | `kas`    | `dsh-universal`        | Warm pool used for claims                      |
-| `readyTimeoutMs` | `kas`    | 3 minutes              | How long to wait for a claimed sandbox         |
-| `kubeconfig`     | `kas`    | normal client lookup   | Optional kubeconfig path                       |
+| Profile field    | Backend               | Default                | Meaning                                         |
+| ---------------- | --------------------- | ---------------------- | ----------------------------------------------- |
+| `backend`        | all                   | required               | `docker`, `kas`, or `buildkite`                 |
+| `image`          | `docker`, `buildkite` | matching release tag   | Runner image                                    |
+| `binary`         | `docker`              | `docker`               | Docker-compatible command                       |
+| `hostUrl`        | `docker`              | `host.docker.internal` | `HOST_URL` runners dial, `tcp://` or `tls://`   |
+| `namespace`      | `kas`                 | `dsh-sandbox`          | Namespace containing claims and warm sandboxes  |
+| `warmPool`       | `kas`                 | `dsh-universal`        | Warm pool used for claims                       |
+| `readyTimeoutMs` | `kas`                 | 3 minutes              | How long to wait for a claimed sandbox          |
+| `kubeconfig`     | `kas`                 | normal client lookup   | Optional kubeconfig path                        |
+| `organization`   | `buildkite`           | required               | Buildkite organization slug                     |
+| `pipeline`       | `buildkite`           | required               | Pipeline slug whose job runs the runner         |
+| `hostUrl`        | `buildkite`           | required               | `HOST_URL` runners dial; agents are never local |
+| `branch`         | `buildkite`           | `main`                 | Branch each build is recorded against           |
+| `readyTimeoutMs` | `buildkite`           | 10 minutes             | How long a build may wait for an agent          |
+| `tokenEnv`       | `buildkite`           | `BUILDKITE_API_TOKEN`  | Host variable holding the API token             |
+
+A Buildkite profile cannot hibernate, so it checkpoints on idle (see below).
+The host process needs the API token in `tokenEnv` at boot, with `read_builds`
+and `write_builds` on the pipeline. The pipeline shape, the registration token,
+and the limits are described in
+[`docs/buildkite.md`](https://github.com/zhming0/dsh-workbench/blob/main/docs/buildkite.md).
 
 For a Web Workspace created by this package, the repository URL stored in its
 anchor takes precedence. Other sessions use `repository` when set, then run
@@ -166,8 +179,9 @@ inside the sandbox. Anchors remain after sandbox expiry so historical dsh
 Workspace registrations do not become missing directories.
 
 Each release publishes a runner image tagged with the same version as this
-package, and the provider defaults to that exact tag, so a Docker profile's
-`image` only matters when testing a locally built image.
+package, and the provider defaults to that exact tag, so a profile's `image`
+only matters when testing a locally built image. A Buildkite profile passes it
+to the build as `DSH_RUNNER_IMAGE`; the pipeline step runs that image.
 
 ### Sandbox profiles
 
@@ -218,7 +232,7 @@ backend:
   push, and a session that expires while checkpointed leaves its `dsh/wip/*`
   branch on the remote.
 
-No shipped backend checkpoints yet; Docker and Kubernetes both hibernate.
+The Buildkite backend checkpoints; Docker and Kubernetes hibernate.
 
 ### Search
 
@@ -302,12 +316,16 @@ order:
 2. The `DSH_WORKBENCH_REGISTRATION_TOKEN` environment variable, same format.
 3. Docker backend only: a token generated on first run and persisted at
    `stateDir/registration-token` with owner-only permissions. The Kubernetes
-   backend refuses to start without an explicit token, because warm pods need
-   the same token before any session claims them.
+   and Buildkite backends refuse to start without an explicit token, because
+   the sandbox side holds the token before any session exists: warm pods from
+   a Secret, Buildkite jobs from the pipeline's own secret store.
 
 For Kubernetes, put the token in the `dsh-registration-token` Secret in the
 sandbox namespace and in the host's environment. See
 [`docs/kubernetes.md`](https://github.com/zhming0/dsh-workbench/blob/main/docs/kubernetes.md).
+For Buildkite, the pipeline step passes it to the job as `REGISTRATION_TOKEN`;
+see
+[`docs/buildkite.md`](https://github.com/zhming0/dsh-workbench/blob/main/docs/buildkite.md).
 
 ## Limits
 

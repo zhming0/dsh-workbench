@@ -81,25 +81,43 @@ sandbox and its workspace still exist. The session cannot wake until a profile
 with that name is configured on that backend again, and `initialize` warns
 about it.
 
-## Slice two: Buildkite Hosted Agent
+## Slice two: Buildkite
 
-Not built yet; noted so the profile shape accommodates it.
+Built as `provider/src/backends/buildkite.ts`; operator documentation is
+[`docs/buildkite.md`](../buildkite.md).
 
-- A Buildkite profile is `{ backend: buildkite, pipeline, [image] }`. Provision
-  triggers a build on that pipeline through the Build API; the job runs the
-  runner image (the `image:` attribute on Hosted Agents is the natural fit if
-  it is available to the organization) with `HOST_URL` and the registration
-  token, and the runner dials out as it does from Kubernetes. No listener on
-  the runner side is needed, which is why dial-out was done first.
-- Hosted Agents cannot pause. The backend reports
-  `supportsHibernate: false`, and the idle path must push the work in progress
-  to an ephemeral branch before cancelling the build, then check that branch
-  out again on the next provision. That is the existing `wipCommit` idea made
-  mandatory for this backend and extended with a push.
+- A Buildkite profile is
+  `{ backend: buildkite, organization, pipeline, hostUrl, [image, branch, readyTimeoutMs, tokenEnv] }`.
+  Provision triggers a build on that pipeline through the Build API with
+  `SANDBOX_ID`, `HOST_URL`, and `DSH_RUNNER_IMAGE` in the build env and the
+  session id in build metadata, then polls until the build is `running`. The
+  pipeline's one step is `docker run` of `$DSH_RUNNER_IMAGE` with those
+  variables plus a `REGISTRATION_TOKEN` from a Buildkite secret. The image
+  defaults to the host's release tag, as in the Docker profile, so host and
+  runner stay in lock step without the operator editing the pipeline. The
+  runner dials out as it does from Kubernetes.
+- A build cannot pause. The backend reports `supportsHibernate: false`, and the
+  manager treats that capability as "checkpoint instead": on idle it runs a
+  script in the sandbox that commits the working tree and force-pushes `HEAD`
+  to `dsh/wip/<session hash>` on `origin`, then cancels the build and keeps the
+  record as hibernated with the checkpoint attached. The next prompt provisions
+  a new build with the checkpoint branch as the setup revision, so
+  `.agents/setup` sees the restored tree, then a second script moves the
+  session back onto its branch, undoes the checkpoint commit, and deletes the
+  branch. A failed push keeps the build running so the idle timer retries. The
+  checkpoint lives in `provider/src/checkpoint.ts` and is not Buildkite
+  specific; any backend without hibernation gets it.
+- `wake` only answers the manager's recovery probe for a record still marked
+  running: a live build is handed back, a finished one is reported missing so a
+  replacement is provisioned. `hibernate` and `expireAt` throw, since the
+  manager never calls them for this capability.
+- Not done: telling the model its sandbox was replaced, so it re-runs
+  environment setup it did by hand. Remote `dsh/wip/*` branches of expired
+  sessions are not garbage collected.
 - The trust boundary widens: a Buildkite API token and the organization's
   agent fleet join the host's trust domain. The token is ambient to the host
-  process, supplied by the deployment (an environment variable from a
-  Kubernetes Secret), the same way the Kubernetes backend uses the host pod's
-  ServiceAccount. It is not a broker secret like `GITHUB_TOKEN`: the broker
-  holds values pushed into sandboxes for the agent to use, and the Buildkite
-  token must never reach a runner.
+  process, read from `tokenEnv` (default `BUILDKITE_API_TOKEN`) at boot, the
+  same way the Kubernetes backend uses the host pod's ServiceAccount. It is not
+  a broker secret like `GITHUB_TOKEN`: the broker holds values pushed into
+  sandboxes for the agent to use, and the Buildkite token must never reach a
+  runner.

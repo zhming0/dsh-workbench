@@ -10,6 +10,7 @@ import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import z from "@deepseek-ai/schemastery";
 import { metrics, trace } from "@opentelemetry/api";
 
+import { BuildkiteBackend } from "./backends/buildkite.js";
 import { DockerBackend } from "./backends/docker.js";
 import { KasBackend } from "./backends/kas.js";
 import { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
@@ -22,6 +23,9 @@ import {
   type Checkpoint,
 } from "./checkpoint.js";
 import {
+  DEFAULT_BUILDKITE_BRANCH,
+  DEFAULT_BUILDKITE_READY_TIMEOUT_MS,
+  DEFAULT_BUILDKITE_TOKEN_ENV,
   resolveConfig,
   resolveRegistrationTokens,
   type Config,
@@ -100,6 +104,19 @@ export class SandboxManager extends TypertRemoteService {
             warmPool: z.string().default("dsh-universal"),
             readyTimeoutMs: z.number().min(1).default(180_000),
             kubeconfig: z.string(),
+          }),
+          z.object({
+            backend: z.const("buildkite").required(),
+            organization: z.string().required(),
+            pipeline: z.string().required(),
+            hostUrl: z.string().required(),
+            image: z.string().default(DEFAULT_RUNNER_IMAGE),
+            branch: z.string().default(DEFAULT_BUILDKITE_BRANCH),
+            readyTimeoutMs: z
+              .number()
+              .min(1)
+              .default(DEFAULT_BUILDKITE_READY_TIMEOUT_MS),
+            tokenEnv: z.string().default(DEFAULT_BUILDKITE_TOKEN_ENV),
           }),
         ]),
       )
@@ -931,6 +948,23 @@ function createBackend(
     const { name: _name, backend: _backend, ...options } = profile;
     return new DockerBackend({ ...options, registrationToken });
   }
+  if (profile.backend === "buildkite") {
+    // The token is ambient to the host process, like the Kubernetes backend's
+    // ServiceAccount. It is not a broker secret: it must never reach a runner.
+    const token = process.env[profile.tokenEnv];
+    if (token === undefined || token.trim() === "") {
+      throw new Error(
+        `profile ${profile.name} needs a Buildkite API token in ${profile.tokenEnv}`,
+      );
+    }
+    const {
+      name: _name,
+      backend: _backend,
+      tokenEnv: _env,
+      ...options
+    } = profile;
+    return new BuildkiteBackend({ ...options, token: token.trim() });
+  }
   const { name: _name, backend: _backend, ...options } = profile;
   return new KasBackend(options);
 }
@@ -944,3 +978,6 @@ function delay(milliseconds: number): Promise<void> {
 }
 
 export default SandboxManager;
+
+/** Internals the test suite reaches into. */
+export const testing = { createBackend };
