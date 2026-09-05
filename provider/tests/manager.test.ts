@@ -9,7 +9,7 @@ import type { Session, SessionEvent } from "@deepseek-ai/dsh-session";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { CredentialBroker } from "../src/broker.js";
-import { SandboxManager } from "../src/manager.js";
+import { SandboxManager } from "../src/manager/index.js";
 import { SessionStore } from "../src/state-store.js";
 import {
   FakeBackend,
@@ -79,7 +79,7 @@ describe("sandbox lifecycle", () => {
     expect(backend.client.setups).toBe(3);
   });
 
-  it("saves a file index at hibernation and drops it with the session", async () => {
+  it("releases a session's sandbox on demand and is a no-op when absent", async () => {
     const backend = new FakeBackend();
     const ctx = new Context();
     const manager = new SandboxManager(
@@ -93,50 +93,67 @@ describe("sandbox lifecycle", () => {
       },
       { backends: { standard: backend }, gateway: gatewayFor(backend) },
     );
-    manager.indexFilesOnHibernate({
-      excludedDirectories: ["node_modules"],
-      maxEntries: 10,
-    });
     const agent = {
       id: "session-one",
       session: { header: {} },
     } as unknown as Agent;
-    const indexPath = join(directory, "file-index", "session-one.json");
 
-    // A running session has no saved index: the runner answers directly.
     await manager.ensureRunning(agent);
-    expect(await manager.hibernatedFileIndex(agent)).toBeUndefined();
-    expect(backend.client.treeRequests).toEqual([]);
+    expect(backend.provisions).toBe(1);
 
-    // Hibernation walks the workspace once, with the file-reference options,
-    // and the saved index answers while the sandbox stays suspended.
-    await manager.hibernate("session-one");
-    expect(backend.client.treeRequests).toEqual([
+    await manager.release("session-one");
+    expect(backend.running).toBe(false);
+    const store = new SessionStore(join(directory, "sessions.json"));
+    await store.initialize();
+    expect(store.get("session-one")).toBeUndefined();
+
+    // Releasing again is a no-op; the next turn provisions a fresh sandbox.
+    await manager.release("session-one");
+    await manager.ensureRunning(agent);
+    expect(backend.provisions).toBe(2);
+  });
+
+  it("does not release a sandbox under a live turn", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
       {
-        path: "/workspace/repository",
-        excludedDirectories: ["node_modules"],
-        maxEntries: 10n,
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 60_000,
+        expiresAfterMs: 60_000,
       },
-    ]);
-    expect(await manager.hibernatedFileIndex(agent)).toEqual({
-      entries: [
-        { path: "src", kind: "directory" },
-        { path: "src/index.ts", kind: "file" },
-      ],
-      truncated: false,
-    });
-    expect(backend.wakes).toBe(0);
-    await expect(stat(indexPath)).resolves.toBeDefined();
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+    const session = { id: "session-one" } as unknown as Session;
 
-    // Once awake the index is stale by definition, so it is not offered.
     await manager.ensureRunning(agent);
-    expect(backend.wakes).toBe(1);
-    expect(await manager.hibernatedFileIndex(agent)).toBeUndefined();
+    ctx.emit("session/event", session, {
+      type: "turn/start",
+      data: { turn: 1 },
+    } as unknown as SessionEvent);
+    await manager.release("session-one");
+    expect(backend.running).toBe(true);
+    const store = new SessionStore(join(directory, "sessions.json"));
+    await store.initialize();
+    expect(store.get("session-one")?.state).toBe("running");
 
-    // Destroying the session removes its index file too.
-    backend.capabilities.supportsHibernate = false;
-    await manager.hibernate("session-one");
-    await expect(stat(indexPath)).rejects.toThrow();
+    // The caller re-triggers after turn/end, and only then does release run.
+    ctx.emit("session/event", session, {
+      type: "turn/end",
+      data: { turn: 1, reason: { kind: "completed" } },
+    } as unknown as SessionEvent);
+    await manager.release("session-one");
+    expect(backend.running).toBe(false);
+    const released = new SessionStore(join(directory, "sessions.json"));
+    await released.initialize();
+    expect(released.get("session-one")).toBeUndefined();
   });
 
   it("suspends a session woken without a turn once its idle timer fires", async () => {

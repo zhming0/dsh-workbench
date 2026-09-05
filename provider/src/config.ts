@@ -3,6 +3,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import z from "@deepseek-ai/schemastery";
+
 import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { SandboxProfile } from "./types.js";
 
@@ -33,7 +35,6 @@ export interface Config {
   workspace?: string;
   idleMs?: number;
   expiresAfterMs?: number;
-  wipCommit?: boolean;
   registrationToken?: string;
   tunnel?: {
     port?: number;
@@ -50,10 +51,53 @@ export interface ResolvedConfig {
   workspace: string;
   idleMs: number;
   expiresAfterMs: number;
-  wipCommit: boolean;
   registrationToken?: string;
   tunnel: { port: number; bind: string };
 }
+
+/**
+ * The schema cordis validates the row config against. Every default here must
+ * stay in sync with resolveConfig, which applies the same defaults at runtime.
+ */
+export const configSchema: Schemastery<Config> = z.object({
+  profiles: z
+    .dict(
+      z.union([
+        z.object({
+          backend: z.const("docker").required(),
+          image: z.string().default(DEFAULT_RUNNER_IMAGE),
+          binary: z.string(),
+          hostUrl: z.string(),
+        }),
+        z.object({
+          backend: z.const("kas").required(),
+          namespace: z.string().default("dsh-sandbox"),
+          warmPool: z.string().default("dsh-universal"),
+          readyTimeoutMs: z.number().min(1).default(180_000),
+          kubeconfig: z.string(),
+        }),
+      ]),
+    )
+    .required(),
+  defaultProfile: z.string(),
+  stateDir: z.string(),
+  repository: z.string(),
+  revision: z.string().default(""),
+  workspace: z.string().default("/workspace/repository"),
+  idleMs: z
+    .number()
+    .min(1)
+    .default(10 * 60_000),
+  expiresAfterMs: z
+    .number()
+    .min(1)
+    .default(7 * 24 * 60 * 60_000),
+  registrationToken: z.string(),
+  tunnel: z.object({
+    port: z.natural().min(1).max(65_535).default(8081),
+    bind: z.string().default("0.0.0.0"),
+  }),
+});
 
 /** Apply every default and check the settings hold together. */
 export function resolveConfig(config: Config): ResolvedConfig {
@@ -86,7 +130,6 @@ export function resolveConfig(config: Config): ResolvedConfig {
     workspace: config.workspace ?? "/workspace/repository",
     idleMs: config.idleMs ?? 10 * 60_000,
     expiresAfterMs: config.expiresAfterMs ?? 7 * 24 * 60 * 60_000,
-    wipCommit: config.wipCommit ?? false,
     ...(config.registrationToken === undefined
       ? {}
       : { registrationToken: config.registrationToken }),

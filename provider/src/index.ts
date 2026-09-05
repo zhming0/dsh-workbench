@@ -1,5 +1,5 @@
 import { resolveConfig } from "./config.js";
-import SandboxManager from "./manager.js";
+import SandboxManager from "./manager/index.js";
 
 /**
  * The sandbox provider entry. `SandboxManager` — the bundle row this package
@@ -10,7 +10,7 @@ export { DockerBackend } from "./backends/docker.js";
 export { KasBackend } from "./backends/kas.js";
 export { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
 export type { Config, ProfileConfig } from "./config.js";
-export type { ManagerDependencies } from "./manager.js";
+export type { ManagerDependencies } from "./manager/index.js";
 export { SandboxManager };
 export default SandboxManager;
 export { TunnelServer } from "./tunnel.js";
