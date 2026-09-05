@@ -1,6 +1,7 @@
 import { metrics, trace } from "@opentelemetry/api";
 
 import { normalizeRepositoryUrl } from "../broker.js";
+import type { Checkpoint } from "../checkpoint.js";
 import type { RunnerClient } from "../runner-client.js";
 import type { SessionStore } from "../state-store.js";
 import {
@@ -29,9 +30,10 @@ const transitions = meter.createCounter("dsh.sandbox.lifecycle.transitions");
  */
 export interface LifecycleHooks {
   /**
-   * Just before a live sandbox leaves the running state: a real suspend
-   * (willSuspend, the runner still answers — index, commit, checkpoint) or a
-   * destroy because the backend cannot suspend (willSuspend is false).
+   * Just before a live sandbox leaves the running state, while the runner
+   * still answers: a real suspend (willSuspend) or a checkpoint-then-destroy
+   * because the backend cannot suspend (willSuspend is false). Either way the
+   * session ends up hibernated and its next wake shows this workspace again.
    */
   beforeHibernate?(context: {
     sessionId: string;
@@ -108,6 +110,11 @@ export class SandboxLifecycle {
         deadline.getTime() <= Date.now()
       ) {
         await this.releaseUnlocked(record.sessionId);
+        continue;
+      }
+      if (sandboxIsGone(record)) {
+        // Nothing is left to put a deadline on; ensureRunning enforces
+        // expiresAt itself on the next turn.
         continue;
       }
       try {
@@ -207,7 +214,9 @@ export class SandboxLifecycle {
       // Expiry already passed: reclaim loudly while we still can name the
       // backend, then provision fresh below.
       const backend = this.deps.registry.backendFor(record);
-      await backend.destroy(record.reference);
+      if (!sandboxIsGone(record)) {
+        await backend.destroy(record.reference);
+      }
       this.deps.attachment.drop(record.sandboxId);
       await this.forgetSession(sessionId);
       record = undefined;
@@ -227,6 +236,26 @@ export class SandboxLifecycle {
     const runningSandboxNeedsRecovery =
       record?.state === "running" &&
       !(await this.deps.registry.backendFor(record).health(record.reference));
+
+    let checkpoint: Checkpoint | undefined;
+    if (
+      record?.checkpoint !== undefined &&
+      (record.state === "hibernated" || runningSandboxNeedsRecovery)
+    ) {
+      // The work is on the remote, not in a sandbox: the sandbox was released
+      // at idle, or the one provisioned to restore it died before finishing.
+      // Provision again under the same profile; the new record carries the
+      // checkpoint until attach has restored it, so a failed restore is
+      // retried on the next turn instead of being forgotten.
+      if (runningSandboxNeedsRecovery) {
+        const backend = this.deps.registry.backendFor(record);
+        await backend.destroy(record.reference).catch(() => {});
+        this.deps.attachment.drop(record.sandboxId);
+      }
+      checkpoint = record.checkpoint;
+      profile = this.deps.registry.profile(record.profile);
+      record = undefined;
+    }
 
     if (
       record !== undefined &&
@@ -282,6 +311,7 @@ export class SandboxLifecycle {
         reference: handle.reference,
         repositoryUrl,
         state: "running",
+        ...(checkpoint === undefined ? {} : { checkpoint }),
         updatedAt: new Date().toISOString(),
       };
       await this.deps.store.set(record);
@@ -291,7 +321,16 @@ export class SandboxLifecycle {
       });
     }
 
-    return this.deps.attachment.attach(record, repositoryUrl);
+    const client = await this.deps.attachment.attach(record, repositoryUrl);
+    if (record.checkpoint !== undefined) {
+      const { checkpoint: _restored, ...restored } = record;
+      await this.deps.store.set({
+        ...restored,
+        updatedAt: new Date().toISOString(),
+      });
+      transitions.add(1, { backend: record.backend, transition: "restore" });
+    }
+    return client;
   }
 
   private async hibernateUnlocked(sessionId: string): Promise<void> {
@@ -326,11 +365,31 @@ export class SandboxLifecycle {
           transition: "hibernate",
         });
       } else {
+        // The sandbox cannot be kept, so push the working tree to the remote
+        // first. A failed push throws before destroy: the sandbox stays up and
+        // the idle timer tries again.
+        if (client === undefined && !(await backend.health(record.reference))) {
+          // After a host restart nothing is cached; a sandbox that is gone
+          // has nothing left to save.
+          throw new SandboxNotFoundError(
+            `sandbox ${record.sandboxId} is no longer running`,
+          );
+        }
+        // A record still carrying a checkpoint never finished restoring it,
+        // so no turn ran here and the pushed branch is still the truth.
+        const checkpoint =
+          record.checkpoint ?? (await this.deps.attachment.checkpoint(record));
         await backend.destroy(record.reference);
-        await this.forgetSession(sessionId);
+        await this.deps.store.set({
+          ...record,
+          state: "hibernated",
+          expiresAt: deadline.toISOString(),
+          checkpoint,
+          updatedAt: new Date().toISOString(),
+        });
         transitions.add(1, {
           backend: record.backend,
-          transition: "expire",
+          transition: "checkpoint",
         });
       }
     } catch (error) {
@@ -362,13 +421,15 @@ export class SandboxLifecycle {
       return;
     }
     this.deps.attachment.evict(sessionId);
-    try {
-      await backend.destroy(record.reference);
-    } catch (error) {
-      if (!(error instanceof SandboxNotFoundError)) {
-        throw error;
+    if (!sandboxIsGone(record)) {
+      try {
+        await backend.destroy(record.reference);
+      } catch (error) {
+        if (!(error instanceof SandboxNotFoundError)) {
+          throw error;
+        }
+        // The sandbox is already gone; its record still needs dropping.
       }
-      // The sandbox is already gone; its record still needs dropping.
     }
     this.deps.attachment.drop(record.sandboxId);
     await this.forgetSession(sessionId);
@@ -381,6 +442,15 @@ export class SandboxLifecycle {
       await hooks.afterRelease?.(sessionId);
     }
   }
+}
+
+/**
+ * A hibernated record with a checkpoint has no sandbox behind it: the work is
+ * on the remote and the backend reference is a memory. Nothing to destroy or
+ * put a deadline on.
+ */
+function sandboxIsGone(record: SessionRecord): boolean {
+  return record.state === "hibernated" && record.checkpoint !== undefined;
 }
 
 function orphanedRecordMessage(record: SessionRecord): string {

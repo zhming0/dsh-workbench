@@ -50,19 +50,13 @@ export class FileIndexHooks implements LifecycleHooks {
 
   /**
    * Index the workspace through the still-running runner, just before the
-   * sandbox suspends. A failure here only costs the fast path ("@" then wakes
-   * the sandbox), so it never blocks hibernation. Only a real suspend has a
-   * workspace worth describing: the destroy branch forgets the session, and
-   * its next turn starts from a fresh clone.
+   * sandbox suspends or is checkpointed. A failure here only costs the fast
+   * path ("@" then wakes the sandbox), so it never blocks hibernation.
    */
   async beforeHibernate(context: {
     sessionId: string;
-    willSuspend: boolean;
     client: RunnerClient | undefined;
   }): Promise<void> {
-    if (!context.willSuspend) {
-      return;
-    }
     const client = context.client;
     if (client === undefined || this.options === undefined) {
       return;
