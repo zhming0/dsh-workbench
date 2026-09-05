@@ -2,11 +2,11 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Context } from "@deepseek-ai/cordis";
+import { Context, Service } from "@deepseek-ai/cordis";
 import { agentEvents, type Agent } from "@deepseek-ai/dsh-agent";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import type { Session, SessionEvent } from "@deepseek-ai/dsh-session";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CredentialBroker } from "../src/broker.js";
 import { SandboxManager } from "../src/manager/index.js";
@@ -274,6 +274,154 @@ describe("sandbox lifecycle", () => {
     expect(store.get("session-one")?.state).toBe("hibernated");
   });
 });
+
+describe("archive release", () => {
+  let directory: string;
+
+  beforeEach(async () => {
+    directory = await mkdtemp(join(tmpdir(), "dsh-sandbox-provider-"));
+  });
+
+  afterEach(async () => {
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  function persistedRecord(sessionId: string) {
+    const store = new SessionStore(join(directory, "sessions.json"));
+    return store.initialize().then(() => store.get(sessionId));
+  }
+
+  function managerConfig() {
+    return {
+      profiles: { standard: { backend: "docker" as const } },
+      stateDir: directory,
+      repository: "https://github.com/example/public.git",
+      idleMs: 10,
+      expiresAfterMs: 60_000,
+    };
+  }
+
+  it("releases the sandbox and its record when the session is archived", async () => {
+    const backend = new FakeBackend();
+    const workspaceRegistry = new FakeWorkspaceRegistry();
+    const ctx = new Context();
+    const manager = new SandboxManager(ctx, managerConfig(), {
+      backends: { standard: backend },
+      gateway: gatewayFor(backend),
+      workspaceRegistry,
+    });
+    const agent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+
+    await manager.ensureRunning(agent);
+    expect(await persistedRecord("session-one")).toBeDefined();
+
+    workspaceRegistry.archivedSessionIds.push("session-one");
+    ctx.emit("domain/changed", {
+      domain: "workspace",
+      table: "",
+      key: "",
+      operation: "put",
+      value: {},
+    });
+    // The reconcile keeps working after the emit returns; poll for its
+    // outcome instead of sleeping on it.
+    await vi.waitFor(async () => {
+      expect(await persistedRecord("session-one")).toBeUndefined();
+    });
+
+    expect(backend.destroys).toBe(1);
+    expect(backend.hibernations).toBe(0);
+    expect(backend.expiries).toBe(0);
+  });
+
+  it("releases archived sessions found at startup", async () => {
+    // Seed the state file, then hand the manager a store whose load is held
+    // until the test says so: the boot trigger must wait for the load instead
+    // of reading an empty in-memory map. A future expiresAt keeps boot's own
+    // expiry recovery out of the picture, so only the archive reconcile can
+    // release the sandbox.
+    const seed = new SessionStore(join(directory, "sessions.json"));
+    await seed.initialize();
+    await seed.set({
+      sessionId: "session-one",
+      backend: "fake",
+      profile: "standard",
+      sandboxId: "sandbox-one",
+      reference: { id: "one" },
+      repositoryUrl: "https://github.com/example/public",
+      state: "hibernated",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    let loadStore: () => void = () => {};
+    const storeLoading = new Promise<void>((resolve) => {
+      loadStore = resolve;
+    });
+    class GatedStore extends SessionStore {
+      async initialize(): Promise<void> {
+        await storeLoading;
+        return super.initialize();
+      }
+    }
+
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    await ctx.plugin(MountedWorkspaceRegistry);
+    await sleep(20);
+    (
+      ctx.get("workspaceRegistry") as unknown as MountedWorkspaceRegistry
+    ).fake.archivedSessionIds.push("session-one");
+
+    const manager = new SandboxManager(ctx, managerConfig(), {
+      backends: { standard: backend },
+      store: new GatedStore(join(directory, "sessions.json")),
+      gateway: gatewayFor(backend),
+    });
+
+    // Let the boot trigger's dispatch drain: the reconcile is parked on the
+    // gated store, so nothing may be released while the load is held.
+    await sleep(10);
+    expect(backend.destroys).toBe(0);
+
+    loadStore();
+    // Settles once the host stores are loaded; the release itself no-ops on
+    // the unknown session.
+    await manager.release("unknown-session");
+    // The reconcile keeps working after the stores settle; poll for its
+    // outcome instead of sleeping on it.
+    await vi.waitFor(async () => {
+      expect(await persistedRecord("session-one")).toBeUndefined();
+    });
+
+    expect(backend.expiries).toBe(1);
+    expect(backend.destroys).toBe(1);
+  });
+});
+
+class MountedWorkspaceRegistry extends Service {
+  static inject: string[] = [];
+  readonly fake = new FakeWorkspaceRegistry();
+
+  constructor(ctx: Context) {
+    super(ctx, "workspaceRegistry");
+  }
+
+  get archivedSessionIds(): readonly string[] {
+    return this.fake.archivedSessionIds;
+  }
+
+  async create(path: string, title?: string) {
+    return this.fake.create(path, title);
+  }
+
+  list() {
+    return this.fake.list();
+  }
+}
 
 describe("repository workspaces and instructions", () => {
   let directory: string;

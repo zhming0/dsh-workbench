@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
+import type {} from "@deepseek-ai/dsh-storage-domain";
 import type {} from "@deepseek-ai/dsh-typert-registry";
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 
@@ -33,6 +34,7 @@ import {
   createRepositoryAnchor,
   repositoryForAnchor,
 } from "../workspace-anchor.js";
+import { ArchiveRelease, type SubagentsLike } from "./archive-release.js";
 import { FileIndexHooks } from "./file-index-hooks.js";
 import { IdleSchedule } from "./idle.js";
 import { ProfileChoice } from "./profile-choice.js";
@@ -55,6 +57,8 @@ export interface ManagerDependencies {
 interface WorkspaceRegistryLike {
   create(path: string, title?: string): Promise<{ path: string }>;
   list(): Array<{ path: string; title: string }>;
+  /** Sessions archived in the Web UI; dsh offers no unarchive, so the set only grows. */
+  readonly archivedSessionIds: readonly string[];
 }
 
 declare module "@deepseek-ai/cordis" {
@@ -82,6 +86,7 @@ export class SandboxManager extends TypertRemoteService {
   private readonly workspaceRegistry: WorkspaceRegistryLike | undefined;
   private readonly engine: SandboxLifecycle;
   private readonly idle: IdleSchedule;
+  private readonly archiveRelease: ArchiveRelease;
   private readonly profileChoice: ProfileChoice;
   private readonly fileIndexHooks: FileIndexHooks;
   private readonly ready: Promise<void>;
@@ -178,6 +183,16 @@ export class SandboxManager extends TypertRemoteService {
       ready: () => this.ready,
       hibernate: (sessionId, guard) => this.engine.hibernate(sessionId, guard),
     });
+    this.archiveRelease = new ArchiveRelease({
+      ready: () => this.ready,
+      lifecycle: this.engine,
+      archivedSessionIds: () => this.archivedSessionIds(),
+      // TODO(dsh-archive-hook): interim bridge — dsh has no archive lifecycle
+      // hook yet. ArchiveRelease.archivedDescendants owns the deletion note.
+      subagents: () => this.ctx.get("subagents") as SubagentsLike | undefined,
+      isTurnLive: (sessionId) => this.idle.isTurnLive(sessionId),
+      warn: (message) => this.ctx.logger("sandbox").warn(message),
+    });
     this.ready = this.initialize();
 
     // The Web API requires a directory-picker capability. This package owns
@@ -205,7 +220,20 @@ export class SandboxManager extends TypertRemoteService {
         this.idle.beginTurn(String(session.id));
       } else if (event.type === "turn/end") {
         this.idle.endTurn(session);
+        // An archive that landed mid-turn waits for the turn to finish.
+        this.archiveRelease.reconcile();
       }
+    });
+    // Archive release: dsh records archives in its workspace domain, so any
+    // write there (and the registry becoming readable at boot) is a chance to
+    // reconcile. Both are cheap: read the set, scan the few session records.
+    ctx.on("domain/changed", (change) => {
+      if (change.domain === "workspace") {
+        this.archiveRelease.reconcile();
+      }
+    });
+    ctx.inject(["workspaceRegistry"], () => {
+      this.archiveRelease.reconcile();
     });
     ctx.effect(() => () => {
       this.idle.dispose();
@@ -338,6 +366,14 @@ export class SandboxManager extends TypertRemoteService {
       sessionId,
       () => !this.idle.isTurnLive(sessionId),
     );
+  }
+
+  /** The host's archive set, read through the workspace registry. */
+  private archivedSessionIds(): readonly string[] {
+    const registry =
+      this.workspaceRegistry ??
+      (this.ctx.get("workspaceRegistry") as WorkspaceRegistryLike | undefined);
+    return registry?.archivedSessionIds ?? [];
   }
 
   /**

@@ -10,6 +10,7 @@ import type {
 /** Test doubles shared by the SandboxManager suites. */
 export class FakeWorkspaceRegistry {
   readonly creates: Array<{ path: string; title?: string }> = [];
+  readonly archivedSessionIds: string[] = [];
 
   async create(path: string, title?: string) {
     this.creates.push(title === undefined ? { path } : { path, title });
@@ -68,6 +69,7 @@ export class FakeBackend implements SandboxBackend {
   hibernations = 0;
   wakes = 0;
   expiries = 0;
+  destroys = 0;
   running = false;
   readonly repositoryUrls: string[] = [];
 
@@ -91,6 +93,7 @@ export class FakeBackend implements SandboxBackend {
   }
 
   async destroy() {
+    this.destroys += 1;
     this.running = false;
   }
 

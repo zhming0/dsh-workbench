@@ -154,6 +154,23 @@ name that namespace.
 | `readyTimeoutMs` | `kas`    | 3 minutes              | How long to wait for a claimed sandbox         |
 | `kubeconfig`     | `kas`    | normal client lookup   | Optional kubeconfig path                       |
 
+### Archived sessions
+
+Archiving a session in the Web UI is one-way: dsh keeps the session log but
+offers no unarchive, so the session can never run again. When the host's
+workspace registry reports an archived session, this provider destroys that
+session's sandbox — container or claim, workspace storage included — and drops
+its record, instead of holding both until `expiresAfterMs`. The release covers
+the session's subagent children too, because the sidebar hides
+subagent-origin sessions and an archived parent can never resume them, so
+their sandboxes would otherwise sit out the retention window unreachable. This
+subtree walk is an interim bridge until dsh grows an archive lifecycle hook;
+if dsh starts cascading archives (or surfacing hidden sessions), it should be
+deleted. Commit and push work you still need before archiving; the release
+also waits out a turn that is still running. Outside the Web profile no
+workspace registry exists, and sessions stay on the ordinary idle and expiry
+path.
+
 For a Web Workspace created by this package, the repository URL stored in its
 anchor takes precedence. Other sessions use `repository` when set, then run
 `git remote get-url origin` in their host working directory. That fallback
