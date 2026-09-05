@@ -1,3 +1,5 @@
+import type { Checkpoint } from "./checkpoint.js";
+
 export type BackendReference = Record<string, unknown>;
 
 export type BackendName = "docker" | "kas";
@@ -65,17 +67,42 @@ export interface SandboxBackend {
   health(reference: BackendReference): Promise<boolean>;
 }
 
-export type SandboxState = "running" | "hibernated";
-
-export interface SessionRecord {
+interface SessionRecordBase {
   sessionId: string;
   backend: string;
   /** Profile the sandbox was provisioned with. */
   profile: string;
-  sandboxId: string;
-  reference: BackendReference;
   repositoryUrl: string;
-  state: SandboxState;
-  expiresAt?: string;
   updatedAt: string;
 }
+
+/** A live sandbox. */
+export interface RunningRecord extends SessionRecordBase {
+  state: "running";
+  sandboxId: string;
+  reference: BackendReference;
+}
+
+/** A suspended sandbox that the backend keeps until `expiresAt`. */
+export interface HibernatedRecord extends SessionRecordBase {
+  state: "hibernated";
+  sandboxId: string;
+  reference: BackendReference;
+  expiresAt: string;
+}
+
+/**
+ * No sandbox exists: the backend could not hibernate, so the work was pushed
+ * to `checkpoint.ref` and the sandbox destroyed. The next turn provisions a
+ * fresh one and restores it, until `expiresAt`.
+ */
+export interface CheckpointedRecord extends SessionRecordBase {
+  state: "checkpointed";
+  checkpoint: Checkpoint;
+  expiresAt: string;
+}
+
+export type SessionRecord =
+  | RunningRecord
+  | HibernatedRecord
+  | CheckpointedRecord;

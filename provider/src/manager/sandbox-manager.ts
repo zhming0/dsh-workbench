@@ -188,6 +188,7 @@ export class SandboxManager extends TypertRemoteService {
       idleMs: this.config.idleMs,
       ready: () => this.ready,
       hibernate: (sessionId, guard) => this.engine.hibernate(sessionId, guard),
+      warn: (message) => this.ctx.logger("sandbox").warn(message),
     });
     this.archiveRelease = new ArchiveRelease({
       ready: () => this.ready,

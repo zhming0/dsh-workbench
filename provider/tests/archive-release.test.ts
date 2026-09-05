@@ -13,6 +13,7 @@ function record(sessionId: string): SessionRecord {
     reference: { id: sessionId },
     repositoryUrl: "https://github.com/example/public",
     state: "hibernated",
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
     updatedAt: new Date().toISOString(),
   };
 }

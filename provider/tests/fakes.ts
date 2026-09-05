@@ -25,11 +25,22 @@ export class FakeWorkspaceRegistry {
   }
 }
 
+export interface FakeExec {
+  argv: string[];
+  cwd: string;
+  env: Record<string, string>;
+}
+
 export class FakeRunnerClient {
   setups = 0;
   healthy = true;
   secrets: Record<string, string> = {};
   readonly treeRequests: unknown[] = [];
+  /** Every exec request, in order. */
+  readonly execs: FakeExec[] = [];
+  /** Replies for exec calls, consumed in order; the default succeeds silently. */
+  readonly execReplies: Array<{ stdout?: string; exitCode?: number }> = [];
+  readonly setupRequests: Array<{ revision: string }> = [];
 
   async health() {
     if (!this.healthy) {
@@ -43,8 +54,9 @@ export class FakeRunnerClient {
   }
   async setGitCredentials() {}
 
-  async setup() {
+  async setup(request: { revision: string }) {
     this.setups += 1;
+    this.setupRequests.push({ revision: request.revision });
     return { ran: this.setups === 1 };
   }
 
@@ -59,6 +71,26 @@ export class FakeRunnerClient {
       truncated: false,
     };
   }
+
+  async *exec(request: FakeExec) {
+    this.execs.push(request);
+    const reply = this.execReplies.shift() ?? {};
+    yield { event: { case: "started" as const, value: { pid: 1n } } };
+    if (reply.stdout !== undefined) {
+      yield {
+        event: {
+          case: "stdout" as const,
+          value: new TextEncoder().encode(reply.stdout),
+        },
+      };
+    }
+    yield {
+      event: {
+        case: "exited" as const,
+        value: { exitCode: reply.exitCode ?? 0, signal: "" },
+      },
+    };
+  }
 }
 
 export class FakeBackend implements SandboxBackend {
@@ -68,8 +100,8 @@ export class FakeBackend implements SandboxBackend {
   provisions = 0;
   hibernations = 0;
   wakes = 0;
-  expiries = 0;
   destroys = 0;
+  expiries = 0;
   running = false;
   readonly repositoryUrls: string[] = [];
 

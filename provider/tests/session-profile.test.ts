@@ -97,6 +97,7 @@ describe("session profile choice", () => {
       reference: { claimName: "claim-one", sandboxId: "sandbox-one" },
       repositoryUrl: "https://github.com/example/public.git",
       state: "hibernated",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
       updatedAt: new Date().toISOString(),
     });
     // Same profile name, but the profile now points at a different backend.
@@ -108,6 +109,7 @@ describe("session profile choice", () => {
       reference: { claimName: "claim-two", sandboxId: "sandbox-two" },
       repositoryUrl: "https://github.com/example/public.git",
       state: "hibernated",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
       updatedAt: new Date().toISOString(),
     });
     const backend = new FakeBackend();
