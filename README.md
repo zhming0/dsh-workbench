@@ -140,8 +140,8 @@ also serves as the Git credential for github.com, so cloning private
 repositories needs nothing else. A fine-grained personal access token scoped
 to the repositories you work on fits best; `gh auth token` works too.
 
-Manage secrets in the Web UI — **Secrets**, at the sidebar foot next to
-Settings — or with the CLI inside the host pod:
+Manage secrets in the Web UI — **Settings → Secrets** — or with the CLI
+inside the host pod:
 
 ```sh
 printf '%s' "$GITHUB_TOKEN" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \

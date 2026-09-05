@@ -9,7 +9,7 @@ import { workbenchRemote } from "../remote-contributions.js";
 import { InstructionsSettings } from "./instructions.js";
 import { SandboxProfileChip } from "./profile.js";
 import { RepositoryDirectoryFlow } from "./repository-directory-flow.js";
-import { SecretsFooterAction } from "./secrets.js";
+import { SecretsSettings } from "./secrets.js";
 
 /**
  * The client bundle entry: mounts the Remote endpoints and registers the
@@ -19,7 +19,7 @@ import { SecretsFooterAction } from "./secrets.js";
 export const inject = ["remote", "slots"];
 
 /** Mount the Remote endpoints, replace folder picking with repository entry,
- * and add the Secrets manager beside Settings at the sidebar foot. */
+ * and add the Instructions and Secrets sections to the Settings page. */
 export async function apply(ctx: Context) {
   const disposeRemote = await ctx.remote.$mount(workbenchRemote);
 
@@ -57,22 +57,8 @@ export async function apply(ctx: Context) {
         ),
     });
     remoteCtx.slots.inject(
-      "sidebar.footer.action",
-      function* registerSecrets() {
-        yield remoteCtx.slots.register(
-          // A list slot requires a stable per-entry id.
-          {
-            name: "sidebar.footer.action",
-            id: "dsh-workbench.secrets",
-            inject: injected,
-          },
-          SecretsFooterAction,
-        );
-      },
-    );
-    remoteCtx.slots.inject(
       "settings.section",
-      function* registerInstructions() {
+      function* registerSettingsSections() {
         yield remoteCtx.slots.register(
           {
             name: "settings.section",
@@ -82,6 +68,16 @@ export async function apply(ctx: Context) {
             inject: injectedInstructions,
           },
           InstructionsSettings,
+        );
+        yield remoteCtx.slots.register(
+          {
+            name: "settings.section",
+            id: "dsh-workbench.secrets",
+            order: 31,
+            label: "Secrets",
+            inject: injected,
+          },
+          SecretsSettings,
         );
       },
     );

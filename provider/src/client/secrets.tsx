@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
-import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
-import type { SidebarFooterActionOwnerProps } from "@deepseek-ai/dsh-client-ui-sidebar/client";
+import { Button, Input } from "@deepseek-ai/dsh-client-ui-primitives";
+import type { SettingsSectionOwnerProps } from "@deepseek-ai/dsh-client-ui-settings/client";
 
 interface SecretsActions {
   listSecrets: () => Promise<string[]>;
@@ -9,79 +9,16 @@ interface SecretsActions {
   deleteSecret: (name: string) => Promise<string[]>;
 }
 
-interface SecretsFooterActionProps
-  extends SidebarFooterActionOwnerProps,
+interface SecretsSettingsProps
+  extends SettingsSectionOwnerProps,
     SecretsActions {}
 
-/** Sidebar foot trigger beside Settings that opens the secrets manager. */
-export function SecretsFooterAction({
-  wide,
-  ...actions
-}: SecretsFooterActionProps) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        title="Secrets"
-        onClick={() => setOpen(true)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          width: wide ? "100%" : 36,
-          height: 36,
-          justifyContent: wide ? "flex-start" : "center",
-          padding: wide ? "0 8px" : 0,
-          background: "none",
-          border: "none",
-          borderRadius: 8,
-          color: "inherit",
-          font: "inherit",
-          cursor: "pointer",
-        }}
-      >
-        <KeyIcon />
-        {wide ? <span>Secrets</span> : null}
-      </button>
-      {open ? (
-        <SecretsModal {...actions} onClose={() => setOpen(false)} />
-      ) : null}
-    </>
-  );
-}
-
-function KeyIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      style={{ flex: "none" }}
-    >
-      <circle cx="7.5" cy="15.5" r="4.5" />
-      <path d="M10.7 12.3 21 2m-3 3 3 3m-6 0 2 2" />
-    </svg>
-  );
-}
-
-interface SecretsModalProps extends SecretsActions {
-  onClose: () => void;
-}
-
-/** Name/value CRUD over the host credential broker. Values are write-only. */
-function SecretsModal({
+/** Settings page for the host credential broker. Values are write-only. */
+export function SecretsSettings({
   listSecrets,
   setSecret,
   deleteSecret,
-  onClose,
-}: SecretsModalProps) {
+}: SecretsSettingsProps) {
   const [names, setNames] = useState<string[]>();
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
@@ -119,24 +56,28 @@ function SecretsModal({
   };
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Secrets"
-      description="Environment variables injected into every sandbox command."
-      closeLabel="Close"
-      className="dsh-workbench-secrets-dialog"
-      footer={
-        <Button type="button" onClick={onClose}>
-          Close
-        </Button>
-      }
-    >
+    <section style={{ maxWidth: 760, color: "var(--dsw-alias-label-primary)" }}>
+      <h2 style={{ margin: "0 0 8px", fontSize: 22 }}>Secrets</h2>
+      <p
+        style={{
+          margin: "0 0 24px",
+          color: "var(--dsw-alias-label-secondary)",
+          lineHeight: 1.5,
+        }}
+      >
+        Environment variables injected into every sandbox command. Values are
+        write-only: saving one stores it, and nothing reads it back.
+      </p>
+
       {names === undefined && error === undefined ? (
-        <p style={{ margin: 0, opacity: 0.7 }}>Loading…</p>
+        <p style={{ margin: 0, color: "var(--dsw-alias-label-secondary)" }}>
+          Loading…
+        </p>
       ) : null}
       {names !== undefined && names.length === 0 ? (
-        <p style={{ margin: 0, opacity: 0.7 }}>No secrets yet.</p>
+        <p style={{ margin: 0, color: "var(--dsw-alias-label-secondary)" }}>
+          No secrets yet.
+        </p>
       ) : null}
       {names !== undefined && names.length > 0 ? (
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -199,20 +140,32 @@ function SecretsModal({
           Save
         </Button>
       </form>
-      {error === undefined ? (
-        <p style={{ margin: "8px 0 0", opacity: 0.7, fontSize: 13 }}>
-          A secret named <code>GITHUB_TOKEN</code> also serves as the Git
-          credential for github.com repositories.
-        </p>
-      ) : (
+
+      {error !== undefined ? (
         <p
           role="alert"
-          style={{ margin: "8px 0 0", color: "var(--dsw-color-error)" }}
+          style={{
+            margin: "12px 0 0",
+            color: "var(--dsw-alias-state-error-primary)",
+          }}
         >
           {error}
         </p>
-      )}
-    </Modal>
+      ) : null}
+
+      <p
+        style={{
+          margin: "24px 0 0",
+          color: "var(--dsw-alias-label-secondary)",
+          fontSize: 13,
+          lineHeight: 1.5,
+        }}
+      >
+        A secret named <code>GITHUB_TOKEN</code> also serves as the Git
+        credential for github.com repositories. Sandbox code can read injected
+        secrets, which is their purpose. The CLI edits the same store.
+      </p>
+    </section>
   );
 }
 

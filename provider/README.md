@@ -63,9 +63,9 @@ reads it, and the file is removed with the session record. If no index exists
 (the host restarted while the sandbox was running, or the walk failed), `@`
 falls back to waking the sandbox.
 
-The Web profile also gains a **Secrets** manager at the sidebar foot, beside
-Settings. It edits the same broker store as the CLI: the browser sends names
-and values in and receives only names back, never a value.
+The Web profile also gains a **Settings → Secrets** page. It edits the same
+broker store as the CLI: the browser sends names and values in and receives
+only names back, never a value.
 
 The **Settings → Instructions** page manages AGENTS.md-style guidance at two
 scopes: one global layer and one layer for each repository Workspace. These
