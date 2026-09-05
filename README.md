@@ -36,6 +36,11 @@ While a session idles, the sandbox's pod is removed; its workspace volume
 survives until expiry. In this repository, "sandbox" always means one such
 provisioned environment.
 
+Archiving a session in the Web UI is one-way — dsh keeps the log but the
+session can never run again — so archiving exits this cycle immediately: the
+provider deletes that sandbox and its storage, its subagent children's
+included, instead of waiting for expiry.
+
 ## Getting started
 
 The distribution is two images released together under one version:
