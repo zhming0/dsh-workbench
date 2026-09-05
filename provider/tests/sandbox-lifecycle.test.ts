@@ -106,8 +106,8 @@ describe("sandbox lifecycle engine", () => {
   it("releases a sandbox whose retention expired while the host was down", async () => {
     const released: string[] = [];
     engine.addHooks({
-      afterRelease: async (sessionId) => {
-        released.push(sessionId);
+      afterRelease: async (record) => {
+        released.push(record.sessionId);
       },
     });
     await store.initialize();
@@ -134,8 +134,8 @@ describe("sandbox lifecycle engine", () => {
       beforeHibernate: async ({ sessionId }) => {
         order.push(`first:${sessionId}`);
       },
-      afterRelease: async (sessionId) => {
-        order.push(`first-release:${sessionId}`);
+      afterRelease: async (record) => {
+        order.push(`first-release:${record.sessionId}`);
       },
     });
     engine.addHooks({
