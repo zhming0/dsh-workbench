@@ -4,7 +4,7 @@ import { Context } from "@deepseek-ai/cordis";
 import type { SubprocessSpawnSpec } from "@deepseek-ai/dsh-subprocess";
 
 import type { RunnerClient } from "../src/runner-client.js";
-import { SandboxSubprocessRuntime } from "../src/subprocess.js";
+import { SandboxSubprocessRuntime, testing } from "../src/subprocess.js";
 
 const SESSION_WORKSPACE = "/data/.dsh-sandbox/workspace-anchors/owner-repo";
 const SANDBOX_WORKSPACE = "/workspace/repository";
@@ -227,5 +227,17 @@ describe("sandbox subprocess seam", () => {
     await spawn(runtimeWith(client), { argv: ["rg", "--files"] });
     expect(resolves).toEqual([]);
     expect(requests[0]?.argv).toEqual(["rg", "--files"]);
+  });
+});
+
+describe("subprocess output buffers", () => {
+  it("keeps a bounded output tail and reports loss", () => {
+    const subprocess = new testing.CollectedBuffer(4);
+    subprocess.append(new TextEncoder().encode("abcdef"));
+    expect(subprocess.readFrom(0)).toEqual({
+      text: "cdef",
+      nextOffset: 6,
+      lossy: true,
+    });
   });
 });
