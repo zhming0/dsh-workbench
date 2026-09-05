@@ -13,6 +13,7 @@ import {
   type ResolvePathRequest,
   type SetupRequest,
   type StatRequest,
+  type TreeRequest,
   type WriteFileRequest,
 } from "./gen/dsh/sandbox/v1/runner_pb.js";
 
@@ -66,6 +67,10 @@ export class RunnerClient {
 
   list(path: string, options?: CallOptions) {
     return this.client.list({ path }, options);
+  }
+
+  tree(request: Omit<TreeRequest, "$typeName">, options?: CallOptions) {
+    return this.client.tree(request, options);
   }
 
   async setSecrets(secrets: Record<string, string>): Promise<void> {

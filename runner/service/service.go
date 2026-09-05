@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -469,6 +470,71 @@ func (s *Service) List(_ context.Context, request *connect.Request[v1.ListReques
 		}
 		response.Entries = append(response.Entries, &v1.ListEntry{Name: entry.Name(), CanonicalPath: canonical, Type: fileType(info), Size: info.Size(), Version: version(info)})
 	}
+	return connect.NewResponse(response), nil
+}
+func (s *Service) Tree(_ context.Context, request *connect.Request[v1.TreeRequest]) (*connect.Response[v1.TreeResponse], error) {
+	excluded := make(map[string]struct{}, len(request.Msg.ExcludedDirectories))
+	for _, name := range request.Msg.ExcludedDirectories {
+		if name == "" || strings.ContainsAny(name, "/\\") {
+			return nil, cerr(connect.CodeInvalidArgument, errors.New("invalid excluded directory name"))
+		}
+		excluded[name] = struct{}{}
+	}
+	maxEntries := int(request.Msg.MaxEntries)
+	if maxEntries <= 0 {
+		maxEntries = 50_000
+	}
+	root := filepath.Clean(request.Msg.Path)
+	response := &v1.TreeResponse{}
+	stopped := false
+	walkErr := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if path == root {
+				return walkErr
+			}
+			return nil
+		}
+		if path == root {
+			return nil
+		}
+		if len(response.Entries) >= maxEntries {
+			stopped = true
+			if entry.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			if _, skip := excluded[entry.Name()]; skip {
+				return fs.SkipDir
+			}
+			relative, err := filepath.Rel(root, path)
+			if err != nil {
+				return nil
+			}
+			response.Entries = append(response.Entries, &v1.TreeEntry{
+				RelativePath: filepath.ToSlash(relative),
+				Type:         v1.FileType_FILE_TYPE_DIRECTORY,
+			})
+			return nil
+		}
+		if !entry.Type().IsRegular() {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil
+		}
+		response.Entries = append(response.Entries, &v1.TreeEntry{
+			RelativePath: filepath.ToSlash(relative),
+			Type:         v1.FileType_FILE_TYPE_REGULAR,
+		})
+		return nil
+	})
+	if walkErr != nil {
+		return nil, cerr(connect.CodeNotFound, walkErr)
+	}
+	response.Truncated = stopped
 	return connect.NewResponse(response), nil
 }
 func (s *Service) SetSecrets(_ context.Context, request *connect.Request[v1.SetSecretsRequest]) (*connect.Response[v1.SetSecretsResponse], error) {
