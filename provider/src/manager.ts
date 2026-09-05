@@ -14,6 +14,14 @@ import { DockerBackend } from "./backends/docker.js";
 import { KasBackend } from "./backends/kas.js";
 import { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";
 import {
+  checkpointRef,
+  parseSaveOutput,
+  RESTORE_SCRIPT,
+  restoreEnvironment,
+  SAVE_SCRIPT,
+  type Checkpoint,
+} from "./checkpoint.js";
+import {
   resolveConfig,
   resolveRegistrationTokens,
   type Config,
@@ -431,11 +439,10 @@ export class SandboxManager extends TypertRemoteService {
     }
     const deadline = new Date(Date.now() + this.config.expiresAfterMs);
     try {
+      // Index while the runner can still answer. Either branch below leaves a
+      // hibernated session whose next wake shows this workspace again.
+      await this.saveFileIndex(sessionId);
       if (backend.capabilities.supportsHibernate) {
-        // Index while the runner can still answer. Only a hibernated session
-        // has a workspace to describe: the destroy branch below forgets the
-        // session, and its next turn starts from a fresh clone.
-        await this.saveFileIndex(sessionId);
         await backend.hibernate(record.reference);
         // Set the final deletion time after compute is suspended. If the
         // provider stops between these steps, the still-running local record
@@ -453,11 +460,21 @@ export class SandboxManager extends TypertRemoteService {
           transition: "hibernate",
         });
       } else {
+        // The sandbox cannot be kept, so push the working tree to the remote
+        // first. A failed push leaves the sandbox running; the idle timer
+        // re-arms and tries again.
+        const checkpoint = await this.saveCheckpoint(sessionId, record);
         await backend.destroy(record.reference);
-        await this.forgetSession(sessionId);
+        await this.store.set({
+          ...record,
+          state: "hibernated",
+          expiresAt: deadline.toISOString(),
+          checkpoint,
+          updatedAt: new Date().toISOString(),
+        });
         transitions.add(1, {
           backend: record.backend,
-          transition: "expire",
+          transition: "checkpoint",
         });
       }
     } catch (error) {
@@ -499,6 +516,11 @@ export class SandboxManager extends TypertRemoteService {
       ) {
         await backend.destroy(record.reference);
         await this.forgetSession(record.sessionId);
+        continue;
+      }
+      if (!backend.capabilities.supportsHibernate) {
+        // A checkpointed record has no sandbox left to put a deadline on; the
+        // host enforces expiresAt itself on the next turn.
         continue;
       }
       try {
@@ -559,6 +581,19 @@ export class SandboxManager extends TypertRemoteService {
 
     await this.broker.refresh();
     const credentials = await this.broker.gitCredentials(repositoryUrl);
+
+    let checkpoint: Checkpoint | undefined;
+    if (
+      record !== undefined &&
+      record.state === "hibernated" &&
+      !this.backendFor(record).capabilities.supportsHibernate
+    ) {
+      // The sandbox was released at idle; provision a new one under the same
+      // profile and restore the pushed work after setup.
+      checkpoint = record.checkpoint;
+      profile = this.config.profiles[record.profile];
+      record = undefined;
+    }
 
     if (
       record !== undefined &&
@@ -628,11 +663,71 @@ export class SandboxManager extends TypertRemoteService {
     await client.setGitCredentials(credentials);
     await client.setup({
       repositoryUrl,
-      revision: this.config.revision,
+      // A fresh clone checks the checkpoint branch out, so `.agents/setup`
+      // already sees the restored tree.
+      revision: checkpoint?.ref ?? this.config.revision,
       workspace: this.config.workspace,
     });
+    if (checkpoint !== undefined) {
+      await this.runScript(
+        client,
+        RESTORE_SCRIPT,
+        restoreEnvironment(checkpoint),
+      );
+      transitions.add(1, { backend: record.backend, transition: "restore" });
+    }
     this.clients.set(sessionId, client);
     return client;
+  }
+
+  private async saveCheckpoint(
+    sessionId: string,
+    record: SessionRecord,
+  ): Promise<Checkpoint> {
+    let client = this.clients.get(sessionId);
+    if (client === undefined) {
+      // After a host restart nothing is cached; a sandbox that is gone has
+      // nothing left to save.
+      if (!(await this.backendFor(record).health(record.reference))) {
+        throw new SandboxNotFoundError(
+          `sandbox ${record.sandboxId} is no longer running`,
+        );
+      }
+      client = await this.waitForRunner(record);
+    }
+    const ref = checkpointRef(sessionId);
+    const output = await this.runScript(client, SAVE_SCRIPT, {
+      DSH_CHECKPOINT_REF: ref,
+    });
+    return parseSaveOutput(ref, output);
+  }
+
+  /** Run a bash script in the session workspace and return its stdout. */
+  private async runScript(
+    client: RunnerClient,
+    script: string,
+    env: Record<string, string>,
+  ): Promise<string> {
+    const stdout: Uint8Array[] = [];
+    const stderr: Uint8Array[] = [];
+    const stream = client.exec({
+      argv: ["/bin/bash", "-c", script],
+      cwd: this.config.workspace,
+      env,
+      stdin: new Uint8Array(),
+    });
+    for await (const { event } of stream) {
+      if (event.case === "stdout") {
+        stdout.push(event.value);
+      } else if (event.case === "stderr") {
+        stderr.push(event.value);
+      } else if (event.case === "exited" && event.value.exitCode !== 0) {
+        throw new Error(
+          `checkpoint script failed with exit code ${event.value.exitCode}: ${Buffer.concat(stderr).toString().trim()}`,
+        );
+      }
+    }
+    return Buffer.concat(stdout).toString();
   }
 
   private async waitForRunner(record: SessionRecord): Promise<RunnerClient> {

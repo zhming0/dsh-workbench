@@ -195,6 +195,31 @@ sessions readable, but they cannot wake until a profile with that name is
 restored on the same backend. A session whose pending choice was removed falls
 back to an error at its first prompt, asking the user to pick again.
 
+### Idle and hibernation
+
+After `idleMs` without a turn the session's sandbox is put away and the
+`expiresAfterMs` countdown starts. What "put away" means depends on the
+backend:
+
+- Docker and Kubernetes hibernate: compute stops, the workspace stays, and the
+  next prompt wakes the same sandbox.
+- A backend that cannot hibernate checkpoints instead. The manager commits the
+  Git working tree inside the sandbox (as `dsh <dsh@localhost>`, only if there
+  are changes), force-pushes `HEAD` to `origin` as
+  `dsh/wip/<16 hex chars of the session hash>`, and then destroys the sandbox.
+  The next prompt provisions a fresh sandbox, clones the repository at that
+  branch so `.agents/setup` runs on the restored tree, checks the original
+  branch out again, undoes the checkpoint commit so the changes are
+  uncommitted once more, and deletes the checkpoint branch locally and, best
+  effort, on the remote. If the push fails the sandbox stays up and the idle
+  timer retries. Only the Git working tree survives: ignored files, installed
+  packages, and anything outside the repository are gone, and the model is not
+  told. The runner's Git credentials for the repository must be allowed to
+  push, and a session that expires while checkpointed leaves its `dsh/wip/*`
+  branch on the remote.
+
+No shipped backend checkpoints yet; Docker and Kubernetes both hibernate.
+
 ### Search
 
 `glob` and `grep` are the stock `@deepseek-ai/dsh-tool-fs-search` row, so

@@ -1,3 +1,5 @@
+import type { Checkpoint } from "./checkpoint.js";
+
 export type BackendReference = Record<string, unknown>;
 
 export type BackendName = "docker" | "kas";
@@ -77,5 +79,10 @@ export interface SessionRecord {
   repositoryUrl: string;
   state: SandboxState;
   expiresAt?: string;
+  /**
+   * Set while hibernated on a backend without hibernation: the sandbox is
+   * gone and the work lives on this remote branch until the next wake.
+   */
+  checkpoint?: Checkpoint;
   updatedAt: string;
 }

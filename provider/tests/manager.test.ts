@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CredentialBroker } from "../src/broker.js";
 import { SandboxManager } from "../src/manager.js";
 import { SessionStore } from "../src/state-store.js";
+import { SandboxNotFoundError } from "../src/types.js";
 import {
   FakeBackend,
   FakeWorkspaceRegistry,
@@ -133,9 +134,14 @@ describe("sandbox lifecycle", () => {
     expect(backend.wakes).toBe(1);
     expect(await manager.hibernatedFileIndex(agent)).toBeUndefined();
 
-    // Destroying the session removes its index file too.
-    backend.capabilities.supportsHibernate = false;
+    // Forgetting the session removes its index file too.
     await manager.hibernate("session-one");
+    await expect(stat(indexPath)).resolves.toBeDefined();
+    backend.wake = async () => {
+      throw new SandboxNotFoundError("sandbox is gone");
+    };
+    await manager.ensureRunning(agent);
+    expect(backend.provisions).toBe(2);
     await expect(stat(indexPath)).rejects.toThrow();
   });
 
