@@ -6,6 +6,7 @@ import SandboxManager from "./manager.js";
  * inserts — lives in manager.ts; this file only re-exports the package
  * surface. Config types and settings resolution live in config.ts.
  */
+export { BuildkiteBackend } from "./backends/buildkite.js";
 export { DockerBackend } from "./backends/docker.js";
 export { KasBackend } from "./backends/kas.js";
 export { CredentialBroker, normalizeRepositoryUrl } from "./broker.js";

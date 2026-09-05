@@ -2,14 +2,14 @@ import type { Checkpoint } from "./checkpoint.js";
 
 export type BackendReference = Record<string, unknown>;
 
-export type BackendName = "docker" | "kas";
+export type BackendName = "docker" | "kas" | "buildkite";
 
 /**
  * One operator-defined way to run a sandbox: a backend and everything that
  * backend needs, fully resolved. A profile is self-contained, so two profiles
  * on the same backend may point at different clusters or Docker hosts.
  */
-export type SandboxProfile = DockerProfile | KasProfile;
+export type SandboxProfile = DockerProfile | KasProfile | BuildkiteProfile;
 
 export interface DockerProfile {
   name: string;
@@ -29,6 +29,22 @@ export interface KasProfile {
   warmPool: string;
   readyTimeoutMs: number;
   kubeconfig?: string;
+}
+
+export interface BuildkiteProfile {
+  name: string;
+  backend: "buildkite";
+  organization: string;
+  /** Pipeline whose single job runs the runner; one build is one sandbox. */
+  pipeline: string;
+  /** Runner image the job should run; passed to the build as DSH_RUNNER_IMAGE. */
+  image: string;
+  branch: string;
+  /** The tunnel endpoint runners dial; Buildkite agents are never local. */
+  hostUrl: string;
+  readyTimeoutMs: number;
+  /** Host environment variable holding the API token. */
+  tokenEnv: string;
 }
 
 export interface SandboxSpec {

@@ -220,5 +220,6 @@ routes are alternatives, and running both gives a session two sandboxes.
 | Page                                         | Covers                                                           |
 | -------------------------------------------- | ---------------------------------------------------------------- |
 | [`docs/kubernetes.md`](docs/kubernetes.md)   | full install walkthrough, host operations, isolation, smoke test |
+| [`docs/buildkite.md`](docs/buildkite.md)     | running sandboxes as Buildkite builds: pipeline shape and limits |
 | [`provider/README.md`](provider/README.md)   | what the bundle patch changes, every setting, the CLI            |
 | [`docs/development.md`](docs/development.md) | repository layout, build and test, checkout installs, releasing  |
