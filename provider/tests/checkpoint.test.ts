@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   checkpointRef,
+  deleteCheckpointBranch,
   parseSaveOutput,
   RESTORE_SCRIPT,
   restoreEnvironment,
@@ -164,6 +165,13 @@ describe("checkpoint scripts", () => {
       ),
     ).rejects.toThrow(/not at checkpoint/);
     expect(await git(replacement, "status", "--porcelain")).toBe("");
+  });
+
+  it("deletes a checkpoint branch from the host", async () => {
+    await git(work, "push", "-q", "origin", `HEAD:refs/heads/${ref}`);
+    expect(await git(origin, "branch", "--list", ref)).not.toBe("");
+    await deleteCheckpointBranch(origin, ref, undefined);
+    expect(await git(origin, "branch", "--list", ref)).toBe("");
   });
 });
 

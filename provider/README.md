@@ -236,9 +236,10 @@ timer retries after another `idleMs`; the runner's Git credentials for the
 repository must be allowed to create and delete `dsh/wip/*` branches. If the
 restore fails, the new sandbox is destroyed and the next prompt tries again
 from the same checkpoint, so a checkpoint branch that was removed from the
-remote produces an error on every prompt until the session is released. A
-session that expires while checkpointed leaves its `dsh/wip/*` branch on the
-remote.
+remote produces an error on every prompt until the session is released. When
+a checkpointed session is released or expires, the host deletes its
+`dsh/wip/*` branch from the remote with the same credentials, best effort: a
+failure is logged and the branch stays.
 
 No shipped backend checkpoints yet; Docker and Kubernetes both hibernate.
 

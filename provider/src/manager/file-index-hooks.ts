@@ -8,6 +8,7 @@ import {
 } from "../file-index.js";
 import type { RunnerClient } from "../runner-client.js";
 import type { SessionStore } from "../state-store.js";
+import type { SessionRecord } from "../types.js";
 import type { LifecycleHooks } from "./sandbox-lifecycle.js";
 
 /** What the "@" file-index feature needs from outside the lifecycle. */
@@ -79,7 +80,7 @@ export class FileIndexHooks implements LifecycleHooks {
   }
 
   /** The session is gone; its index has no future either. */
-  async afterRelease(sessionId: string): Promise<void> {
-    await this.deps.fileIndexes.remove(sessionId);
+  async afterRelease(record: SessionRecord): Promise<void> {
+    await this.deps.fileIndexes.remove(record.sessionId);
   }
 }

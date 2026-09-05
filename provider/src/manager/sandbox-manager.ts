@@ -33,6 +33,7 @@ import {
   createRepositoryAnchor,
   repositoryForAnchor,
 } from "../workspace-anchor.js";
+import { CheckpointHooks } from "./checkpoint-hooks.js";
 import { FileIndexHooks } from "./file-index-hooks.js";
 import { IdleSchedule } from "./idle.js";
 import { ProfileChoice } from "./profile-choice.js";
@@ -67,7 +68,7 @@ declare module "@deepseek-ai/cordis" {
  * The sandbox service surface dsh mounts: a Cordis plugin and typert RPC
  * host. All session machinery lives behind it — the lifecycle engine
  * (sandbox-lifecycle.ts), the runner attachment, the profile registry, and
- * the policies (idle, profile choice, file-index hooks) — wired
+ * the policies (idle, profile choice, file-index and checkpoint hooks) — wired
  * in the constructor; this class only composes them and delegates.
  */
 export class SandboxManager extends TypertRemoteService {
@@ -156,9 +157,15 @@ export class SandboxManager extends TypertRemoteService {
       workspace: this.config.workspace,
       warn: (message) => this.ctx.logger("sandbox").warn(message),
     });
-    // Hooks run in registration order; file-index capture is the only
-    // beforeHibernate step today. Add new hibernate-time features here.
+    // Hooks run in registration order. Add new hibernate-time or release-time
+    // features here.
     this.engine.addHooks(this.fileIndexHooks);
+    this.engine.addHooks(
+      new CheckpointHooks({
+        broker: this.broker,
+        warn: (message) => this.ctx.logger("sandbox").warn(message),
+      }),
+    );
     this.instructions = new ManagedInstructions(ctx, {
       store:
         dependencies.instructions ??

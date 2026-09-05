@@ -1,6 +1,13 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 
 import type { RunnerClient } from "./runner-client.js";
+
+const execute = promisify(execFile);
 
 /**
  * Where a session's work went when its sandbox could not be kept. A backend
@@ -158,6 +165,50 @@ export async function restoreCheckpoint(
     RESTORE_SCRIPT,
     restoreEnvironment(checkpoint),
   );
+}
+
+/**
+ * Delete a checkpoint branch from the host, for a session that ended without
+ * a sandbox to do it from. `git push` needs a repository to run in, so an
+ * empty one is created for the call. The credential reaches git through the
+ * child's environment, not its command line, so it never shows in a process
+ * listing.
+ */
+export async function deleteCheckpointBranch(
+  repositoryUrl: string,
+  ref: string,
+  credential: { username: string; password: string } | undefined,
+): Promise<void> {
+  const scratch = await mkdtemp(join(tmpdir(), "dsh-checkpoint-"));
+  try {
+    const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
+    const config: string[] = [];
+    if (credential !== undefined) {
+      env["DSH_GIT_USERNAME"] = credential.username;
+      env["DSH_GIT_PASSWORD"] = credential.password;
+      config.push(
+        "-c",
+        "credential.helper=",
+        "-c",
+        'credential.helper=!f() { echo "username=$DSH_GIT_USERNAME"; echo "password=$DSH_GIT_PASSWORD"; }; f',
+      );
+    }
+    await execute("git", ["init", "-q"], { cwd: scratch });
+    await execute(
+      "git",
+      [
+        ...config,
+        "push",
+        "--quiet",
+        repositoryUrl,
+        "--delete",
+        `refs/heads/${ref}`,
+      ],
+      { cwd: scratch, env, timeout: 30_000 },
+    );
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
 }
 
 /**

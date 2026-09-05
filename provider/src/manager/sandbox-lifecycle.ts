@@ -43,7 +43,7 @@ export interface LifecycleHooks {
     client: RunnerClient | undefined;
   }): Promise<void>;
   /** The session's record is gone; drop anything derived from it. */
-  afterRelease?(sessionId: string): Promise<void>;
+  afterRelease?(record: SessionRecord): Promise<void>;
 }
 
 export interface SandboxLifecycleDependencies {
@@ -452,7 +452,7 @@ export class SandboxLifecycle {
   private async forgetSession(record: SessionRecord): Promise<void> {
     await this.deps.store.delete(record.sessionId);
     for (const hooks of this.hooks) {
-      await hooks.afterRelease?.(record.sessionId);
+      await hooks.afterRelease?.(record);
     }
   }
 }
