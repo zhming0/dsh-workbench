@@ -29,11 +29,10 @@ describe("session state store", () => {
       reference: { id: "one" },
       repositoryUrl: "https://github.com/example/repo.git",
       state: "running",
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
       updatedAt: new Date().toISOString(),
     });
     const reopened = new SessionStore(path);
     await reopened.initialize();
-    expect(reopened.get("one")?.sandboxId).toBe("sandbox-one");
+    expect(reopened.get("one")).toMatchObject({ sandboxId: "sandbox-one" });
   });
 });

@@ -37,12 +37,14 @@ export class FileIndexHooks implements LifecycleHooks {
   }
 
   /**
-   * The file index saved when this session hibernated. Undefined while the
-   * sandbox is running (ask the runner instead), or when no index was saved.
+   * The file index saved when this session hibernated or was checkpointed.
+   * Undefined while the sandbox is running (ask the runner instead), or when
+   * no index was saved.
    */
   async hibernatedFileIndex(agent: Agent): Promise<FileIndex | undefined> {
     const sessionId = String(agent.id);
-    if (this.deps.store.get(sessionId)?.state !== "hibernated") {
+    const state = this.deps.store.get(sessionId)?.state;
+    if (state !== "hibernated" && state !== "checkpointed") {
       return undefined;
     }
     return this.deps.fileIndexes.load(sessionId);
@@ -50,19 +52,13 @@ export class FileIndexHooks implements LifecycleHooks {
 
   /**
    * Index the workspace through the still-running runner, just before the
-   * sandbox suspends. A failure here only costs the fast path ("@" then wakes
-   * the sandbox), so it never blocks hibernation. Only a real suspend has a
-   * workspace worth describing: the destroy branch forgets the session, and
-   * its next turn starts from a fresh clone.
+   * sandbox suspends or is checkpointed. A failure here only costs the fast
+   * path ("@" then wakes the sandbox), so it never blocks hibernation.
    */
   async beforeHibernate(context: {
     sessionId: string;
-    willSuspend: boolean;
     client: RunnerClient | undefined;
   }): Promise<void> {
-    if (!context.willSuspend) {
-      return;
-    }
     const client = context.client;
     if (client === undefined || this.options === undefined) {
       return;

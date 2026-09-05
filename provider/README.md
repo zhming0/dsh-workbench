@@ -194,6 +194,54 @@ sessions readable, but they cannot wake until a profile with that name is
 restored on the same backend. A session whose pending choice was removed falls
 back to an error at its first prompt, asking the user to pick again.
 
+### Idle and hibernation
+
+After `idleMs` without a turn the session's sandbox is put away and the
+`expiresAfterMs` countdown starts. What "put away" means depends on the
+backend:
+
+- Docker and Kubernetes hibernate: compute stops, the workspace stays, and the
+  next prompt wakes the same sandbox.
+- A backend that cannot hibernate checkpoints instead. The manager commits the
+  Git working tree inside the sandbox (as `dsh <dsh@localhost>`, only if there
+  are changes), force-pushes `HEAD` to `origin` as
+  `dsh/wip/<16 hex chars of the session hash>`, and then destroys the sandbox.
+  The next prompt provisions a fresh sandbox, clones the repository at that
+  branch so `.agents/setup` runs on the restored tree, checks the original
+  branch out again, undoes the checkpoint commit so the changes are
+  uncommitted once more, and deletes the checkpoint branch locally and, best
+  effort, on the remote.
+
+A checkpoint keeps the checked-out branch, its commits, and every tracked or
+untracked file that is not ignored. It does not keep ignored files, installed
+packages, anything outside the repository, other local branches, stashes, or
+which changes were staged: everything comes back unstaged. A merge or rebase
+that was stopped on conflicts comes back as the conflicted files with their
+markers, no longer mid-merge. `.agents/setup` runs while `dsh/wip/<hash>` is
+the checked-out branch name; the session's own branch is restored afterwards.
+The model is not told the sandbox was replaced.
+
+Unlike hibernation, a checkpoint leaves the sandbox: it lands on the
+repository's real remote, where anyone who can list branches can read it. So
+untracked files whose names look like secrets are never checkpointed and are
+lost with the sandbox: `.env`, `.env.*`, `.envrc`, `*.pem`, `*.key`, `*.p12`,
+`*.pfx`, `*.jks`, `id_rsa*`, `id_ecdsa*`, `id_ed25519*`, `.netrc`,
+`.git-credentials`, and `credentials.json`, at any depth. Files already
+tracked by Git are not filtered, since they are on the remote already. This
+is a name-based filter, not a content scan: a token the model wrote into a
+file with an ordinary name is pushed like any other change.
+
+If the push fails the sandbox stays up, the host logs a warning, and the idle
+timer retries after another `idleMs`; the runner's Git credentials for the
+repository must be allowed to create and delete `dsh/wip/*` branches. If the
+restore fails, the new sandbox is destroyed and the next prompt tries again
+from the same checkpoint, so a checkpoint branch that was removed from the
+remote produces an error on every prompt until the session is released. A
+session that expires while checkpointed leaves its `dsh/wip/*` branch on the
+remote.
+
+No shipped backend checkpoints yet; Docker and Kubernetes both hibernate.
+
 ### Search
 
 `glob` and `grep` are the stock `@deepseek-ai/dsh-tool-fs-search` row, so
