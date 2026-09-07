@@ -1,8 +1,5 @@
 import { sleep } from "./fakes.js";
-import {
-  ArchiveRelease,
-  type SubagentsLike,
-} from "../src/manager/archive-release.js";
+import { ArchiveRelease } from "../src/manager/archive-release.js";
 import type { SandboxLifecycle } from "../src/manager/sandbox-lifecycle.js";
 import type { SessionRecord } from "../src/types.js";
 import { describe, expect, it } from "vitest";
@@ -45,7 +42,6 @@ function fakeLifecycle(records: SessionRecord[]) {
 
 interface ArchiveReleaseOptions {
   archivedSessionIds?: readonly string[];
-  subagents?: SubagentsLike;
   isTurnLive?: (sessionId: string) => boolean;
   ready?: Promise<void>;
   warnings?: string[];
@@ -59,30 +55,27 @@ function archiveRelease(
     ready: () => options.ready ?? Promise.resolve(),
     lifecycle,
     archivedSessionIds: () => options.archivedSessionIds ?? [],
-    subagents: () => options.subagents,
     isTurnLive: options.isTurnLive ?? (() => false),
     warn: (message) => options.warnings?.push(message),
   });
 }
 
 describe("ArchiveRelease", () => {
-  it("releases archived sessions and their subagent trees", async () => {
+  it("releases the archived root session's sandbox", async () => {
+    // Subagent sessions hold no sandbox record of their own, so the root is
+    // the only record an archive ever releases.
     const { lifecycle, released } = fakeLifecycle([
       record("root"),
-      record("child"),
       record("unrelated"),
     ]);
     const archive = archiveRelease(lifecycle, {
       archivedSessionIds: ["root"],
-      subagents: {
-        listDescendants: async () => [{ id: "child" }],
-      },
     });
 
     archive.reconcile();
     await sleep(20);
 
-    expect(released).toEqual(["root", "child"]);
+    expect(released).toEqual(["root"]);
   });
 
   it("refuses to cut a live turn and releases once the turn closes", async () => {
@@ -101,44 +94,6 @@ describe("ArchiveRelease", () => {
     turnLive = false;
     archive.reconcile();
     await sleep(20);
-    expect(released).toEqual(["root"]);
-  });
-
-  it("still releases the parent when subagent discovery fails", async () => {
-    const { lifecycle, released } = fakeLifecycle([
-      record("root"),
-      record("child"),
-    ]);
-    const warnings: string[] = [];
-    const archive = archiveRelease(lifecycle, {
-      archivedSessionIds: ["root"],
-      subagents: {
-        listDescendants: async () => {
-          throw new Error("projections unavailable");
-        },
-      },
-      warnings,
-    });
-
-    archive.reconcile();
-    await sleep(20);
-
-    expect(released).toEqual(["root"]);
-    expect(warnings).toHaveLength(1);
-  });
-
-  it("releases the parent only when no delegation service is mounted", async () => {
-    const { lifecycle, released } = fakeLifecycle([
-      record("root"),
-      record("child"),
-    ]);
-    const archive = archiveRelease(lifecycle, {
-      archivedSessionIds: ["root"],
-    });
-
-    archive.reconcile();
-    await sleep(20);
-
     expect(released).toEqual(["root"]);
   });
 

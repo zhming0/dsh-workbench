@@ -24,7 +24,7 @@ interface ManagedInstructionDependencies {
   store: InstructionStore;
   stateDir: string;
   ensureRunning(agent: Agent): Promise<unknown>;
-  repositoryForSession(sessionId: string): string | undefined;
+  repositoryForAgent(agent: Agent): string | undefined;
   workspaceRegistry(): WorkspaceRegistryLike | undefined;
 }
 
@@ -106,9 +106,7 @@ export class ManagedInstructions {
   }
 
   private renderFor(agent: Agent): string {
-    const repositoryUrl = this.dependencies.repositoryForSession(
-      String(agent.id),
-    );
+    const repositoryUrl = this.dependencies.repositoryForAgent(agent);
     return renderManagedInstructions(
       this.dependencies.store.global(),
       repositoryUrl === undefined

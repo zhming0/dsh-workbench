@@ -21,16 +21,20 @@ export interface IdleScheduleHooks {
  *
  * A live turn holds no countdown of its own: `beginTurn`/`endTurn` track
  * sessions whose turn is open on the session log (dsh-session pairs every
- * turn/start with a turn/end; repair synthesizes one after a crash). The
- * activity counter is silent during a single long generation, so live-turn
- * tracking is the only signal that suspending would cut a live turn. Rare —
- * a generation has to outlast idleMs — but a mid-stream suspend fails the
- * whole turn, so the cheap check is worth keeping.
+ * turn/start with a turn/end; repair synthesizes one after a crash). Turns
+ * are counted per key, not flagged: a subagent shares its root session's
+ * sandbox, so a parent turn and a child turn arrive under the same key and
+ * overlap freely — the key stays live until the last open turn closes, and a
+ * child's turn/end must not suspend the parent mid-generation. The activity
+ * counter is silent during a single long generation, so live-turn tracking is
+ * the only signal that suspending would cut a live turn. Rare — a generation
+ * has to outlast idleMs — but a mid-stream suspend fails the whole turn, so
+ * the cheap check is worth keeping.
  */
 export class IdleSchedule {
   private readonly timers = new Map<string, NodeJS.Timeout>();
   private readonly activity = new Map<string, number>();
-  private readonly liveTurns = new Set<string>();
+  private readonly liveTurns = new Map<string, number>();
 
   constructor(private readonly hooks: IdleScheduleHooks) {}
 
@@ -61,20 +65,25 @@ export class IdleSchedule {
 
   /** A turn is running; the session must not suspend under it. */
   beginTurn(sessionId: string): void {
-    this.liveTurns.add(sessionId);
+    this.liveTurns.set(sessionId, (this.liveTurns.get(sessionId) ?? 0) + 1);
   }
 
   /** A turn closed: endTurn re-arms, so the session suspends once idle. */
   endTurn(session: Session | string): void {
     const sessionId =
       typeof session === "string" ? session : String(session.id);
-    this.liveTurns.delete(sessionId);
+    const remaining = (this.liveTurns.get(sessionId) ?? 0) - 1;
+    if (remaining <= 0) {
+      this.liveTurns.delete(sessionId);
+    } else {
+      this.liveTurns.set(sessionId, remaining);
+    }
     this.schedule(sessionId);
   }
 
   /** Whether a turn is open; release paths must not cut a live turn. */
   isTurnLive(sessionId: string): boolean {
-    return this.liveTurns.has(sessionId);
+    return (this.liveTurns.get(sessionId) ?? 0) > 0;
   }
 
   /** Cancel every armed countdown; the host is going down. */

@@ -38,6 +38,19 @@ world runs against the sandbox whether the Web surface mounts it from a shipped
 agent preset, a copied one, or the [`examples/`](../examples/agent.cordis.yml)
 preset.
 
+Subagent sessions share the root session's sandbox. Every sandbox lookup keys
+on the agent's top-level session — resolved from the durable `parentSession`
+lineage of the child session header — so delegation reads and writes one
+working copy, a child's first tool call boots the root's sandbox, and a child
+turn holds it against idle and release exactly as a root turn does (turns are
+counted per key, so a parent and a child turning at once keep the sandbox
+alive until both close). There is no locking or conflict detection between a
+parent and its subagents; the sandbox boundary is the containment. Resolution
+is memoized per session, so a child never switches sandboxes when an ancestor
+is disposed mid-run; a child whose parent cannot be resolved at all (absent
+or disposed ancestor) falls back to its own sandbox, and the fallback is
+logged as a warning.
+
 In the Web profile, the package replaces directory picking with a repository
 URL dialog. It creates an owner-only host anchor, registers it as a dsh
 Workspace named `owner/repo`, and returns that path through dsh's normal picker
@@ -160,16 +173,13 @@ Archiving a session in the Web UI is one-way: dsh keeps the session log but
 offers no unarchive, so the session can never run again. When the host's
 workspace registry reports an archived session, this provider destroys that
 session's sandbox — container or claim, workspace storage included — and drops
-its record, instead of holding both until `expiresAfterMs`. The release covers
-the session's subagent children too, because the sidebar hides
-subagent-origin sessions and an archived parent can never resume them, so
-their sandboxes would otherwise sit out the retention window unreachable. This
-subtree walk is an interim bridge until dsh grows an archive lifecycle hook;
-if dsh starts cascading archives (or surfacing hidden sessions), it should be
-deleted. Commit and push work you still need before archiving; the release
-also waits out a turn that is still running. Outside the Web profile no
-workspace registry exists, and sessions stay on the ordinary idle and expiry
-path.
+its record, instead of holding both until `expiresAfterMs`. Subagent sessions
+share the root session's sandbox, so releasing the root releases the whole
+subagent tree; the children could not resume afterward anyway, because the
+sidebar hides subagent-origin sessions. Commit and push work you still need
+before archiving; the release also waits out a turn that is still running,
+whatever session in the tree opened it. Outside the Web profile no workspace
+registry exists, and sessions stay on the ordinary idle and expiry path.
 
 For a Web Workspace created by this package, the repository URL stored in its
 anchor takes precedence. Other sessions use `repository` when set, then run
