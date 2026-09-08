@@ -92,6 +92,24 @@ its host anchor path, which does not exist inside the sandbox; the model only
 ever needs sandbox paths, and it finds its working directory the way any shell
 user does.
 
+The bundle also corrects the model-facing system prompt. dsh's stock opener
+names the session working directory in host coordinates — the anchor directory
+above — and adds paragraphs about the host's dsh implementation checkout and
+its Web GUI, none of which holds inside a sandbox. The `sandbox-context` row
+shadows the `cwd` prompt variable with the sandbox workspace, contributes a
+short environment section naming the sandbox mount and the GUI paragraph's
+still-true claim about what "this page" means, and drops the host-only
+checkout and GUI sections from the assembled prompt. The drop matches those
+sections by their text, not by name or position, so it survives dsh refactors
+of its prompt composition. If a dsh update rewords or removes those
+paragraphs, the drop matches nothing, logs a warning once per host process,
+and the sections ship unchanged while the environment section still states the
+facts. Tests run the drop against an assembly built by the pinned
+`@deepseek-ai/dsh-system-prompt` service, and a wording test downloads the
+pinned composer packages (`@deepseek-ai/dsh-app-boot`, `@deepseek-ai/dsh-web-app`)
+and fails CI when either paragraph changes, so a dsh bump cannot silently
+reword them. The markers themselves are pinned to the observed wording.
+
 One module is not part of the bundle patch:
 `@zhming0/dsh-workbench/launch-token`. Mounted as a row, it serves
 `GET /launch-token`, which redirects the browser to dsh's tokenized login URL so

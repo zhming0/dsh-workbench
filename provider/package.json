@@ -35,6 +35,10 @@
       "types": "./dist/file-reference.d.ts",
       "default": "./dist/file-reference.js"
     },
+    "./sandbox-context": {
+      "types": "./dist/sandbox-context.d.ts",
+      "default": "./dist/sandbox-context.js"
+    },
     "./launch-token": {
       "types": "./dist/launch-token.d.ts",
       "default": "./dist/launch-token.js"
@@ -104,14 +108,15 @@
     "@deepseek-ai/dsh-client-ui-sidebar": "0.1.2-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "0.1.2-rc.1",
     "@deepseek-ai/dsh-client-ui-workspace": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-fs": "0.1.2-rc.1",
     "@deepseek-ai/dsh-file-reference": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-fs": "0.1.2-rc.1",
     "@deepseek-ai/dsh-host-webserver": "0.1.2-rc.1",
     "@deepseek-ai/dsh-llm": "0.1.2-rc.1",
     "@deepseek-ai/dsh-session": "0.1.2-rc.1",
     "@deepseek-ai/dsh-shell": "0.1.2-rc.1",
     "@deepseek-ai/dsh-storage-domain": "0.1.2-rc.1",
     "@deepseek-ai/dsh-subprocess": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.1.2-rc.1",
     "@deepseek-ai/dsh-tools": "0.1.2-rc.1",
     "@deepseek-ai/dsh-typert-protocol": "0.1.2-rc.1",
     "@deepseek-ai/dsh-typert-registry": "0.1.2-rc.1",
@@ -131,8 +136,8 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/dsh-agent": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-fs": "0.1.2-rc.1",
     "@deepseek-ai/dsh-file-reference": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-fs": "0.1.2-rc.1",
     "@deepseek-ai/dsh-llm": "0.1.2-rc.1",
     "@deepseek-ai/dsh-session": "0.1.2-rc.1",
     "@deepseek-ai/dsh-shell": "0.1.2-rc.1",
