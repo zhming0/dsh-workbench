@@ -233,6 +233,175 @@ describe("sandbox lifecycle", () => {
     expect(backend.hibernations).toBe(1);
   });
 
+  it("serves subagent sessions from the root session's sandbox", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const parent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+    const child = {
+      id: "subagent-one",
+      session: { header: { parentSession: "session-one" } },
+    } as unknown as Agent;
+    const manager = new SandboxManager(
+      ctx,
+      {
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 60_000,
+        expiresAfterMs: 60_000,
+      },
+      {
+        backends: { standard: backend },
+        gateway: gatewayFor(backend),
+        agentLookup: (sessionId) =>
+          sessionId === "session-one"
+            ? parent
+            : sessionId === "subagent-one"
+              ? child
+              : undefined,
+      },
+    );
+
+    // The child's first tool call boots the root's sandbox; no second
+    // sandbox is provisioned for the child session.
+    await manager.ensureRunning(parent);
+    await manager.ensureRunning(child);
+    expect(backend.provisions).toBe(1);
+
+    const store = new SessionStore(join(directory, "sessions.json"));
+    await store.initialize();
+    expect(store.get("session-one")?.state).toBe("running");
+    expect(store.get("subagent-one")).toBeUndefined();
+
+    // A live child turn holds the shared sandbox, exactly as a parent turn
+    // would: release waits for the turn to close.
+    const childSession = { id: "subagent-one" } as unknown as Session;
+    ctx.emit("session/event", childSession, {
+      type: "turn/start",
+      data: { turn: 1 },
+    } as unknown as SessionEvent);
+    await manager.release("session-one");
+    expect(backend.running).toBe(true);
+
+    ctx.emit("session/event", childSession, {
+      type: "turn/end",
+      data: { turn: 1, reason: { kind: "completed" } },
+    } as unknown as SessionEvent);
+    await manager.release("session-one");
+    expect(backend.running).toBe(false);
+  });
+
+  it("keeps the shared sandbox live while a parent and child turn overlap", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const parent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+    const child = {
+      id: "subagent-one",
+      session: { header: { parentSession: "session-one" } },
+    } as unknown as Agent;
+    const manager = new SandboxManager(
+      ctx,
+      {
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 60_000,
+        expiresAfterMs: 60_000,
+      },
+      {
+        backends: { standard: backend },
+        gateway: gatewayFor(backend),
+        agentLookup: (sessionId) =>
+          sessionId === "session-one"
+            ? parent
+            : sessionId === "subagent-one"
+              ? child
+              : undefined,
+      },
+    );
+    await manager.ensureRunning(parent);
+
+    // Parent turn opens, background child turn opens, child turn closes:
+    // the root must stay live under the parent's still-open turn.
+    const parentSession = { id: "session-one" } as unknown as Session;
+    const childSession = { id: "subagent-one" } as unknown as Session;
+    ctx.emit("session/event", parentSession, {
+      type: "turn/start",
+      data: { turn: 1 },
+    } as unknown as SessionEvent);
+    ctx.emit("session/event", childSession, {
+      type: "turn/start",
+      data: { turn: 1 },
+    } as unknown as SessionEvent);
+    ctx.emit("session/event", childSession, {
+      type: "turn/end",
+      data: { turn: 1, reason: { kind: "completed" } },
+    } as unknown as SessionEvent);
+    await manager.release("session-one");
+    expect(backend.running).toBe(true);
+
+    ctx.emit("session/event", parentSession, {
+      type: "turn/end",
+      data: { turn: 1, reason: { kind: "completed" } },
+    } as unknown as SessionEvent);
+    await manager.release("session-one");
+    expect(backend.running).toBe(false);
+  });
+
+  it("keeps a subagent on its root sandbox after the root stops resolving", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const parent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+    const child = {
+      id: "subagent-one",
+      session: { header: { parentSession: "session-one" } },
+    } as unknown as Agent;
+    // The registry is live at resolution time; the Web UI can dispose a
+    // top-level agent while a continuable child keeps running.
+    let parentLive = true;
+    const manager = new SandboxManager(
+      ctx,
+      {
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 60_000,
+        expiresAfterMs: 60_000,
+      },
+      {
+        backends: { standard: backend },
+        gateway: gatewayFor(backend),
+        agentLookup: (sessionId) =>
+          sessionId === "subagent-one"
+            ? child
+            : sessionId === "session-one" && parentLive
+              ? parent
+              : undefined,
+      },
+    );
+    await manager.ensureRunning(child);
+    expect(backend.provisions).toBe(1);
+
+    // Root disposed mid-run: the memoized root keeps the child on the same
+    // sandbox instead of silently booting a fresh one from origin HEAD.
+    parentLive = false;
+    await manager.ensureRunning(child);
+    expect(backend.provisions).toBe(1);
+    const store = new SessionStore(join(directory, "sessions.json"));
+    await store.initialize();
+    expect(store.get("session-one")?.state).toBe("running");
+    expect(store.get("subagent-one")).toBeUndefined();
+  });
+
   it("leaves provisioning and waking to the first prompt, not session-start", async () => {
     const backend = new FakeBackend();
     const ctx = new Context();

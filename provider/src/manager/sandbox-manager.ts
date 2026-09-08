@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type {} from "@deepseek-ai/dsh-storage-domain";
+import { SessionId, type Session } from "@deepseek-ai/dsh-session";
 import type {} from "@deepseek-ai/dsh-typert-registry";
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 
@@ -34,12 +35,13 @@ import {
   createRepositoryAnchor,
   repositoryForAnchor,
 } from "../workspace-anchor.js";
-import { ArchiveRelease, type SubagentsLike } from "./archive-release.js";
+import { ArchiveRelease } from "./archive-release.js";
 import { FileIndexHooks } from "./file-index-hooks.js";
 import { IdleSchedule } from "./idle.js";
 import { ProfileChoice } from "./profile-choice.js";
 import { ProfileRegistry } from "./profile-registry.js";
 import { RunnerAttachment } from "./runner-attachment.js";
+import { rootSessionId } from "./root-session.js";
 import { SandboxLifecycle } from "./sandbox-lifecycle.js";
 
 const execute = promisify(execFile);
@@ -52,6 +54,8 @@ export interface ManagerDependencies {
   gateway?: RunnerGateway;
   instructions?: InstructionStore;
   workspaceRegistry?: WorkspaceRegistryLike;
+  /** Resolves a session id to its live agent; defaults to the agent registry. */
+  agentLookup?: (sessionId: string) => Agent | undefined;
 }
 
 interface WorkspaceRegistryLike {
@@ -91,6 +95,8 @@ export class SandboxManager extends TypertRemoteService {
   private readonly fileIndexHooks: FileIndexHooks;
   private readonly ready: Promise<void>;
   private readonly gateway: RunnerGateway;
+  private readonly agentLookup: (sessionId: string) => Agent | undefined;
+  private readonly rootSessions = new Map<string, string>();
 
   constructor(
     ctx: Context,
@@ -170,8 +176,8 @@ export class SandboxManager extends TypertRemoteService {
         new InstructionStore(join(this.config.stateDir, "instructions.json")),
       stateDir: this.config.stateDir,
       ensureRunning: (agent) => this.ensureRunning(agent),
-      repositoryForSession: (sessionId) =>
-        this.engine.record(sessionId)?.repositoryUrl,
+      repositoryForAgent: (agent) =>
+        this.engine.record(this.rootSessionId(agent))?.repositoryUrl,
       workspaceRegistry: () =>
         this.workspaceRegistry ??
         (this.ctx.get("workspaceRegistry") as
@@ -187,12 +193,19 @@ export class SandboxManager extends TypertRemoteService {
       ready: () => this.ready,
       lifecycle: this.engine,
       archivedSessionIds: () => this.archivedSessionIds(),
-      // TODO(dsh-archive-hook): interim bridge — dsh has no archive lifecycle
-      // hook yet. ArchiveRelease.archivedDescendants owns the deletion note.
-      subagents: () => this.ctx.get("subagents") as SubagentsLike | undefined,
       isTurnLive: (sessionId) => this.idle.isTurnLive(sessionId),
       warn: (message) => this.ctx.logger("sandbox").warn(message),
     });
+    this.agentLookup =
+      dependencies.agentLookup ??
+      ((sessionId) => {
+        // The host always mounts the agent registry before this manager;
+        // tests may construct the manager against a bare context.
+        const registry = this.ctx.agents as
+          | { get(id: ReturnType<typeof SessionId>): Agent | undefined }
+          | undefined;
+        return registry?.get(SessionId(sessionId));
+      });
     this.ready = this.initialize();
 
     // The Web API requires a directory-picker capability. This package owns
@@ -212,14 +225,15 @@ export class SandboxManager extends TypertRemoteService {
     this.instructions.install();
     ctx.on("agent/status", ({ agent, status }) => {
       if (status === "running") {
-        this.idle.markActive(String(agent.id));
+        this.idle.markActive(this.rootSessionId(agent));
       }
     });
     ctx.on("session/event", (session, event) => {
+      const sessionId = this.rootSessionIdOfSession(session);
       if (event.type === "turn/start") {
-        this.idle.beginTurn(String(session.id));
+        this.idle.beginTurn(sessionId);
       } else if (event.type === "turn/end") {
-        this.idle.endTurn(session);
+        this.idle.endTurn(sessionId);
         // An archive that landed mid-turn waits for the turn to finish.
         this.archiveRelease.reconcile();
       }
@@ -332,14 +346,20 @@ export class SandboxManager extends TypertRemoteService {
 
   /**
    * A session is about to run: provision, wake, or recover its sandbox and
-   * answer with the live runner.
+   * answer with the live runner. Subagent sessions resolve to their root
+   * session's sandbox, so a child's first tool call boots the root's sandbox
+   * and every agent in one session tree shares one working copy.
    */
   async ensureRunning(agent: Agent): Promise<RunnerClient> {
     await this.ready;
-    const sessionId = String(agent.id);
+    const sessionId = this.rootSessionId(agent);
     this.idle.markActive(sessionId);
+    // Resolve the repository through the root agent when it is live: the
+    // child inherits its cwd at creation, so both resolve identically, and
+    // this keeps the provenance local to the sandbox being served.
+    const rootAgent = this.agentLookup(sessionId) ?? agent;
     const client = await this.engine.ensureRunning(sessionId, () =>
-      this.repositoryFor(agent),
+      this.repositoryFor(rootAgent),
     );
     // markActive cancelled any armed countdown above, and a wake never
     // guarantees a turn follows (a created session can idle out untouched),
@@ -391,7 +411,50 @@ export class SandboxManager extends TypertRemoteService {
    */
   async hibernatedFileIndex(agent: Agent): Promise<FileIndex | undefined> {
     await this.ready;
-    return this.fileIndexHooks.hibernatedFileIndex(agent);
+    return this.fileIndexHooks.hibernatedFileIndex(this.rootSessionId(agent));
+  }
+
+  /**
+   * The top-level session whose sandbox serves this agent's work, memoized
+   * per session id: resolution reads the live agent registry, so an ancestor
+   * disposed mid-run would otherwise flip the session onto a different
+   * sandbox. Once resolved, a session keeps its root for this process.
+   */
+  private rootSessionId(agent: Agent): string {
+    const sessionId = String(agent.id);
+    let root = this.rootSessions.get(sessionId);
+    if (root === undefined) {
+      root = rootSessionId(agent, this.agentLookup);
+      this.rootSessions.set(sessionId, root);
+      if (
+        root === sessionId &&
+        agent.session.header.parentSession !== undefined
+      ) {
+        this.ctx
+          .logger("sandbox")
+          .warn(
+            `subagent session ${sessionId} cannot resolve its parent session ${String(agent.session.header.parentSession)} live; serving it from its own sandbox`,
+          );
+      }
+    }
+    return root;
+  }
+
+  /**
+   * Same resolution for a bare session event: the session's live agent owns
+   * the lineage; an unknown session is its own root. The memo is consulted
+   * first, so a session whose agent is already gone keys on the same root
+   * its earlier events did — a turn/end under the raw id would strand a
+   * live-turn count on the root and stop the sandbox from ever idling.
+   */
+  private rootSessionIdOfSession(session: Session): string {
+    const sessionId = String(session.id);
+    const memoized = this.rootSessions.get(sessionId);
+    if (memoized !== undefined) {
+      return memoized;
+    }
+    const agent = this.agentLookup(sessionId);
+    return agent === undefined ? sessionId : this.rootSessionId(agent);
   }
 
   private async repositoryFor(agent: Agent): Promise<string> {

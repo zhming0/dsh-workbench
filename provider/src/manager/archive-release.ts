@@ -6,19 +6,12 @@ export interface WorkspaceArchiveSet {
   readonly archivedSessionIds: readonly string[];
 }
 
-/** The one dsh subagent-runtime call the archive release needs. */
-export interface SubagentsLike {
-  listDescendants(rootSessionId: string): Promise<Array<{ id: string }>>;
-}
-
 export interface ArchiveReleaseDependencies {
   /** Settles once the host stores are loaded; a boot trigger waits for it. */
   ready(): Promise<void>;
   lifecycle: Pick<SandboxLifecycle, "records" | "release">;
   /** The host's archive set; absent outside the Web profile. */
   archivedSessionIds(): readonly string[];
-  /** Resolves the dsh subagent tree under one root; absent without delegation. */
-  subagents(): SubagentsLike | undefined;
   /** Whether a turn is open; release must not cut a live turn. */
   isTurnLive(sessionId: string): boolean;
   warn(message: string): void;
@@ -49,23 +42,13 @@ export class ArchiveRelease {
     // survive until an unrelated trigger happens to fire.
     await this.deps.ready();
     const ids = new Set(this.deps.archivedSessionIds());
-    // Every recorded session the archive set covers, plus its subagent tree.
-    const doomed = new Set(
-      this.deps.lifecycle
-        .records()
-        .filter((record) => ids.has(record.sessionId))
-        .map((record) => record.sessionId),
-    );
-    for (const id of doomed) {
-      // listDescendants returns the whole tree, so one call per root is enough.
-      for (const child of await this.archivedDescendants(id)) {
-        doomed.add(child);
-      }
-    }
+    // Records exist only for root sessions — subagent sessions share their
+    // root's sandbox — so releasing the archived root releases the whole
+    // subagent tree with it.
     await Promise.all(
       this.deps.lifecycle
         .records()
-        .filter((record) => doomed.has(record.sessionId))
+        .filter((record) => ids.has(record.sessionId))
         .map((record) =>
           this.deps.lifecycle.release(record.sessionId, () => {
             // Re-checked inside the session's lock; when it refuses, the
@@ -74,32 +57,5 @@ export class ArchiveRelease {
           }),
         ),
     );
-  }
-
-  /**
-   * Subagent session ids below one archived root, best-effort. Interim
-   * bridge, not a design statement: dsh's archive is a display filter with no
-   * lifecycle hook, and it cascades to nothing, while the sidebar hides
-   * subagent-origin sessions — so once a root is archived, its children's
-   * sandboxes are unreachable and can never be archived by hand; they would
-   * sit out expiresAfterMs as dead storage. When dsh grows an archive hook
-   * (or cascades itself, or surfaces hidden sessions), delete this walk and
-   * its wiring in the facade.
-   */
-  private async archivedDescendants(rootId: string): Promise<string[]> {
-    const subagents = this.deps.subagents();
-    if (subagents === undefined) {
-      return [];
-    }
-    try {
-      const tree = await subagents.listDescendants(rootId);
-      return tree.map((entry) => entry.id);
-    } catch (error) {
-      // The parent-only release still runs; children still expire.
-      this.deps.warn(
-        `could not list subagents under ${rootId}: ${String(error)}`,
-      );
-      return [];
-    }
   }
 }

@@ -1,5 +1,3 @@
-import type { Agent } from "@deepseek-ai/dsh-agent";
-
 import {
   captureFileIndex,
   FileIndexStore,
@@ -39,9 +37,9 @@ export class FileIndexHooks implements LifecycleHooks {
   /**
    * The file index saved when this session hibernated. Undefined while the
    * sandbox is running (ask the runner instead), or when no index was saved.
+   * The manager resolves the root session id before delegating.
    */
-  async hibernatedFileIndex(agent: Agent): Promise<FileIndex | undefined> {
-    const sessionId = String(agent.id);
+  async hibernatedFileIndex(sessionId: string): Promise<FileIndex | undefined> {
     if (this.deps.store.get(sessionId)?.state !== "hibernated") {
       return undefined;
     }
