@@ -118,6 +118,15 @@ otherwise — so the Deployment runs a small init container that restores mode
 `0600` after the walk and before dsh starts. Nothing to configure; if you
 inspect the pod, the init container is expected.
 
+**Slow model API egress.** The host image is Node 24, where Happy Eyeballs
+(`net.autoSelectFamily`) is on by default and abandons each resolved address
+attempt after 250 ms. A model API endpoint further than that in TCP connect
+time fails every model call as an instant `ETIMEDOUT`, and a pod network
+without an IPv6 route has no working family to fall through to. The
+Deployment therefore sets
+`NODE_OPTIONS=--network-family-autoselection-attempt-timeout=3000` to give
+each attempt 3 s while keeping dual-stack failover.
+
 The seeded configuration already declares one `standard` profile on the `kas`
 backend with this namespace and warm pool, and the provider talks to the API
 server with the automounted
