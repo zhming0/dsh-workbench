@@ -90,6 +90,13 @@ spec:
                 secretKeyRef:
                   name: dsh-registration-token
                   key: token
+            # Node >= 20 enables Happy Eyeballs and abandons each address
+            # attempt after 250ms. Model API endpoints that need longer to
+            # connect fail as instant ETIMEDOUT, and pod networks without an
+            # IPv6 route have no working family to fall through to. 3000ms
+            # keeps dual-stack failover while tolerating slow addresses.
+            - name: NODE_OPTIONS
+              value: --network-family-autoselection-attempt-timeout=3000
           ports:
             - name: tunnel
               containerPort: 8081
