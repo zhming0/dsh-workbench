@@ -42,7 +42,11 @@ export interface KasBackendOptions {
 
 export class KasBackend implements SandboxBackend {
   readonly name = "kas";
-  readonly capabilities = { supportsHibernate: true };
+  readonly capabilities = {
+    supportsHibernate: true,
+    // Suspension removes the pod; only the workspace volume comes back.
+    wakeKeepsFilesystem: false,
+  };
   private readonly api: CustomObjectsApi;
   private readonly readyTimeoutMs: number;
 

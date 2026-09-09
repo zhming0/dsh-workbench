@@ -102,7 +102,10 @@ export class FakeRunnerClient {
 
 export class FakeBackend implements SandboxBackend {
   readonly name = "fake";
-  readonly capabilities = { supportsHibernate: true };
+  readonly capabilities = {
+    supportsHibernate: true,
+    wakeKeepsFilesystem: true,
+  };
   readonly client = new FakeRunnerClient();
   provisions = 0;
   hibernations = 0;

@@ -44,6 +44,7 @@ import { ProfileRegistry } from "./profile-registry.js";
 import { RunnerAttachment } from "./runner-attachment.js";
 import { rootSessionId } from "./root-session.js";
 import { SandboxLifecycle } from "./sandbox-lifecycle.js";
+import { SandboxNotices } from "./sandbox-notices.js";
 
 const execute = promisify(execFile);
 
@@ -94,6 +95,7 @@ export class SandboxManager extends TypertRemoteService {
   private readonly archiveRelease: ArchiveRelease;
   private readonly profileChoice: ProfileChoice;
   private readonly fileIndexHooks: FileIndexHooks;
+  private readonly notices: SandboxNotices;
   private readonly ready: Promise<void>;
   private readonly gateway: RunnerGateway;
   private readonly agentLookup: (sessionId: string) => Agent | undefined;
@@ -175,6 +177,12 @@ export class SandboxManager extends TypertRemoteService {
     // beforeHibernate/beforeCheckpoint step today. Add new features that run
     // while the sandbox still answers here.
     this.engine.addHooks(this.fileIndexHooks);
+    // A completed restore or wake queues the turn's notice; the pre-step
+    // listener installed below rides it onto exactly that turn's prompt.
+    this.notices = new SandboxNotices(ctx, {
+      rootSessionId: (agent) => this.rootSessionId(agent),
+    });
+    this.engine.addHooks(this.notices);
     this.instructions = new ManagedInstructions(ctx, {
       store:
         dependencies.instructions ??
@@ -229,6 +237,9 @@ export class SandboxManager extends TypertRemoteService {
     // soon as a blank session exists, before the user has picked a profile.
     // ManagedInstructions.install() calls ensureRunning at `agent/pre-step`.
     this.instructions.install();
+    // After it, so the notice listener reads only when next() has already run
+    // the ensureRunning hooks for this step.
+    this.notices.install();
     ctx.on("agent/status", ({ agent, status }) => {
       if (status === "running") {
         this.idle.markActive(this.rootSessionId(agent));

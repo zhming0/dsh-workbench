@@ -281,7 +281,9 @@ After `idleMs` without a turn the session's sandbox is put away and the
 backend:
 
 - Docker and Kubernetes hibernate: compute stops, the workspace stays, and the
-  next prompt wakes the same sandbox.
+  next prompt wakes the same sandbox. Docker starts the container it stopped,
+  so its whole filesystem is still there; Kubernetes builds a new pod around
+  the surviving workspace volume.
 - A backend that cannot hibernate checkpoints instead. The manager commits the
   Git working tree inside the sandbox (as `dsh <dsh@localhost>`, only if there
   are changes), writes the commits that `origin`'s default branch does not
@@ -299,7 +301,19 @@ branches, stashes, or which changes were staged: everything comes back
 unstaged. A merge or rebase that was stopped on conflicts comes back as the
 conflicted files with their markers, no longer mid-merge. `.agents/setup` runs
 before the restore, on the configured revision, as it does for a new session.
-The model is not told the sandbox was replaced.
+The first prompt after a restore carries a notice that says the sandbox was
+recreated from a checkpoint: Git changes and commits are back, while installed
+tools, ignored files, and anything outside the repository are gone, and
+previously staged changes are now unstaged, so the model can re-run the setup
+steps it needs.
+
+A wake carries its own one-shot notice on the first prompt, worded for what the
+machine kept. On Kubernetes the new pod kept only the workspace, so the notice
+names running processes, `/tmp`, the home directory, and tools installed
+elsewhere as gone; on Docker the files survived and the notice says only that
+the processes did not. Only a backend that hibernates sends this notice: a
+backend that checkpoints never wakes, so its first prompt after a restore is
+the only one that carries a note.
 
 The bundle lives in the host's state directory next to the credential store,
 with the same file permissions, so a checkpoint has the same exposure as a

@@ -29,8 +29,8 @@ const transitions = meter.createCounter("dsh.sandbox.lifecycle.transitions");
 /**
  * Where features may hook the lifecycle. The engine defines the seams; a
  * feature that needs one registers here instead of the engine calling it by
- * name, so adding a hibernate-time or release-time feature changes no engine
- * code.
+ * name, so adding a hibernate-time, wake-time, restore-time, or release-time
+ * feature changes no engine code.
  */
 export interface LifecycleHooks {
   /**
@@ -44,10 +44,34 @@ export interface LifecycleHooks {
     client: RunnerClient | undefined;
   }): Promise<void>;
   /**
+   * A sandbox that had stopped is awake and its runner is connected. Only a
+   * backend that hibernates reports this: everywhere else a wake is a
+   * recovery probe of a sandbox that never went away, so there is nothing to
+   * announce. The workspace survived either way, but `keepsFilesystem` says
+   * whether the wake reused the machine (Docker) or built a new one around it
+   * (Kubernetes), which decides what else is still there.
+   */
+  afterWake?(context: {
+    sessionId: string;
+    record: RunningRecord;
+    client: RunnerClient;
+    keepsFilesystem: boolean;
+  }): Promise<void>;
+  /**
    * Just before a sandbox that cannot hibernate has its working tree saved
    * and is destroyed. The runner is connected, because the save needs it too.
    */
   beforeCheckpoint?(context: {
+    sessionId: string;
+    record: RunningRecord;
+    client: RunnerClient;
+  }): Promise<void>;
+  /**
+   * A checkpointed session is whole again in a fresh sandbox: the record says
+   * running, the working tree is back, and the bundle is gone. The new runner
+   * is connected and cached, so the hook may talk to it.
+   */
+  afterRestore?(context: {
     sessionId: string;
     record: RunningRecord;
     client: RunnerClient;
@@ -596,7 +620,21 @@ export class SandboxLifecycle {
       };
       await this.deps.store.set(woken);
       transitions.add(1, { backend: record.backend, transition: "wake" });
-      return this.deps.attachment.attach(woken, repositoryUrl);
+      const client = await this.deps.attachment.attach(woken, repositoryUrl);
+      // After the attach, so the hook sees the reconnected runner once the
+      // runner's own resume hook has run. A backend that cannot hibernate
+      // only probes a sandbox it never put away, so it has no wake to report.
+      if (backend.capabilities.supportsHibernate) {
+        for (const hooks of this.hooks) {
+          await hooks.afterWake?.({
+            sessionId: record.sessionId,
+            record: woken,
+            client,
+            keepsFilesystem: backend.capabilities.wakeKeepsFilesystem ?? false,
+          });
+        }
+      }
+      return client;
     } catch (error) {
       if (!(error instanceof SandboxNotFoundError)) {
         throw error;
@@ -677,6 +715,13 @@ export class SandboxLifecycle {
     await this.deps.store.set(replacement);
     transitions.add(1, { backend: record.backend, transition: "restore" });
     await this.deps.checkpoints.remove(record.sessionId);
+    for (const hooks of this.hooks) {
+      await hooks.afterRestore?.({
+        sessionId: record.sessionId,
+        record: replacement,
+        client,
+      });
+    }
     return client;
   }
 
