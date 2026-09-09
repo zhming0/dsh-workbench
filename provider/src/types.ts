@@ -53,6 +53,20 @@ export class SandboxNotFoundError extends Error {
 }
 
 /**
+ * A suspend failed on the checkpoint path: the backend cannot hibernate, so
+ * the session's sandbox keeps costing compute while the idle controller waits
+ * between retries. The message is the underlying failure's own — only the
+ * type is new information, and keeping the text leaves every existing log
+ * and test message intact.
+ */
+export class CheckpointFailedError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.name = "CheckpointFailedError";
+  }
+}
+
+/**
  * A backend owns sandbox acquisition and lifecycle, not transport: runners
  * dial the host tunnel themselves, so there is no connect() here.
  */

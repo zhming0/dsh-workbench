@@ -112,6 +112,8 @@ export class FakeBackend implements SandboxBackend {
   running = false;
   /** Thrown by the next destroy, then cleared. */
   destroyFailure: Error | undefined;
+  /** Thrown by the next hibernate, then cleared. */
+  hibernateFailure: Error | undefined;
   readonly repositoryUrls: string[] = [];
 
   async provision(spec: SandboxSpec) {
@@ -122,6 +124,11 @@ export class FakeBackend implements SandboxBackend {
   }
 
   async hibernate() {
+    if (this.hibernateFailure !== undefined) {
+      const failure = this.hibernateFailure;
+      this.hibernateFailure = undefined;
+      throw failure;
+    }
     this.hibernations += 1;
     this.running = false;
   }

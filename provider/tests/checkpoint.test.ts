@@ -234,20 +234,25 @@ describe("checkpoint scripts", () => {
 describe("idle schedule", () => {
   it("warns and re-arms when a suspend attempt fails", async () => {
     const warnings: string[] = [];
+    const errors: string[] = [];
     let attempts = 0;
     const idle = new IdleSchedule({
       idleMs: 5,
+      maxCheckpointFailures: 3,
       ready: async () => {},
       hibernate: async () => {
         attempts += 1;
         throw new Error("bundle too large");
       },
       warn: (message) => warnings.push(message),
+      error: (message) => errors.push(message),
+      release: async () => {},
     });
     idle.schedule("session-one");
     await sleep(40);
     idle.dispose();
     expect(attempts).toBeGreaterThan(1);
+    expect(errors).toEqual([]);
     expect(warnings[0]).toMatch(
       /could not suspend session-one.*bundle too large/,
     );

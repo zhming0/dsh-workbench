@@ -3,10 +3,11 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CredentialBroker } from "../src/broker.js";
 import { CheckpointStore, restoreEnvironment } from "../src/checkpoint.js";
+import { IdleSchedule } from "../src/manager/idle.js";
 import { SandboxLifecycle } from "../src/manager/sandbox-lifecycle.js";
 import { ProfileRegistry } from "../src/manager/profile-registry.js";
 import { RunnerAttachment } from "../src/manager/runner-attachment.js";
@@ -395,6 +396,131 @@ describe("sandbox lifecycle engine", () => {
       expect(store.get("session-one")).toBeUndefined();
       expect(backend.destroys).toBe(1);
       expect(existsSync(bundlePath())).toBe(false);
+    });
+
+    describe("when the idle controller retries the save", () => {
+      const IDLE_MS = 1_000;
+      let warnings: string[];
+      let errors: string[];
+      let idle: IdleSchedule;
+
+      /**
+       * Fire the armed countdown and let its suspend attempt settle. The
+       * fake clock only drives the countdown; the attempt's real file
+       * writes finish on the event loop, so keep handing the loop turns
+       * until the engine has no operation in flight.
+       */
+      const idleTick = async () => {
+        const operations = () =>
+          (engine as unknown as { operations: Map<string, unknown> }).operations
+            .size;
+        await vi.advanceTimersByTimeAsync(IDLE_MS);
+        while (operations() > 0) {
+          await new Promise((resolve) => setImmediate(resolve));
+        }
+        await new Promise((resolve) => setImmediate(resolve));
+      };
+
+      beforeEach(() => {
+        vi.useFakeTimers({
+          toFake: [
+            "setTimeout",
+            "clearTimeout",
+            "setInterval",
+            "clearInterval",
+          ],
+        });
+        warnings = [];
+        errors = [];
+        idle = new IdleSchedule({
+          idleMs: IDLE_MS,
+          maxCheckpointFailures: 3,
+          ready: async () => {},
+          hibernate: (sessionId, guard) => engine.hibernate(sessionId, guard),
+          warn: (message) => warnings.push(message),
+          error: (message) => errors.push(message),
+          release: (sessionId) => engine.release(sessionId),
+        });
+      });
+
+      afterEach(() => {
+        idle.dispose();
+        vi.useRealTimers();
+      });
+
+      it("keeps the sandbox under the cap and gives up at it", async () => {
+        await engine.initialize();
+        await engine.ensureRunning("session-one", async () => REPOSITORY);
+        idle.schedule("session-one");
+
+        // Two failed saves keep the running sandbox for another idle delay.
+        for (let remaining = 2; remaining > 0; remaining -= 1) {
+          backend.client.execReplies.push({ exitCode: 1 });
+          await idleTick();
+          expect(store.get("session-one")?.state).toBe("running");
+          expect(backend.destroys).toBe(0);
+        }
+        expect(warnings).toHaveLength(2);
+        expect(warnings[0]).toMatch(/could not checkpoint session-one/);
+
+        // The third gives up: destroy, forget, and one error saying why.
+        backend.client.execReplies.push({ exitCode: 1 });
+        await idleTick();
+        expect(store.get("session-one")).toBeUndefined();
+        expect(backend.destroys).toBe(1);
+        expect(errors).toEqual([
+          expect.stringMatching(/session-one \(3 failed saves\).*exit code 1/),
+        ]);
+        expect(warnings).toHaveLength(2);
+      });
+
+      it("starts the count over after a successful save", async () => {
+        await engine.initialize();
+        await engine.ensureRunning("session-one", async () => REPOSITORY);
+        idle.schedule("session-one");
+
+        backend.client.execReplies.push({ exitCode: 1 });
+        await idleTick();
+        expect(store.get("session-one")?.state).toBe("running");
+
+        backend.client.execReplies.push({ stdout: SAVE_OUTPUT });
+        await idleTick();
+        expect(store.get("session-one")?.state).toBe("checkpointed");
+
+        // Back to running through the ordinary restore, as a wake would.
+        await engine.ensureRunning("session-one", async () => REPOSITORY);
+        idle.schedule("session-one");
+
+        // Two more failures stay under the cap; a carried-over count would
+        // have reached it on the second one.
+        for (let remaining = 2; remaining > 0; remaining -= 1) {
+          backend.client.execReplies.push({ exitCode: 1 });
+          await idleTick();
+          expect(store.get("session-one")?.state).toBe("running");
+        }
+        expect(errors).toEqual([]);
+
+        backend.client.execReplies.push({ exitCode: 1 });
+        await idleTick();
+        expect(store.get("session-one")).toBeUndefined();
+      });
+
+      it("retries a hibernating backend past the cap instead of giving up", async () => {
+        backend.capabilities.supportsHibernate = true;
+        await engine.initialize();
+        await engine.ensureRunning("session-one", async () => REPOSITORY);
+        idle.schedule("session-one");
+
+        // Every attempt fails and re-arms; the sandbox is never given up.
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          backend.hibernateFailure = new Error("no capacity");
+          await idleTick();
+          expect(store.get("session-one")?.state).toBe("running");
+        }
+        expect(backend.destroys).toBe(0);
+        expect(errors).toEqual([]);
+        expect(warnings.length).toBeGreaterThanOrEqual(4);
+      });
     });
   });
 });

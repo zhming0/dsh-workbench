@@ -34,6 +34,12 @@ export interface Config {
   revision?: string;
   workspace?: string;
   idleMs?: number;
+  /**
+   * Failed checkpoint saves in a row before the idle controller gives up on
+   * the session's sandbox and drops it, as idle did before checkpointing
+   * existed.
+   */
+  checkpointMaxFailures?: number;
   expiresAfterMs?: number;
   registrationToken?: string;
   tunnel?: {
@@ -50,6 +56,7 @@ export interface ResolvedConfig {
   revision: string;
   workspace: string;
   idleMs: number;
+  checkpointMaxFailures: number;
   expiresAfterMs: number;
   registrationToken?: string;
   tunnel: { port: number; bind: string };
@@ -88,6 +95,7 @@ export const configSchema: Schemastery<Config> = z.object({
     .number()
     .min(1)
     .default(10 * 60_000),
+  checkpointMaxFailures: z.number().min(1).default(3),
   expiresAfterMs: z
     .number()
     .min(1)
@@ -129,6 +137,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
     revision: config.revision ?? "",
     workspace: config.workspace ?? "/workspace/repository",
     idleMs: config.idleMs ?? 10 * 60_000,
+    checkpointMaxFailures: config.checkpointMaxFailures ?? 3,
     expiresAfterMs: config.expiresAfterMs ?? 7 * 24 * 60 * 60_000,
     ...(config.registrationToken === undefined
       ? {}

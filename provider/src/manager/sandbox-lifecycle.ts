@@ -5,6 +5,7 @@ import type { CheckpointStore } from "../checkpoint.js";
 import type { RunnerClient } from "../runner-client.js";
 import type { SessionStore } from "../state-store.js";
 import {
+  CheckpointFailedError,
   SandboxNotFoundError,
   type CheckpointedRecord,
   type HibernatedRecord,
@@ -382,18 +383,25 @@ export class SandboxLifecycle {
    */
   private async suspendRunning(record: RunningRecord): Promise<void> {
     const backend = this.deps.registry.backendFor(record);
+    const checkpoint = !backend.capabilities.supportsHibernate;
     try {
-      if (backend.capabilities.supportsHibernate) {
-        await this.hibernateSandbox(record, backend);
-      } else {
+      if (checkpoint) {
         await this.checkpointSandbox(record, backend);
+      } else {
+        await this.hibernateSandbox(record, backend);
       }
     } catch (error) {
-      if (!(error instanceof SandboxNotFoundError)) {
+      if (error instanceof SandboxNotFoundError) {
+        await this.forgetSession(record.sessionId);
+        transitions.add(1, { backend: record.backend, transition: "missing" });
+      } else if (checkpoint) {
+        // Mark the path for the retry policies: keeping a hibernating
+        // sandbox costs nothing, so its failures retry freely, while a
+        // checkpoint keeps a paid sandbox running between attempts.
+        throw new CheckpointFailedError(error);
+      } else {
         throw error;
       }
-      await this.forgetSession(record.sessionId);
-      transitions.add(1, { backend: record.backend, transition: "missing" });
     }
     this.deps.attachment.detach(record.sessionId, record.sandboxId);
   }

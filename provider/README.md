@@ -156,19 +156,20 @@ Configuration is YAML in the profile's own layer,
 
 `profiles` is the one required setting.
 
-| Setting             | Default                 | Meaning                                                          |
-| ------------------- | ----------------------- | ---------------------------------------------------------------- |
-| `profiles.<name>`   | required                | One sandbox profile; its fields are listed in the next table     |
-| `defaultProfile`    | first profile           | Profile used when a session does not pick one                    |
-| `repository`        | session repository      | Fallback repository for non-anchor sessions                      |
-| `revision`          | repository default      | Optional branch, tag, or commit to check out                     |
-| `workspace`         | `/workspace/repository` | Repository checkout and working directory                        |
-| `idleMs`            | 10 minutes              | Idle delay after the last turn or wake before hibernating        |
-| `expiresAfterMs`    | 7 days                  | How long a hibernated workspace is retained                      |
-| `stateDir`          | `~/.dsh-sandbox`        | Records, broker data, token, instructions, and Workspace anchors |
-| `registrationToken` | see below               | Token(s) runners must present, comma-separated                   |
-| `tunnel.port`       | `8081`                  | Port the host listens on for runner tunnels                      |
-| `tunnel.bind`       | `0.0.0.0`               | Address the tunnel listener binds to                             |
+| Setting                 | Default                 | Meaning                                                          |
+| ----------------------- | ----------------------- | ---------------------------------------------------------------- |
+| `profiles.<name>`       | required                | One sandbox profile; its fields are listed in the next table     |
+| `defaultProfile`        | first profile           | Profile used when a session does not pick one                    |
+| `repository`            | session repository      | Fallback repository for non-anchor sessions                      |
+| `revision`              | repository default      | Optional branch, tag, or commit to check out                     |
+| `workspace`             | `/workspace/repository` | Repository checkout and working directory                        |
+| `idleMs`                | 10 minutes              | Idle delay after the last turn or wake before hibernating        |
+| `checkpointMaxFailures` | 3                       | Failed checkpoint saves in a row before the session is dropped   |
+| `expiresAfterMs`        | 7 days                  | How long a hibernated workspace is retained                      |
+| `stateDir`              | `~/.dsh-sandbox`        | Records, broker data, token, instructions, and Workspace anchors |
+| `registrationToken`     | see below               | Token(s) runners must present, comma-separated                   |
+| `tunnel.port`           | `8081`                  | Port the host listens on for runner tunnels                      |
+| `tunnel.bind`           | `0.0.0.0`               | Address the tunnel listener binds to                             |
 
 Each profile carries the settings of its own backend. Profiles do not share
 settings with each other, so two Kubernetes profiles in one namespace both
@@ -274,7 +275,14 @@ the clone has no `origin/HEAD` it carries the whole history instead. A bundle
 over 64 MiB fails the checkpoint.
 
 If the save fails the sandbox stays up, the host logs a warning, and the idle
-timer retries after another `idleMs`. If the restore fails, the new sandbox is
+timer retries after another `idleMs`. After `checkpointMaxFailures` failed
+saves in a row it stops retrying: the sandbox is destroyed and the session is
+dropped, as idle did before checkpointing existed, so a save that can never
+succeed (for example a bundle over the size cap) does not keep a paid sandbox
+running until the backend's own timeout reclaims it. The count starts over at
+the next activity and after a successful save. A backend that can hibernate is
+not affected: suspending it costs nothing, so its failures keep retrying. If
+the restore fails, the new sandbox is
 destroyed and the next prompt tries again from the same bundle; a bundle that
 was removed from the state directory produces an error on every prompt until
 the session is released. A session that expires while checkpointed loses its
