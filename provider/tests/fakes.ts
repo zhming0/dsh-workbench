@@ -109,6 +109,7 @@ export class FakeBackend implements SandboxBackend {
   wakes = 0;
   destroys = 0;
   expiries = 0;
+  readonly expiryDeadlines: Date[] = [];
   running = false;
   /** Thrown by the next destroy, then cleared. */
   destroyFailure: Error | undefined;
@@ -143,8 +144,9 @@ export class FakeBackend implements SandboxBackend {
     this.running = false;
   }
 
-  async expireAt() {
+  async expireAt(_reference: BackendReference, deadline: Date) {
     this.expiries += 1;
+    this.expiryDeadlines.push(deadline);
   }
 
   async health() {

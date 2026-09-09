@@ -29,6 +29,7 @@ describe("session state store", () => {
       reference: { id: "one" },
       repositoryUrl: "https://github.com/example/repo.git",
       state: "running",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
       updatedAt: new Date().toISOString(),
     });
     const reopened = new SessionStore(path);

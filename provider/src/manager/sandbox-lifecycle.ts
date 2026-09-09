@@ -64,6 +64,9 @@ export interface SandboxLifecycleDependencies {
   attachment: RunnerAttachment;
   /** The bundles of checkpointed sessions, keyed by session. */
   checkpoints: CheckpointStore;
+  /** Idle delay after the last turn or wake before a session suspends. */
+  idleMs: number;
+  /** How long a hibernated workspace is retained past its suspension. */
   expiresAfterMs: number;
   warn(message: string): void;
 }
@@ -104,6 +107,12 @@ type LifecycleEvent = EnsureEvent | HibernateEvent | ReleaseEvent;
  * facade, idle policy, host-event features) decide when an event fires and
  * hand in what the reaction needs (a repository for provisioning, a guard
  * for release). Every event is serialized through the session's lock.
+ *
+ * A running sandbox also carries its own expiry: a backend-side deletion
+ * deadline one full idle-plus-retention cycle past now, armed at provision
+ * and wake and renewed at turn end. A sandbox that outlives its host is
+ * therefore still removed, and never sooner than the idle timer and
+ * retention would have removed it anyway.
  */
 export class SandboxLifecycle {
   private readonly operations = new Map<string, Promise<void>>();
@@ -127,9 +136,12 @@ export class SandboxLifecycle {
   }
 
   /**
-   * Boot recovery: load the session records, then replay a release event for
-   * each one whose retention expired while the host was down. Call once
-   * after the stores are loaded and the hooks are registered.
+   * Boot recovery: load the session records, then reconcile each one with
+   * its deadline. A live deadline is re-armed exactly; a lapsed one releases
+   * the sandbox — hibernated retention, a checkpoint bundle past its
+   * retention, or a running sandbox whose expiry passed while the host was
+   * down. Call once after the stores are loaded and the hooks are
+   * registered.
    */
   async initialize(): Promise<void> {
     await this.deps.store.initialize();
@@ -141,15 +153,21 @@ export class SandboxLifecycle {
         this.deps.warn(orphanedRecordMessage(record));
         continue;
       }
-      if (record.state === "running") {
-        continue;
-      }
       const deadline = new Date(record.expiresAt);
       if (
         !Number.isFinite(deadline.getTime()) ||
         deadline.getTime() <= Date.now()
       ) {
-        await this.react(record.sessionId, { type: "release" });
+        if (
+          record.state === "running" &&
+          !Number.isFinite(deadline.getTime())
+        ) {
+          // A running record without a usable deadline predates the running
+          // expiry: arm a fresh one instead of judging it expired.
+          await this.renewExpiry(record);
+        } else {
+          await this.react(record.sessionId, { type: "release" });
+        }
         continue;
       }
       if (record.state === "checkpointed") {
@@ -173,9 +191,9 @@ export class SandboxLifecycle {
   /**
    * A session is about to run: return its live runner. The machine answers
    * from the state the session is in — provisioning its first sandbox,
-   * waking a hibernated one, or recovering a dead one. `repository` resolves
-   * the repository URL and is only consulted when the session has no record
-   * yet.
+   * waking a hibernated one, restoring a checkpointed one, or recovering a
+   * dead one. `repository` resolves the repository URL and is only consulted
+   * when the session has no record yet.
    */
   ensureRunning(
     sessionId: string,
@@ -231,6 +249,24 @@ export class SandboxLifecycle {
         return;
       }
       await this.react(sessionId, { type: "release" });
+    });
+  }
+
+  /**
+   * A turn just ended: renew the running sandbox's expiry so it stays
+   * anchored to recent activity. A no-op for sessions without a running
+   * sandbox; a sandbox the backend already lost is reclaimed so the next
+   * turn provisions cleanly.
+   */
+  refreshExpiry(sessionId: string): Promise<void> {
+    return this.serialize(sessionId, async () => {
+      const record = this.deps.store.get(sessionId);
+      if (record?.state !== "running") {
+        return;
+      }
+      if (!(await this.renewExpiry(record))) {
+        await this.reclaimExpired(record);
+      }
     });
   }
 
@@ -527,7 +563,10 @@ export class SandboxLifecycle {
     await this.forgetSession(record.sessionId);
   }
 
-  /** The absent → running transition: create the sandbox, write the record. */
+  /**
+   * The absent → running transition: create the sandbox, set its expiry,
+   * write the record.
+   */
   private async provision(
     sessionId: string,
     profile: SandboxProfile,
@@ -542,7 +581,10 @@ export class SandboxLifecycle {
     return record;
   }
 
-  /** Create a sandbox and describe it as a running record, without storing it. */
+  /**
+   * Create a sandbox, arm its running expiry, and describe it as a running
+   * record, without storing it.
+   */
   private async claimSandbox(
     sessionId: string,
     profile: SandboxProfile,
@@ -555,6 +597,8 @@ export class SandboxLifecycle {
     const started = Date.now();
     const handle = await backend.provision({ sessionId, repositoryUrl });
     claimLatency.record(Date.now() - started, { backend: profile.backend });
+    const expiry = this.runningExpiry();
+    await backend.expireAt(handle.reference, expiry);
     return {
       sessionId,
       backend: backend.name,
@@ -563,15 +607,17 @@ export class SandboxLifecycle {
       reference: handle.reference,
       repositoryUrl,
       state: "running",
+      expiresAt: expiry.toISOString(),
       updatedAt: new Date().toISOString(),
     };
   }
 
   /**
-   * The hibernated-or-dead → running transition: wake the sandbox, or, when
-   * the backend has lost the object, provision a replacement under the same
-   * profile (which backendFor just proved is configured), so a session does
-   * not silently change size or backend.
+   * The hibernated-or-dead → running transition: wake the sandbox and renew
+   * its expiry (the KAS wake clears the claim's expiry before unpausing),
+   * or, when the backend has lost the object, provision a replacement under
+   * the same profile (which backendFor just proved is configured), so a
+   * session does not silently change size or backend.
    */
   private async wakeOrReplace(
     record: RunningRecord | HibernatedRecord,
@@ -584,6 +630,8 @@ export class SandboxLifecycle {
       resumeLatency.record(Date.now() - started, {
         backend: record.backend,
       });
+      const expiry = this.runningExpiry();
+      await backend.expireAt(handle.reference, expiry);
       const woken: RunningRecord = {
         sessionId: record.sessionId,
         backend: record.backend,
@@ -592,6 +640,7 @@ export class SandboxLifecycle {
         sandboxId: handle.sandboxId,
         reference: handle.reference,
         state: "running",
+        expiresAt: expiry.toISOString(),
         updatedAt: new Date().toISOString(),
       };
       await this.deps.store.set(woken);
@@ -685,10 +734,8 @@ export class SandboxLifecycle {
    * the backend, so the next ensureRunning provisions fresh. A checkpointed
    * session has no sandbox left; only its record and bundle go.
    */
-  private async reclaimExpired(
-    record: HibernatedRecord | CheckpointedRecord,
-  ): Promise<void> {
-    if (record.state === "hibernated") {
+  private async reclaimExpired(record: SessionRecord): Promise<void> {
+    if (record.state !== "checkpointed") {
       const backend = this.deps.registry.backendFor(record);
       await backend.destroy(record.reference);
       this.deps.attachment.drop(record.sandboxId);
@@ -707,14 +754,46 @@ export class SandboxLifecycle {
     }
   }
 
-  /** Only a session without a live sandbox carries a deadline. */
-  private hasExpired(
-    record: SessionRecord,
-  ): record is HibernatedRecord | CheckpointedRecord {
-    return (
-      record.state !== "running" &&
-      new Date(record.expiresAt).getTime() <= Date.now()
-    );
+  /**
+   * Whether the record's deadline has passed. Every record written by this
+   * machine carries one; a legacy running record without a usable deadline
+   * never reads as expired, and boot arms it a fresh expiry instead.
+   */
+  private hasExpired(record: SessionRecord): boolean {
+    return new Date(record.expiresAt).getTime() <= Date.now();
+  }
+
+  /**
+   * The expiry a running sandbox carries: deletion one full
+   * idle-plus-retention cycle past now. It cannot fire before the idle timer
+   * would have suspended the sandbox and its retention elapsed, so it only
+   * ever removes a sandbox that outlived its host.
+   */
+  private runningExpiry(): Date {
+    return new Date(Date.now() + this.deps.idleMs + this.deps.expiresAfterMs);
+  }
+
+  /**
+   * Renew one running record's expiry on the backend and persist it. False
+   * when the backend has already lost the sandbox.
+   */
+  private async renewExpiry(record: RunningRecord): Promise<boolean> {
+    const deadline = this.runningExpiry();
+    const backend = this.deps.registry.backendFor(record);
+    try {
+      await backend.expireAt(record.reference, deadline);
+    } catch (error) {
+      if (!(error instanceof SandboxNotFoundError)) {
+        throw error;
+      }
+      return false;
+    }
+    await this.deps.store.set({
+      ...record,
+      expiresAt: deadline.toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    return true;
   }
 
   /** Run one operation under the session's exclusive lock. */

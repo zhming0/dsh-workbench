@@ -162,6 +162,7 @@ export class SandboxManager extends TypertRemoteService {
       checkpoints: new CheckpointStore(
         join(this.config.stateDir, "checkpoints"),
       ),
+      idleMs: this.config.idleMs,
       expiresAfterMs: this.config.expiresAfterMs,
       warn: (message) => this.ctx.logger("sandbox").warn(message),
     });
@@ -240,6 +241,13 @@ export class SandboxManager extends TypertRemoteService {
         this.idle.beginTurn(sessionId);
       } else if (event.type === "turn/end") {
         this.idle.endTurn(sessionId);
+        // The expiry rides turn/end: a sandbox is only ever removed after a
+        // full idle-plus-retention cycle past its last turn.
+        void this.engine.refreshExpiry(sessionId).catch((error) => {
+          this.ctx
+            .logger("sandbox")
+            .warn(`could not refresh ${sessionId}'s expiry: ${String(error)}`);
+        });
         // An archive that landed mid-turn waits for the turn to finish.
         this.archiveRelease.reconcile();
       }

@@ -96,6 +96,12 @@ export interface RunningRecord extends SessionRecordBase {
   state: "running";
   sandboxId: string;
   reference: BackendReference;
+  /**
+   * Deletion deadline the backend enforces while the sandbox runs: one full
+   * idle-plus-retention cycle past the last turn, so a sandbox that outlives
+   * its host is still removed.
+   */
+  expiresAt: string;
 }
 
 /** A suspended sandbox that the backend keeps until `expiresAt`. */
