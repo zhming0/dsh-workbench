@@ -69,3 +69,11 @@
 
     - id: sandbox-file-reference
       name: '@zhming0/dsh-workbench/file-reference'
+
+    # States the sandbox environment in the model's system prompt: shadows the
+    # cwd prompt variable with the sandbox workspace, contributes a short
+    # environment section, and drops dsh's host-only prompt sections (the
+    # implementation checkout and Web GUI paragraphs), which do not hold
+    # inside a sandbox.
+    - id: sandbox-context
+      name: '@zhming0/dsh-workbench/sandbox-context'
