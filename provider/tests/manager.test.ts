@@ -53,7 +53,8 @@ describe("sandbox lifecycle", () => {
     await manager.ensureRunning(agent);
     expect(backend.provisions).toBe(1);
     expect(backend.client.setups).toBe(1);
-    expect(backend.expiries).toBe(0);
+    // One expiry so far: the one armed at provision.
+    expect(backend.expiries).toBe(1);
 
     const cliBroker = new CredentialBroker({
       path: join(directory, "broker.json"),
@@ -72,11 +73,59 @@ describe("sandbox lifecycle", () => {
     expect(backend.wakes).toBe(1);
 
     await manager.hibernate("session-one");
-    expect(backend.expiries).toBe(1);
+    // Two expiry arms (provision, recovery wake) plus the retention deadline
+    // the suspension arms.
+    expect(backend.expiries).toBe(3);
     await manager.ensureRunning(agent);
     expect(backend.hibernations).toBe(1);
     expect(backend.wakes).toBe(2);
     expect(backend.client.setups).toBe(3);
+  });
+
+  it("refreshes the running expiry at turn end and leaves hibernated ones alone", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
+      {
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 60_000,
+        expiresAfterMs: 60_000,
+      },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+    const session = { id: "session-one" } as unknown as Session;
+
+    await manager.ensureRunning(agent);
+    const armed = backend.expiries;
+    const t0 = Date.now();
+    ctx.emit("session/event", session, {
+      type: "turn/end",
+      data: { turn: 1 },
+    } as unknown as SessionEvent);
+    // The refresh is fire-and-forget; poll for its outcome.
+    await vi.waitFor(() => {
+      expect(backend.expiries).toBeGreaterThan(armed);
+    });
+    const refreshed = backend.expiryDeadlines.at(-1)?.getTime();
+    expect(refreshed).toBeGreaterThanOrEqual(t0 + 120_000);
+    expect(refreshed).toBeLessThanOrEqual(Date.now() + 120_000);
+
+    // A hibernated sandbox has no running expiry to refresh.
+    await manager.hibernate("session-one");
+    const suspended = backend.expiries;
+    ctx.emit("session/event", session, {
+      type: "turn/end",
+      data: { turn: 2 },
+    } as unknown as SessionEvent);
+    await sleep(50);
+    expect(backend.expiries).toBe(suspended);
   });
 
   it("releases a session's sandbox on demand and is a no-op when absent", async () => {
@@ -503,7 +552,8 @@ describe("archive release", () => {
 
     expect(backend.destroys).toBe(1);
     expect(backend.hibernations).toBe(0);
-    expect(backend.expiries).toBe(0);
+    // Only the provision-time expiry; archiving never expires anything.
+    expect(backend.expiries).toBe(1);
   });
 
   it("releases archived sessions found at startup", async () => {

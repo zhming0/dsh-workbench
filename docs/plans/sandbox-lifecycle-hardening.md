@@ -21,14 +21,14 @@ Two fixes, in dependency order. Fix 1 is the safety net (correctness under
 host death); fix 2 is the clean path (prompt parking on graceful shutdown).
 With fix 1 in place, fix 2 is hygiene rather than correctness.
 
-## Fix 1 — running-state backstop deadline
+## Fix 1 — running-state expiry
 
 Every sandbox carries a backend-side deadline from the moment it exists, not
 only after hibernate.
 
-**Deadline semantics.** The backstop must never delete a workspace sooner than
+**Deadline semantics.** The running expiry must never delete a workspace sooner than
 the normal lifecycle would. The normal path retains data until roughly
-`last activity + idleMs + expiresAfterMs`, so the backstop deadline is exactly
+`last activity + idleMs + expiresAfterMs`, so the running expiry is exactly
 that: `now + idleMs + expiresAfterMs`, derived from existing settings. No new
 setting.
 
@@ -50,7 +50,7 @@ follow-up check in `ensureRunningUnlocked` (destroy the record when
 reconcile can re-arm the exact deadline instead of recomputing it.
 
 **Backend asymmetry, accepted.** Docker's `expireAt` is an in-process timer,
-so the backstop only protects while the host lives; boot reconcile remains the
+so the expiry only protects while the host lives; boot reconcile remains the
 recovery path there. That is fine — Docker orphans are on the user's own
 machine. KAS gets the real benefit: `shutdownTime` is enforced by the cluster
 with no host involvement. The manager stays backend-agnostic and does not
@@ -81,7 +81,7 @@ dsh launcher runs plugin teardown on SIGTERM/SIGINT at all. Default plan:
 **Time budget.** Docker hibernate is `docker stop --time 10` per sandbox and
 KAS suspend waits for the `Suspended` condition, so parking many sessions must
 run concurrently to fit a typical 30-second termination grace period. If the
-budget is exceeded, fix 1's backstop still bounds the damage.
+budget is exceeded, fix 1's running expiry still bounds the damage.
 
 ## Non-goals
 
@@ -93,7 +93,7 @@ budget is exceeded, fix 1's backstop still bounds the damage.
 
 ## Delivery slices
 
-1. **Backstop deadline** — manager changes (provision, wake, turn-end refresh,
+1. **Running expiry** — manager changes (provision, wake, turn-end refresh,
    boot reconcile, `expiresAt` on running records) plus unit tests in
    `provider/tests/core.test.ts` asserting `expireAt` is called with
    `now + idleMs + expiresAfterMs` at each of the four points, using the fake
@@ -107,5 +107,5 @@ budget is exceeded, fix 1's backstop still bounds the damage.
    re-run the kind lifecycle suite.
 
 Update the lifecycle description in `README.md` and `provider/README.md`
-(idle/expiry semantics now include the running-state backstop) as part of
+(idle/expiry semantics now include the running-state expiry) as part of
 slice 1.

@@ -167,6 +167,15 @@ name that namespace.
 | `readyTimeoutMs` | `kas`    | 3 minutes              | How long to wait for a claimed sandbox         |
 | `kubeconfig`     | `kas`    | normal client lookup   | Optional kubeconfig path                       |
 
+### Running-sandbox expiry
+
+A running sandbox also carries a backend-side deletion deadline of
+`idleMs + expiresAfterMs` past its last turn — armed when the sandbox is
+provisioned or woken, refreshed at each turn's end, and re-armed at boot. A
+sandbox that outlives its host — a crash, a closed laptop — is therefore
+still removed, and never sooner than the idle delay and hibernation
+retention would remove it anyway.
+
 ### Archived sessions
 
 Archiving a session in the Web UI is one-way: dsh keeps the session log but

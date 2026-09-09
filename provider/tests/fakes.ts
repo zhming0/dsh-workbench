@@ -69,6 +69,7 @@ export class FakeBackend implements SandboxBackend {
   hibernations = 0;
   wakes = 0;
   expiries = 0;
+  readonly expiryDeadlines: Date[] = [];
   destroys = 0;
   running = false;
   readonly repositoryUrls: string[] = [];
@@ -97,8 +98,9 @@ export class FakeBackend implements SandboxBackend {
     this.running = false;
   }
 
-  async expireAt() {
+  async expireAt(_reference: BackendReference, deadline: Date) {
     this.expiries += 1;
+    this.expiryDeadlines.push(deadline);
   }
 
   async health() {
