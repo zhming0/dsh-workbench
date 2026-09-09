@@ -10,6 +10,7 @@ import type {} from "@deepseek-ai/dsh-typert-registry";
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 
 import { CredentialBroker } from "../broker.js";
+import { CheckpointStore } from "../checkpoint.js";
 import {
   configSchema,
   resolveConfig,
@@ -158,6 +159,9 @@ export class SandboxManager extends TypertRemoteService {
       registry,
       pendingProfile: (sessionId) => this.profileChoice.pending(sessionId),
       attachment,
+      checkpoints: new CheckpointStore(
+        join(this.config.stateDir, "checkpoints"),
+      ),
       expiresAfterMs: this.config.expiresAfterMs,
       warn: (message) => this.ctx.logger("sandbox").warn(message),
     });
@@ -168,7 +172,8 @@ export class SandboxManager extends TypertRemoteService {
       warn: (message) => this.ctx.logger("sandbox").warn(message),
     });
     // Hooks run in registration order; file-index capture is the only
-    // beforeHibernate step today. Add new hibernate-time features here.
+    // beforeHibernate/beforeCheckpoint step today. Add new features that run
+    // while the sandbox still answers here.
     this.engine.addHooks(this.fileIndexHooks);
     this.instructions = new ManagedInstructions(ctx, {
       store:
@@ -188,6 +193,7 @@ export class SandboxManager extends TypertRemoteService {
       idleMs: this.config.idleMs,
       ready: () => this.ready,
       hibernate: (sessionId, guard) => this.engine.hibernate(sessionId, guard),
+      warn: (message) => this.ctx.logger("sandbox").warn(message),
     });
     this.archiveRelease = new ArchiveRelease({
       ready: () => this.ready,
@@ -368,7 +374,7 @@ export class SandboxManager extends TypertRemoteService {
     return client;
   }
 
-  /** Suspend (or, without hibernation support, destroy) the session's sandbox. */
+  /** Suspend the session's sandbox: hibernate, or checkpoint and destroy. */
   async hibernate(sessionId: string): Promise<void> {
     await this.ready;
     await this.engine.hibernate(sessionId);

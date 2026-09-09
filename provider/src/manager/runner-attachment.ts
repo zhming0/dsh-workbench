@@ -1,7 +1,12 @@
 import type { CredentialBroker } from "../broker.js";
+import {
+  restoreCheckpoint,
+  saveCheckpoint,
+  type SavedCheckpoint,
+} from "../checkpoint.js";
 import type { RunnerClient } from "../runner-client.js";
 import type { RunnerGateway } from "../tunnel.js";
-import type { SessionRecord } from "../types.js";
+import type { RunningRecord, SessionRecord } from "../types.js";
 
 export interface RunnerAttachmentDependencies {
   gateway: RunnerGateway;
@@ -44,12 +49,7 @@ export class RunnerAttachment {
       if (health.sandboxId !== record.sandboxId) {
         throw new Error("runner identity changed");
       }
-      await this.deps.broker.refresh();
-      const credentials = await this.deps.broker.gitCredentials(
-        record.repositoryUrl,
-      );
-      await cached.setSecrets(this.deps.broker.secrets());
-      await cached.setGitCredentials(credentials);
+      await this.pushCredentials(cached, record.repositoryUrl);
       return cached;
     } catch {
       this.clients.delete(sessionId);
@@ -59,24 +59,67 @@ export class RunnerAttachment {
 
   /**
    * Attach the record's runner: wait for its registration, then push secrets
-   * and git credentials and run setup. Registers the client in the cache.
+   * and git credentials and run setup. With a checkpoint the sandbox is a
+   * fresh one replacing one that was released: after the usual clone and
+   * `.agents/setup`, the restore puts the session's commits and working tree
+   * back. Registers the client in the cache.
    */
   async attach(
-    record: SessionRecord,
+    record: RunningRecord,
     repositoryUrl: string,
+    checkpoint?: SavedCheckpoint,
   ): Promise<RunnerClient> {
     const client = await this.waitForRunner(record);
-    await client.setSecrets(this.deps.broker.secrets());
-    await client.setGitCredentials(
-      await this.deps.broker.gitCredentials(repositoryUrl),
-    );
+    await this.pushCredentials(client, repositoryUrl);
     await client.setup({
       repositoryUrl,
       revision: this.deps.revision,
       workspace: this.deps.workspace,
     });
+    if (checkpoint !== undefined) {
+      await restoreCheckpoint(
+        client,
+        this.deps.workspace,
+        checkpoint.checkpoint,
+        checkpoint.bundle,
+      );
+    }
     this.clients.set(record.sessionId, client);
     return client;
+  }
+
+  /**
+   * The record's runner, reconnecting when a host restart left no cached
+   * client. The caller has already confirmed the sandbox is alive. Registers
+   * the client in the cache.
+   */
+  async connect(record: RunningRecord): Promise<RunnerClient> {
+    let client = this.clients.get(record.sessionId);
+    if (client === undefined) {
+      client = await this.waitForRunner(record);
+      this.clients.set(record.sessionId, client);
+    }
+    return client;
+  }
+
+  /**
+   * Commit the session's working tree through the still-running runner and
+   * bring the commits the remote lacks back as a bundle.
+   */
+  async checkpoint(record: RunningRecord): Promise<SavedCheckpoint> {
+    const client = await this.connect(record);
+    return saveCheckpoint(client, this.deps.workspace);
+  }
+
+  private async pushCredentials(
+    client: RunnerClient,
+    repositoryUrl: string,
+  ): Promise<void> {
+    await this.deps.broker.refresh();
+    await client.setSecrets(this.deps.broker.secrets());
+    await client.setGitCredentials(
+      await this.deps.broker.gitCredentials(repositoryUrl),
+    );
   }
 
   /** Forget a session's runner handle. */
@@ -95,7 +138,9 @@ export class RunnerAttachment {
     this.drop(sandboxId);
   }
 
-  private async waitForRunner(record: SessionRecord): Promise<RunnerClient> {
+  private async waitForRunner(record: {
+    sandboxId: string;
+  }): Promise<RunnerClient> {
     const deadline = Date.now() + 60_000;
     let lastError: unknown;
     while (Date.now() < deadline) {

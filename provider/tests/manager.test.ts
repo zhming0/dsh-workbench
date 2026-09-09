@@ -186,9 +186,12 @@ describe("sandbox lifecycle", () => {
     expect(backend.hibernations).toBe(1);
     const store = new SessionStore(join(directory, "sessions.json"));
     await store.initialize();
-    expect(store.get("session-one")?.state).toBe("hibernated");
+    const hibernated = store.get("session-one");
+    expect(hibernated?.state).toBe("hibernated");
     // The expiry countdown only starts when hibernation happens.
-    expect(store.get("session-one")?.expiresAt).toBeDefined();
+    expect(
+      hibernated?.state !== "running" && hibernated?.expiresAt,
+    ).toBeTruthy();
 
     // Waking the hibernated session re-arms instead of running forever.
     await manager.ensureRunning(agent);

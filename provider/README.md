@@ -239,6 +239,56 @@ sessions readable, but they cannot wake until a profile with that name is
 restored on the same backend. A session whose pending choice was removed falls
 back to an error at its first prompt, asking the user to pick again.
 
+### Idle and hibernation
+
+After `idleMs` without a turn the session's sandbox is put away and the
+`expiresAfterMs` countdown starts. What "put away" means depends on the
+backend:
+
+- Docker and Kubernetes hibernate: compute stops, the workspace stays, and the
+  next prompt wakes the same sandbox.
+- A backend that cannot hibernate checkpoints instead. The manager commits the
+  Git working tree inside the sandbox (as `dsh <dsh@localhost>`, only if there
+  are changes), writes the commits that `origin`'s default branch does not
+  have to a Git bundle, stores that bundle under `stateDir/checkpoints/` on
+  the host, and then destroys the sandbox. Nothing is pushed. The next prompt
+  provisions a fresh sandbox, clones and runs `.agents/setup` as for a new
+  session, unpacks the bundle, checks the original branch out at the saved
+  commit, and undoes the checkpoint commit so the changes are uncommitted once
+  more. The bundle is deleted once the restore succeeds.
+
+A checkpoint keeps the checked-out branch, its commits (pushed or not), and
+every tracked or untracked file that is not ignored. It does not keep ignored
+files, installed packages, anything outside the repository, other local
+branches, stashes, or which changes were staged: everything comes back
+unstaged. A merge or rebase that was stopped on conflicts comes back as the
+conflicted files with their markers, no longer mid-merge. `.agents/setup` runs
+before the restore, on the configured revision, as it does for a new session.
+The model is not told the sandbox was replaced.
+
+The bundle lives in the host's state directory next to the credential store,
+with the same file permissions, so a checkpoint has the same exposure as a
+hibernated sandbox's disk and needs no write access to the repository. The
+bundle only carries commits the remote's default branch does not have; when
+the clone has no `origin/HEAD` it carries the whole history instead. A bundle
+over 64 MiB fails the checkpoint.
+
+If the save fails the sandbox stays up, the host logs a warning, and the idle
+timer retries after another `idleMs`. If the restore fails, the new sandbox is
+destroyed and the next prompt tries again from the same bundle; a bundle that
+was removed from the state directory produces an error on every prompt until
+the session is released. A session that expires while checkpointed loses its
+bundle with its record.
+
+The session record says "checkpointed" from the moment the bundle is on host
+disk until a fresh sandbox has been provisioned and restored. A host crash
+inside either window therefore keeps the work: the next prompt restores from
+the bundle. The cost is a sandbox the host no longer knows about, the one it
+was about to destroy or the one it was restoring into. Only the backend's own
+limits, such as a job timeout, reclaim it.
+
+No shipped backend checkpoints yet; Docker and Kubernetes both hibernate.
+
 ### Search
 
 `glob` and `grep` are the stock `@deepseek-ai/dsh-tool-fs-search` row, so
