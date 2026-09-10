@@ -189,7 +189,7 @@ Every setting, with its default, is in
 
 |                                               | Before                    | After                                  |
 | --------------------------------------------- | ------------------------- | -------------------------------------- |
-| `read`, `write`, `edit`, `str_replace_editor` | your disk                 | sandbox workspace                      |
+| `read`, `write`, `edit`, `present`            | your disk                 | sandbox workspace                      |
 | `bash`                                        | your machine              | sandbox                                |
 | `glob`, `grep`                                | ripgrep on your machine   | sandbox workspace, ripgrep in the sandbox |
 | Working directory                             | wherever you launched dsh | `/workspace/repository` in the sandbox |

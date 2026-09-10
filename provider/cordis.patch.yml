@@ -7,8 +7,8 @@
 # surface bundle put them: in the host plane for headless, behind agent presets
 # for web. That lets the stock agent compositions work unchanged.
 
-# The host filesystem provider, so `read`, `write`, `edit`, and
-# str_replace_editor address the session's sandbox workspace.
+# The host filesystem provider, so `read`, `write`, `edit`, and `present`
+# address the session's sandbox workspace.
 - id: fs-sandbox
   disabled: true
 
@@ -34,14 +34,51 @@
 # turn off. Both halves would mislead the model, whose paths are sandbox
 # paths, so the row goes. Nothing left enabled needs the service: the stock
 # tool rows only resolve `sandboxPolicy` when the fs or shell backend confines,
-# and the sandbox backends do not.
+# and the sandbox backends do not, and the Web rows that inject it are
+# disabled below.
 - id: sandbox-policy
+  disabled: true
+
+# The Web right sidebar's Files and Preview tabs, and the clickable file
+# references under each turn, read through `workspace-files`, which serves the
+# browser from plain HTTP requests outside any agent turn. This package's
+# filesystem finds a session's sandbox through the calling agent, so the stock
+# service fails on every request, and `ui-deliverables` also injects
+# `sandboxPolicy`, which is disabled above. The four rows go together: the
+# Web app serves a package's browser half only for a mounted row, so the two
+# tab rows cannot load their `workspace-files` client dependency once that
+# row is off. The sidebar surface itself (`ui-sidebar-right`) stays, because
+# the chat UI injects it; it renders no tabs. docs/plans/web-sidebar.md
+# records what running these against the sandbox takes. Web-only, like
+# directory-picker below.
+- id: workspace-files
+  disabled: true
+
+- id: ui-sidebar-files
+  disabled: true
+
+- id: ui-sidebar-documentpreview
+  disabled: true
+
+- id: ui-deliverables
   disabled: true
 
 # Replace the Web app's host-directory chooser with this package's repository
 # URL flow. This patch is skipped with a warning in profiles, such as headless,
 # where the Web-only row does not exist.
 - id: directory-picker
+  disabled: true
+
+# The Web header's "Open in..." button launches a desktop application on the
+# dsh host against the session cwd. Neither holds here: the host runs headless
+# and the cwd is the bookkeeping anchor, while the application probe would run
+# through the sandbox subprocess seam and report programs installed in the
+# sandbox. Both halves go: the browser half calls the host routes directly, so
+# it cannot stand without them. Web-only, like directory-picker.
+- id: open-in-app
+  disabled: true
+
+- id: ui-open-in-app
   disabled: true
 
 # The stock "@" file-discovery provider walks the session cwd on the host

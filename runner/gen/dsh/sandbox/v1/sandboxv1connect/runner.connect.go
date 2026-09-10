@@ -45,6 +45,9 @@ const (
 	RunnerServiceResolvePathProcedure = "/dsh.sandbox.v1.RunnerService/ResolvePath"
 	// RunnerServiceReadFileProcedure is the fully-qualified name of the RunnerService's ReadFile RPC.
 	RunnerServiceReadFileProcedure = "/dsh.sandbox.v1.RunnerService/ReadFile"
+	// RunnerServiceReadFileRangeProcedure is the fully-qualified name of the RunnerService's
+	// ReadFileRange RPC.
+	RunnerServiceReadFileRangeProcedure = "/dsh.sandbox.v1.RunnerService/ReadFileRange"
 	// RunnerServiceWriteFileProcedure is the fully-qualified name of the RunnerService's WriteFile RPC.
 	RunnerServiceWriteFileProcedure = "/dsh.sandbox.v1.RunnerService/WriteFile"
 	// RunnerServiceEditFileProcedure is the fully-qualified name of the RunnerService's EditFile RPC.
@@ -72,6 +75,7 @@ type RunnerServiceClient interface {
 	ResolveExecutable(context.Context, *connect.Request[v1.ResolveExecutableRequest]) (*connect.Response[v1.ResolveExecutableResponse], error)
 	ResolvePath(context.Context, *connect.Request[v1.ResolvePathRequest]) (*connect.Response[v1.ResolvePathResponse], error)
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
+	ReadFileRange(context.Context, *connect.Request[v1.ReadFileRangeRequest]) (*connect.Response[v1.ReadFileRangeResponse], error)
 	WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error)
 	EditFile(context.Context, *connect.Request[v1.EditFileRequest]) (*connect.Response[v1.EditFileResponse], error)
 	Stat(context.Context, *connect.Request[v1.StatRequest]) (*connect.Response[v1.StatResponse], error)
@@ -121,6 +125,12 @@ func NewRunnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+RunnerServiceReadFileProcedure,
 			connect.WithSchema(runnerServiceMethods.ByName("ReadFile")),
+			connect.WithClientOptions(opts...),
+		),
+		readFileRange: connect.NewClient[v1.ReadFileRangeRequest, v1.ReadFileRangeResponse](
+			httpClient,
+			baseURL+RunnerServiceReadFileRangeProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("ReadFileRange")),
 			connect.WithClientOptions(opts...),
 		),
 		writeFile: connect.NewClient[v1.WriteFileRequest, v1.WriteFileResponse](
@@ -181,6 +191,7 @@ type runnerServiceClient struct {
 	resolveExecutable *connect.Client[v1.ResolveExecutableRequest, v1.ResolveExecutableResponse]
 	resolvePath       *connect.Client[v1.ResolvePathRequest, v1.ResolvePathResponse]
 	readFile          *connect.Client[v1.ReadFileRequest, v1.ReadFileResponse]
+	readFileRange     *connect.Client[v1.ReadFileRangeRequest, v1.ReadFileRangeResponse]
 	writeFile         *connect.Client[v1.WriteFileRequest, v1.WriteFileResponse]
 	editFile          *connect.Client[v1.EditFileRequest, v1.EditFileResponse]
 	stat              *connect.Client[v1.StatRequest, v1.StatResponse]
@@ -214,6 +225,11 @@ func (c *runnerServiceClient) ResolvePath(ctx context.Context, req *connect.Requ
 // ReadFile calls dsh.sandbox.v1.RunnerService.ReadFile.
 func (c *runnerServiceClient) ReadFile(ctx context.Context, req *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
 	return c.readFile.CallUnary(ctx, req)
+}
+
+// ReadFileRange calls dsh.sandbox.v1.RunnerService.ReadFileRange.
+func (c *runnerServiceClient) ReadFileRange(ctx context.Context, req *connect.Request[v1.ReadFileRangeRequest]) (*connect.Response[v1.ReadFileRangeResponse], error) {
+	return c.readFileRange.CallUnary(ctx, req)
 }
 
 // WriteFile calls dsh.sandbox.v1.RunnerService.WriteFile.
@@ -263,6 +279,7 @@ type RunnerServiceHandler interface {
 	ResolveExecutable(context.Context, *connect.Request[v1.ResolveExecutableRequest]) (*connect.Response[v1.ResolveExecutableResponse], error)
 	ResolvePath(context.Context, *connect.Request[v1.ResolvePathRequest]) (*connect.Response[v1.ResolvePathResponse], error)
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
+	ReadFileRange(context.Context, *connect.Request[v1.ReadFileRangeRequest]) (*connect.Response[v1.ReadFileRangeResponse], error)
 	WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error)
 	EditFile(context.Context, *connect.Request[v1.EditFileRequest]) (*connect.Response[v1.EditFileResponse], error)
 	Stat(context.Context, *connect.Request[v1.StatRequest]) (*connect.Response[v1.StatResponse], error)
@@ -308,6 +325,12 @@ func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOp
 		RunnerServiceReadFileProcedure,
 		svc.ReadFile,
 		connect.WithSchema(runnerServiceMethods.ByName("ReadFile")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runnerServiceReadFileRangeHandler := connect.NewUnaryHandler(
+		RunnerServiceReadFileRangeProcedure,
+		svc.ReadFileRange,
+		connect.WithSchema(runnerServiceMethods.ByName("ReadFileRange")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runnerServiceWriteFileHandler := connect.NewUnaryHandler(
@@ -370,6 +393,8 @@ func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOp
 			runnerServiceResolvePathHandler.ServeHTTP(w, r)
 		case RunnerServiceReadFileProcedure:
 			runnerServiceReadFileHandler.ServeHTTP(w, r)
+		case RunnerServiceReadFileRangeProcedure:
+			runnerServiceReadFileRangeHandler.ServeHTTP(w, r)
 		case RunnerServiceWriteFileProcedure:
 			runnerServiceWriteFileHandler.ServeHTTP(w, r)
 		case RunnerServiceEditFileProcedure:
@@ -413,6 +438,10 @@ func (UnimplementedRunnerServiceHandler) ResolvePath(context.Context, *connect.R
 
 func (UnimplementedRunnerServiceHandler) ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dsh.sandbox.v1.RunnerService.ReadFile is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) ReadFileRange(context.Context, *connect.Request[v1.ReadFileRangeRequest]) (*connect.Response[v1.ReadFileRangeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dsh.sandbox.v1.RunnerService.ReadFileRange is not implemented"))
 }
 
 func (UnimplementedRunnerServiceHandler) WriteFile(context.Context, *connect.Request[v1.WriteFileRequest]) (*connect.Response[v1.WriteFileResponse], error) {

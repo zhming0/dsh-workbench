@@ -8,6 +8,7 @@ import {
   type EditFileRequest,
   type ExecRequest,
   type GitCredential,
+  type ReadFileRangeRequest,
   type ReadFileRequest,
   type ResolveExecutableRequest,
   type ResolvePathRequest,
@@ -48,6 +49,13 @@ export class RunnerClient {
 
   readFile(request: Omit<ReadFileRequest, "$typeName">, options?: CallOptions) {
     return this.client.readFile(request, options);
+  }
+
+  readFileRange(
+    request: Omit<ReadFileRangeRequest, "$typeName">,
+    options?: CallOptions,
+  ) {
+    return this.client.readFileRange(request, options);
   }
 
   writeFile(

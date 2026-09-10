@@ -73,7 +73,7 @@ checks the controller lifecycle against it. See
 ## Running from a checkout (laptop + Docker)
 
 Instead of the released images, a checkout installs into a dsh you run
-yourself. This needs `@deepseek-ai/dsh` 0.1.2-rc.1 on your PATH. Build first,
+yourself. This needs `@deepseek-ai/dsh` 0.1.5-rc.1 on your PATH. Build first,
 then install the provider directory:
 
 ```sh

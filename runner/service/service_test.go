@@ -86,6 +86,45 @@ func TestWriteGuardsAndEditAmbiguity(t *testing.T) {
 	}
 }
 
+func TestReadFileRangeWindows(t *testing.T) {
+	s := New("box")
+	p := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(p, []byte("0123456789"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	read := func(offset, length int64) string {
+		r, err := s.ReadFileRange(context.Background(), connect.NewRequest(&v1.ReadFileRangeRequest{Path: p, Offset: offset, Length: length}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(r.Msg.Content)
+	}
+	cases := []struct {
+		offset, length int64
+		want           string
+	}{
+		{0, 4, "0123"},
+		{3, 4, "3456"},
+		{7, 10, "789"}, // window crosses the end: shorter, not an error
+		{10, 4, ""},    // offset at the end
+		{12, 4, ""},    // offset past the end
+		{2, 0, ""},
+	}
+	for _, c := range cases {
+		if got := read(c.offset, c.length); got != c.want {
+			t.Errorf("range(%d, %d) = %q, want %q", c.offset, c.length, got, c.want)
+		}
+	}
+	_, err := s.ReadFileRange(context.Background(), connect.NewRequest(&v1.ReadFileRangeRequest{Path: p, Offset: -1, Length: 4}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("negative offset code = %v", connect.CodeOf(err))
+	}
+	_, err = s.ReadFileRange(context.Background(), connect.NewRequest(&v1.ReadFileRangeRequest{Path: p + ".missing", Offset: 0, Length: 4}))
+	if connect.CodeOf(err) != connect.CodeNotFound {
+		t.Fatalf("missing file code = %v", connect.CodeOf(err))
+	}
+}
+
 func TestSecretsReplaceAndSafeEnvironment(t *testing.T) {
 	t.Setenv("PROVIDER_PRIVATE_TOKEN", "must-not-leak")
 	s := New("box")

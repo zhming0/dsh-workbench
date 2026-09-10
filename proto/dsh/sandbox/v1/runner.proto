@@ -10,6 +10,7 @@ service RunnerService {
   rpc ResolveExecutable(ResolveExecutableRequest) returns (ResolveExecutableResponse);
   rpc ResolvePath(ResolvePathRequest) returns (ResolvePathResponse);
   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  rpc ReadFileRange(ReadFileRangeRequest) returns (ReadFileRangeResponse);
   rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
   rpc EditFile(EditFileRequest) returns (EditFileResponse);
   rpc Stat(StatRequest) returns (StatResponse);
@@ -77,6 +78,20 @@ message ReadFileRequest {
 }
 
 message ReadFileResponse {
+  bytes content = 1;
+}
+
+// One byte window of a regular file. Unlike ReadFile, a file larger than the
+// window is not an error: the runner reads at most `length` bytes starting at
+// `offset`, fewer when the file ends inside the window and none at or past its
+// end.
+message ReadFileRangeRequest {
+  string path = 1;
+  int64 offset = 2;
+  int64 length = 3;
+}
+
+message ReadFileRangeResponse {
   bytes content = 1;
 }
 

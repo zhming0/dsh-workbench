@@ -16,7 +16,7 @@ const run = promisify(execFile);
 
 /**
  * The packages that compose the host-only prompt paragraphs. Verified at
- * 0.1.2-rc.1: addHarnessSourceSection in dsh-app-boot writes the checkout
+ * 0.1.5-rc.1: addHarnessSourceSection in dsh-app-boot writes the checkout
  * paragraph, webSurfacePrompt in dsh-web-app writes the GUI paragraph. If a
  * later dsh moves the composition elsewhere, this list is what to update.
  */

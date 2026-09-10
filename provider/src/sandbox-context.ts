@@ -40,7 +40,7 @@ export const SANDBOX_ENVIRONMENT_PROMPT =
 
 /**
  * Fragments that identify dsh's host-only prompt sections (observed in
- * 0.1.2-rc.1): the implementation-checkout paragraph and the Web GUI
+ * 0.1.5-rc.1): the implementation-checkout paragraph and the Web GUI
  * paragraph. Deliberately narrow, so only sections making those claims are
  * dropped.
  */
@@ -92,7 +92,7 @@ export function installSandboxContext(
 ): void {
   systemPrompt.section({
     name: SANDBOX_ENVIRONMENT_SECTION,
-    order: systemPrompt.getSectionOrder("DEPLOYMENT_PERSONA"),
+    order: systemPrompt.getSectionOrder("DEPLOYMENT_PERSONA_PREFIX"),
     text: SANDBOX_ENVIRONMENT_PROMPT,
   });
   systemPrompt.variable("cwd", () => workspace());
