@@ -26,6 +26,8 @@ import {
 import { InstructionStore } from "../instruction-store.js";
 import type { InstructionSettingsView } from "../instructions-remote.js";
 import { ManagedInstructions } from "../managed-instructions.js";
+import type { PresentedImageBytes } from "../media-remote.js";
+import { readPresentedImage } from "../presented-image.js";
 import { workbenchHost } from "../remote-contributions.js";
 import type { RunnerClient } from "../runner-client.js";
 import type { SessionProfileView } from "../session-profile-remote.js";
@@ -348,6 +350,34 @@ export class SandboxManager extends TypertRemoteService {
   ): Promise<SessionProfileView> {
     await this.ready;
     return this.profileChoice.set(sessionId, profile);
+  }
+
+  /**
+   * Read one image the model declared with `present` for the chat's inline
+   * preview. A browser request carries no agent, so the session's live agent is
+   * resolved from the id and the read runs inside its initiator scope, which is
+   * what lets the filesystem provider pick the runner. A session with no live
+   * agent answers with an error rather than provisioning or waking a sandbox
+   * for a preview.
+   */
+  async readImage(
+    sessionId: string,
+    path: string,
+  ): Promise<PresentedImageBytes> {
+    await this.ready;
+    const agent = this.agentLookup(sessionId);
+    if (agent === undefined) {
+      throw new Error(
+        `cannot preview "${path}": session ${sessionId} is not live`,
+      );
+    }
+    const fs = this.ctx.get("fs");
+    if (fs === undefined) {
+      throw new Error("cannot preview: the filesystem service is unavailable");
+    }
+    return this.ctx.agents.withInitiator(agent, () =>
+      readPresentedImage(fs, path, agent.session.header.cwd),
+    );
   }
 
   /**

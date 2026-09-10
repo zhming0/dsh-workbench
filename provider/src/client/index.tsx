@@ -7,7 +7,12 @@ import type { RemoteResult } from "@deepseek-ai/dsh-typert-protocol";
 
 import { workbenchRemote } from "../remote-contributions.js";
 import { InstructionsSettings } from "./instructions.js";
+import { PresentedImages } from "./media.js";
 import { SandboxProfileChip } from "./profile.js";
+import {
+  presentedImagesDefinition,
+  selectPresentedImages,
+} from "./presented-images.js";
 import { RepositoryDirectoryFlow } from "./repository-directory-flow.js";
 import { SecretsSettings } from "./secrets.js";
 
@@ -106,6 +111,35 @@ export async function apply(ctx: Context) {
           SandboxProfileChip,
         );
       },
+    );
+  });
+
+  ctx.inject(["uiConversation"], (uiCtx) => {
+    uiCtx.uiConversation.events.register(presentedImagesDefinition);
+  });
+
+  ctx.inject(["remote.sandboxManager"], (remoteCtx) => {
+    const readImage = async (sessionId: string, path: string) => {
+      const result = await remoteCtx.remote.sandboxManager.readImage(
+        sessionId,
+        path,
+      );
+      if (!result.ok) {
+        throw new Error(result.error.message);
+      }
+      return result.value;
+    };
+    const injected = () => ({ readImage });
+
+    remoteCtx.slots.inject("conversation.chat.turnTail", () =>
+      remoteCtx.slots.register(
+        {
+          name: "conversation.chat.turnTail",
+          select: selectPresentedImages,
+          inject: injected,
+        },
+        PresentedImages,
+      ),
     );
   });
 

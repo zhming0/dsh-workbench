@@ -12,6 +12,12 @@ is worth today: it shows the same files GitHub shows once the agent pushes,
 and the part a user cannot get from GitHub — unpushed work in progress — is
 readable by asking the model.
 
+One piece of that surface is not waiting for this plan: the chat renders an
+inline preview for image files the model declares with `present`
+(`provider/src/presented-images.ts` and the `presented-image` half of the
+provider), so a picture shows up in the conversation without any tab. This
+plan covers the sidebar's own Files, Preview, and file-reference rows.
+
 Revisit when the sidebar carries something the sandbox alone can give: a
 terminal tab, a browser preview of a port inside the sandbox, or a workflow
 where people review unpushed deliverables in dsh rather than on GitHub. Neither

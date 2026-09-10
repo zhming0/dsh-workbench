@@ -30,13 +30,14 @@ export const SANDBOX_ENVIRONMENT_SECTION = "environment:sandbox";
 
 /**
  * The environment section text. `{{cwd}}` renders the sandbox workspace
- * through the shadowed prompt variable. The last sentence carries the
- * "this page means the GUI" mapping from the Web GUI paragraph dsh composes:
- * that mapping stays true for a sandboxed session even though the URL does
- * not, so dropping the paragraph must not lose it.
+ * through the shadowed prompt variable. The last two sentences carry the
+ * "this page means the GUI" mapping from the Web GUI paragraph dsh composes
+ * and the one way a sandboxed session can put a picture in the chat: that
+ * mapping stays true for a sandboxed session even though the URL does not, so
+ * dropping the paragraph must not lose it.
  */
 export const SANDBOX_ENVIRONMENT_PROMPT =
-  'You are working inside an isolated sandbox: file and shell tools resolve paths inside this sandbox, and the repository checkout is mounted at {{cwd}}. There is no DeepSeek Harness source checkout inside the sandbox; the DeepSeek Harness web UI runs on the host machine and is unreachable from here. When the user says "this page", "this GUI", or "this app", they mean that web UI.';
+  'You are working inside an isolated sandbox: file and shell tools resolve paths inside this sandbox, and the repository checkout is mounted at {{cwd}}. There is no DeepSeek Harness source checkout inside the sandbox; the DeepSeek Harness web UI runs on the host machine and is unreachable from here. When the user says "this page", "this GUI", or "this app", they mean that web UI. To show the user a picture, call `present` with the image file path: the chat renders an inline preview for image files declared that way, while a Markdown image link to a sandbox path does not render.';
 
 /**
  * Fragments that identify dsh's host-only prompt sections (observed in

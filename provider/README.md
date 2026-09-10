@@ -103,6 +103,16 @@ UI depends on it, and renders no tabs.
 [`docs/plans/web-sidebar.md`](../docs/plans/web-sidebar.md) records what
 running them against the sandbox takes, for when the sidebar earns it.
 
+Images do reach the chat, without that sidebar. The bundle's browser half
+folds the `deliverables/presented` events the `present` tool appends and
+renders an inline preview where the turn ends, so a picture the model declares
+with `present` shows up in the conversation. The bytes arrive over a
+session-addressed `readImage` Remote, which resolves the session's live agent
+and reads through the filesystem inside that agent's initiator scope — the
+same trick the deferred sidebar work uses. A session with no live agent shows
+the file name instead of waking a sandbox for a preview, and files above 8 MiB
+are never previewed.
+
 The header's **Open in...** button (`open-in-app`, `ui-open-in-app`) is also
 off: it launches a desktop application on the host against the session `cwd`.
 That `cwd` is the anchor, and the application probe would run through the
