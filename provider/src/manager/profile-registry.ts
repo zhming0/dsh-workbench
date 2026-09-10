@@ -1,3 +1,4 @@
+import { BuildkiteBackend } from "../backends/buildkite.js";
 import { DockerBackend } from "../backends/docker.js";
 import { KasBackend } from "../backends/kas.js";
 import type {
@@ -67,6 +68,23 @@ function createBackend(
       registrationToken: registrationToken as string,
     });
   }
+  if (profile.backend === "buildkite") {
+    // The token is ambient to the host process, like the Kubernetes backend's
+    // ServiceAccount. It is not a broker secret: it must never reach a runner.
+    const token = process.env[profile.tokenEnv];
+    if (token === undefined || token.trim() === "") {
+      throw new Error(
+        `profile ${profile.name} needs a Buildkite API token in ${profile.tokenEnv}`,
+      );
+    }
+    const {
+      name: _name,
+      backend: _backend,
+      tokenEnv: _env,
+      ...options
+    } = profile;
+    return new BuildkiteBackend({ ...options, token: token.trim() });
+  }
   const { name: _name, backend: _backend, ...options } = profile;
   return new KasBackend(options);
 }
@@ -74,3 +92,6 @@ function createBackend(
 function orphanedRecordMessage(record: SessionRecord): string {
   return `session ${record.sessionId} has a ${record.backend} sandbox from profile ${record.profile}, which is no longer configured on that backend`;
 }
+
+/** Internals the test suite reaches into. */
+export const testing = { createBackend };

@@ -8,6 +8,11 @@ import z from "@deepseek-ai/schemastery";
 import { DEFAULT_RUNNER_IMAGE } from "./runner-image.js";
 import type { SandboxProfile } from "./types.js";
 
+// Queue wait is the unknown here: a hosted queue dispatches in seconds, a
+// self-hosted one may be busy.
+export const DEFAULT_BUILDKITE_READY_TIMEOUT_MS = 10 * 60_000;
+export const DEFAULT_BUILDKITE_TOKEN_ENV = "BUILDKITE_API_TOKEN";
+
 /** A profile as written in the settings file: a backend plus its settings. */
 export type ProfileConfig =
   | {
@@ -22,6 +27,15 @@ export type ProfileConfig =
       warmPool?: string;
       readyTimeoutMs?: number;
       kubeconfig?: string;
+    }
+  | {
+      backend: "buildkite";
+      organization: string;
+      pipeline: string;
+      hostUrl: string;
+      image?: string;
+      readyTimeoutMs?: number;
+      tokenEnv?: string;
     };
 
 export interface Config {
@@ -75,6 +89,18 @@ export const configSchema: Schemastery<Config> = z.object({
           warmPool: z.string().default("dsh-universal"),
           readyTimeoutMs: z.number().min(1).default(180_000),
           kubeconfig: z.string(),
+        }),
+        z.object({
+          backend: z.const("buildkite").required(),
+          organization: z.string().required(),
+          pipeline: z.string().required(),
+          hostUrl: z.string().required(),
+          image: z.string().default(DEFAULT_RUNNER_IMAGE),
+          readyTimeoutMs: z
+            .number()
+            .min(1)
+            .default(DEFAULT_BUILDKITE_READY_TIMEOUT_MS),
+          tokenEnv: z.string().default(DEFAULT_BUILDKITE_TOKEN_ENV),
         }),
       ]),
     )
@@ -166,6 +192,19 @@ function resolveProfile(
       // host-gateway resolves the Docker host from inside a container on
       // every Docker platform, so runners reach the host tunnel by default.
       hostUrl: profile.hostUrl ?? `tcp://host.docker.internal:${tunnelPort}`,
+    };
+  }
+  if (profile.backend === "buildkite") {
+    return {
+      name,
+      backend: "buildkite",
+      organization: profile.organization,
+      pipeline: profile.pipeline,
+      image: profile.image ?? DEFAULT_RUNNER_IMAGE,
+      hostUrl: profile.hostUrl,
+      readyTimeoutMs:
+        profile.readyTimeoutMs ?? DEFAULT_BUILDKITE_READY_TIMEOUT_MS,
+      tokenEnv: profile.tokenEnv ?? DEFAULT_BUILDKITE_TOKEN_ENV,
     };
   }
   return {
