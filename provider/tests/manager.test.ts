@@ -38,7 +38,10 @@ describe("sandbox lifecycle", () => {
         profiles: { standard: { backend: "docker" } },
         stateDir: directory,
         repository: "https://github.com/example/public.git",
-        idleMs: 10,
+        // Idling is not this test's subject, and it asserts exact provision
+        // and wake counts around real broker file I/O: a 10ms window let the
+        // idle policy hibernate mid-test, which added a second wake.
+        idleMs: 60_000,
         expiresAfterMs: 60_000,
       },
       { backends: { standard: backend }, gateway: gatewayFor(backend) },
@@ -468,7 +471,9 @@ describe("archive release", () => {
       profiles: { standard: { backend: "docker" as const } },
       stateDir: directory,
       repository: "https://github.com/example/public.git",
-      idleMs: 10,
+      // Keep the idle policy out of the way: with a short window it could
+      // hibernate before the archive reconcile this suite asserts on.
+      idleMs: 60_000,
       expiresAfterMs: 60_000,
     };
   }
