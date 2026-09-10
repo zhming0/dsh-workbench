@@ -168,6 +168,27 @@ export class SandboxFileSystem extends FileSystem {
     }
   }
 
+  async readByteRange(
+    target: FsTarget,
+    range: { offset: number; length: number },
+    signal?: AbortSignal,
+  ): Promise<Uint8Array> {
+    try {
+      const client = await this.ctx.sandboxManager.clientForCurrentAgent();
+      const result = await client.readFileRange(
+        {
+          path: this.processPath(target),
+          offset: BigInt(range.offset),
+          length: BigInt(range.length),
+        },
+        signalOptions(signal),
+      );
+      return result.content;
+    } catch (error) {
+      throw mapFileError(error, "read", target.displayPath, signal);
+    }
+  }
+
   async listDir(target: FsTarget, signal?: AbortSignal): Promise<FsDirEntry[]> {
     try {
       const client = await this.ctx.sandboxManager.clientForCurrentAgent();

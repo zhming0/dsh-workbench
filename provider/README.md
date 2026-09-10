@@ -92,6 +92,22 @@ its host anchor path, which does not exist inside the sandbox; the model only
 ever needs sandbox paths, and it finds its working directory the way any shell
 user does.
 
+Three Web features stay off. The right sidebar's **Files** and **Preview**
+tabs and the clickable file references under each turn (`workspace-files`,
+`ui-sidebar-files`, `ui-sidebar-documentpreview`, `ui-deliverables`) read the
+session workspace through dsh's filesystem service from plain browser
+requests, outside any agent turn, and this package's filesystem finds a
+session's sandbox through the agent that is asking, so they cannot reach the
+sandbox as shipped. The right sidebar itself stays mounted, because the chat
+UI depends on it, and renders no tabs.
+[`docs/plans/web-sidebar.md`](../docs/plans/web-sidebar.md) records what
+running them against the sandbox takes, for when the sidebar earns it.
+
+The header's **Open in...** button (`open-in-app`, `ui-open-in-app`) is also
+off: it launches a desktop application on the host against the session `cwd`.
+That `cwd` is the anchor, and the application probe would run through the
+sandbox subprocess seam and report programs installed in the sandbox.
+
 The bundle also corrects the model-facing system prompt. dsh's stock opener
 names the session working directory in host coordinates — the anchor directory
 above — and adds paragraphs about the host's dsh implementation checkout and

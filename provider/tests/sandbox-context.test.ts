@@ -199,7 +199,8 @@ describe("against the pinned dsh-system-prompt service", () => {
     const systemPrompt = new SystemPrompt(ctx, {
       includeHarnessIdentity: true,
       includeRuntimeContext: true,
-      persona: PERSONA_SECTION,
+      personaPrefix: PERSONA_SECTION,
+      personaSuffix: "Your working directory is {{cwd}}.",
     });
     systemPrompt.section({
       name: "harness:source",
@@ -215,14 +216,16 @@ describe("against the pinned dsh-system-prompt service", () => {
     const assembly = await systemPrompt.assemble({});
     expect(assembly.sections.map((section) => section.name)).toEqual([
       "harness:identity",
+      "deployment:persona-prefix",
       "harness:source",
       "web:surface",
-      "deployment:persona",
+      "deployment:persona-suffix",
     ]);
     expect(dropHostOnlySections(assembly.sections)).toBe(2);
     expect(assembly.sections.map((section) => section.name)).toEqual([
       "harness:identity",
-      "deployment:persona",
+      "deployment:persona-prefix",
+      "deployment:persona-suffix",
     ]);
   });
 });

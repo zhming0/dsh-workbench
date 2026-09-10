@@ -337,6 +337,27 @@ func (s *Service) ReadFile(_ context.Context, request *connect.Request[v1.ReadFi
 	}
 	return connect.NewResponse(&v1.ReadFileResponse{Content: content}), nil
 }
+
+// ReadFileRange returns the bytes at [offset, offset+length): shorter when the
+// file ends inside the window, empty at or past its end. The window is the
+// bound, so a large file is never buffered; the caller caps length.
+func (s *Service) ReadFileRange(_ context.Context, request *connect.Request[v1.ReadFileRangeRequest]) (*connect.Response[v1.ReadFileRangeResponse], error) {
+	offset, length := request.Msg.Offset, request.Msg.Length
+	if offset < 0 || length < 0 {
+		return nil, cerr(connect.CodeInvalidArgument, errors.New("offset and length must be non-negative"))
+	}
+	file, err := os.Open(request.Msg.Path)
+	if err != nil {
+		return nil, cerr(connect.CodeNotFound, err)
+	}
+	defer func() { _ = file.Close() }()
+	content, err := io.ReadAll(io.NewSectionReader(file, offset, length))
+	if err != nil {
+		return nil, cerr(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&v1.ReadFileRangeResponse{Content: content}), nil
+}
+
 func atomicWrite(path string, content []byte, mode os.FileMode) error {
 	directory := filepath.Dir(path)
 	file, err := os.CreateTemp(directory, ".dsh-write-")

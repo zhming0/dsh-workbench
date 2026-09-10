@@ -738,6 +738,114 @@ func (x *ReadFileResponse) GetContent() []byte {
 	return nil
 }
 
+// One byte window of a regular file. Unlike ReadFile, a file larger than the
+// window is not an error: the runner reads at most `length` bytes starting at
+// `offset`, fewer when the file ends inside the window and none at or past its
+// end.
+type ReadFileRangeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Offset        int64                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	Length        int64                  `protobuf:"varint,3,opt,name=length,proto3" json:"length,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadFileRangeRequest) Reset() {
+	*x = ReadFileRangeRequest{}
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadFileRangeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadFileRangeRequest) ProtoMessage() {}
+
+func (x *ReadFileRangeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadFileRangeRequest.ProtoReflect.Descriptor instead.
+func (*ReadFileRangeRequest) Descriptor() ([]byte, []int) {
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ReadFileRangeRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *ReadFileRangeRequest) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *ReadFileRangeRequest) GetLength() int64 {
+	if x != nil {
+		return x.Length
+	}
+	return 0
+}
+
+type ReadFileRangeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Content       []byte                 `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadFileRangeResponse) Reset() {
+	*x = ReadFileRangeResponse{}
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadFileRangeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadFileRangeResponse) ProtoMessage() {}
+
+func (x *ReadFileRangeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadFileRangeResponse.ProtoReflect.Descriptor instead.
+func (*ReadFileRangeResponse) Descriptor() ([]byte, []int) {
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ReadFileRangeResponse) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
 type WriteFileRequest struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Path    string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
@@ -753,7 +861,7 @@ type WriteFileRequest struct {
 
 func (x *WriteFileRequest) Reset() {
 	*x = WriteFileRequest{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[12]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -765,7 +873,7 @@ func (x *WriteFileRequest) String() string {
 func (*WriteFileRequest) ProtoMessage() {}
 
 func (x *WriteFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[12]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -778,7 +886,7 @@ func (x *WriteFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteFileRequest.ProtoReflect.Descriptor instead.
 func (*WriteFileRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{12}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *WriteFileRequest) GetPath() string {
@@ -848,7 +956,7 @@ type WriteFileResponse struct {
 
 func (x *WriteFileResponse) Reset() {
 	*x = WriteFileResponse{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[13]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -860,7 +968,7 @@ func (x *WriteFileResponse) String() string {
 func (*WriteFileResponse) ProtoMessage() {}
 
 func (x *WriteFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[13]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -873,7 +981,7 @@ func (x *WriteFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteFileResponse.ProtoReflect.Descriptor instead.
 func (*WriteFileResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{13}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *WriteFileResponse) GetCreated() bool {
@@ -917,7 +1025,7 @@ type EditFileRequest struct {
 
 func (x *EditFileRequest) Reset() {
 	*x = EditFileRequest{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[14]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -929,7 +1037,7 @@ func (x *EditFileRequest) String() string {
 func (*EditFileRequest) ProtoMessage() {}
 
 func (x *EditFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[14]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -942,7 +1050,7 @@ func (x *EditFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditFileRequest.ProtoReflect.Descriptor instead.
 func (*EditFileRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{14}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *EditFileRequest) GetPath() string {
@@ -991,7 +1099,7 @@ type EditFileResponse struct {
 
 func (x *EditFileResponse) Reset() {
 	*x = EditFileResponse{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[15]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1003,7 +1111,7 @@ func (x *EditFileResponse) String() string {
 func (*EditFileResponse) ProtoMessage() {}
 
 func (x *EditFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[15]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1016,7 +1124,7 @@ func (x *EditFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditFileResponse.ProtoReflect.Descriptor instead.
 func (*EditFileResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{15}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *EditFileResponse) GetBefore() []byte {
@@ -1050,7 +1158,7 @@ type StatRequest struct {
 
 func (x *StatRequest) Reset() {
 	*x = StatRequest{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[16]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1062,7 +1170,7 @@ func (x *StatRequest) String() string {
 func (*StatRequest) ProtoMessage() {}
 
 func (x *StatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[16]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1075,7 +1183,7 @@ func (x *StatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatRequest.ProtoReflect.Descriptor instead.
 func (*StatRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{16}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StatRequest) GetPath() string {
@@ -1104,7 +1212,7 @@ type StatResponse struct {
 
 func (x *StatResponse) Reset() {
 	*x = StatResponse{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[17]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1116,7 +1224,7 @@ func (x *StatResponse) String() string {
 func (*StatResponse) ProtoMessage() {}
 
 func (x *StatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[17]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1129,7 +1237,7 @@ func (x *StatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatResponse.ProtoReflect.Descriptor instead.
 func (*StatResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{17}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *StatResponse) GetExists() bool {
@@ -1169,7 +1277,7 @@ type ListRequest struct {
 
 func (x *ListRequest) Reset() {
 	*x = ListRequest{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[18]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1181,7 +1289,7 @@ func (x *ListRequest) String() string {
 func (*ListRequest) ProtoMessage() {}
 
 func (x *ListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[18]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1194,7 +1302,7 @@ func (x *ListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRequest.ProtoReflect.Descriptor instead.
 func (*ListRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{18}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListRequest) GetPath() string {
@@ -1217,7 +1325,7 @@ type ListEntry struct {
 
 func (x *ListEntry) Reset() {
 	*x = ListEntry{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[19]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1229,7 +1337,7 @@ func (x *ListEntry) String() string {
 func (*ListEntry) ProtoMessage() {}
 
 func (x *ListEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[19]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1242,7 +1350,7 @@ func (x *ListEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEntry.ProtoReflect.Descriptor instead.
 func (*ListEntry) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{19}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListEntry) GetName() string {
@@ -1289,7 +1397,7 @@ type ListResponse struct {
 
 func (x *ListResponse) Reset() {
 	*x = ListResponse{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[20]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1301,7 +1409,7 @@ func (x *ListResponse) String() string {
 func (*ListResponse) ProtoMessage() {}
 
 func (x *ListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[20]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1314,7 +1422,7 @@ func (x *ListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListResponse.ProtoReflect.Descriptor instead.
 func (*ListResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{20}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ListResponse) GetEntries() []*ListEntry {
@@ -1340,7 +1448,7 @@ type TreeRequest struct {
 
 func (x *TreeRequest) Reset() {
 	*x = TreeRequest{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[21]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1352,7 +1460,7 @@ func (x *TreeRequest) String() string {
 func (*TreeRequest) ProtoMessage() {}
 
 func (x *TreeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[21]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1365,7 +1473,7 @@ func (x *TreeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TreeRequest.ProtoReflect.Descriptor instead.
 func (*TreeRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{21}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *TreeRequest) GetPath() string {
@@ -1400,7 +1508,7 @@ type TreeEntry struct {
 
 func (x *TreeEntry) Reset() {
 	*x = TreeEntry{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[22]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1412,7 +1520,7 @@ func (x *TreeEntry) String() string {
 func (*TreeEntry) ProtoMessage() {}
 
 func (x *TreeEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[22]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1425,7 +1533,7 @@ func (x *TreeEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TreeEntry.ProtoReflect.Descriptor instead.
 func (*TreeEntry) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{22}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *TreeEntry) GetRelativePath() string {
@@ -1453,7 +1561,7 @@ type TreeResponse struct {
 
 func (x *TreeResponse) Reset() {
 	*x = TreeResponse{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[23]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1465,7 +1573,7 @@ func (x *TreeResponse) String() string {
 func (*TreeResponse) ProtoMessage() {}
 
 func (x *TreeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[23]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1478,7 +1586,7 @@ func (x *TreeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TreeResponse.ProtoReflect.Descriptor instead.
 func (*TreeResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{23}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *TreeResponse) GetEntries() []*TreeEntry {
@@ -1504,7 +1612,7 @@ type SetSecretsRequest struct {
 
 func (x *SetSecretsRequest) Reset() {
 	*x = SetSecretsRequest{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[24]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1516,7 +1624,7 @@ func (x *SetSecretsRequest) String() string {
 func (*SetSecretsRequest) ProtoMessage() {}
 
 func (x *SetSecretsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[24]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1529,7 +1637,7 @@ func (x *SetSecretsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSecretsRequest.ProtoReflect.Descriptor instead.
 func (*SetSecretsRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{24}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SetSecretsRequest) GetSecrets() map[string]string {
@@ -1547,7 +1655,7 @@ type SetSecretsResponse struct {
 
 func (x *SetSecretsResponse) Reset() {
 	*x = SetSecretsResponse{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[25]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1559,7 +1667,7 @@ func (x *SetSecretsResponse) String() string {
 func (*SetSecretsResponse) ProtoMessage() {}
 
 func (x *SetSecretsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[25]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1572,7 +1680,7 @@ func (x *SetSecretsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSecretsResponse.ProtoReflect.Descriptor instead.
 func (*SetSecretsResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{25}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{27}
 }
 
 type GitCredential struct {
@@ -1586,7 +1694,7 @@ type GitCredential struct {
 
 func (x *GitCredential) Reset() {
 	*x = GitCredential{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[26]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1598,7 +1706,7 @@ func (x *GitCredential) String() string {
 func (*GitCredential) ProtoMessage() {}
 
 func (x *GitCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[26]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1611,7 +1719,7 @@ func (x *GitCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitCredential.ProtoReflect.Descriptor instead.
 func (*GitCredential) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{26}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GitCredential) GetHost() string {
@@ -1644,7 +1752,7 @@ type SetGitCredentialsRequest struct {
 
 func (x *SetGitCredentialsRequest) Reset() {
 	*x = SetGitCredentialsRequest{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[27]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1656,7 +1764,7 @@ func (x *SetGitCredentialsRequest) String() string {
 func (*SetGitCredentialsRequest) ProtoMessage() {}
 
 func (x *SetGitCredentialsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[27]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1669,7 +1777,7 @@ func (x *SetGitCredentialsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGitCredentialsRequest.ProtoReflect.Descriptor instead.
 func (*SetGitCredentialsRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{27}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *SetGitCredentialsRequest) GetCredentials() []*GitCredential {
@@ -1687,7 +1795,7 @@ type SetGitCredentialsResponse struct {
 
 func (x *SetGitCredentialsResponse) Reset() {
 	*x = SetGitCredentialsResponse{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[28]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1699,7 +1807,7 @@ func (x *SetGitCredentialsResponse) String() string {
 func (*SetGitCredentialsResponse) ProtoMessage() {}
 
 func (x *SetGitCredentialsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[28]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1712,7 +1820,7 @@ func (x *SetGitCredentialsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGitCredentialsResponse.ProtoReflect.Descriptor instead.
 func (*SetGitCredentialsResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{28}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{30}
 }
 
 type SetupRequest struct {
@@ -1726,7 +1834,7 @@ type SetupRequest struct {
 
 func (x *SetupRequest) Reset() {
 	*x = SetupRequest{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[29]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1738,7 +1846,7 @@ func (x *SetupRequest) String() string {
 func (*SetupRequest) ProtoMessage() {}
 
 func (x *SetupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[29]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1751,7 +1859,7 @@ func (x *SetupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupRequest.ProtoReflect.Descriptor instead.
 func (*SetupRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{29}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SetupRequest) GetRepositoryUrl() string {
@@ -1784,7 +1892,7 @@ type SetupResponse struct {
 
 func (x *SetupResponse) Reset() {
 	*x = SetupResponse{}
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[30]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1796,7 +1904,7 @@ func (x *SetupResponse) String() string {
 func (*SetupResponse) ProtoMessage() {}
 
 func (x *SetupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[30]
+	mi := &file_dsh_sandbox_v1_runner_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1809,7 +1917,7 @@ func (x *SetupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupResponse.ProtoReflect.Descriptor instead.
 func (*SetupResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{30}
+	return file_dsh_sandbox_v1_runner_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *SetupResponse) GetRan() bool {
@@ -1867,6 +1975,12 @@ const file_dsh_sandbox_v1_runner_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1b\n" +
 	"\tmax_bytes\x18\x02 \x01(\x03R\bmaxBytes\",\n" +
 	"\x10ReadFileResponse\x12\x18\n" +
+	"\acontent\x18\x01 \x01(\fR\acontent\"Z\n" +
+	"\x14ReadFileRangeRequest\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x03R\x06offset\x12\x16\n" +
+	"\x06length\x18\x03 \x01(\x03R\x06length\"1\n" +
+	"\x15ReadFileRangeResponse\x12\x18\n" +
 	"\acontent\x18\x01 \x01(\fR\acontent\"\xa2\x01\n" +
 	"\x10WriteFileRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
@@ -1946,13 +2060,14 @@ const file_dsh_sandbox_v1_runner_proto_rawDesc = "" +
 	"\x11FILE_TYPE_REGULAR\x10\x01\x12\x17\n" +
 	"\x13FILE_TYPE_DIRECTORY\x10\x02\x12\x15\n" +
 	"\x11FILE_TYPE_SYMLINK\x10\x03\x12\x13\n" +
-	"\x0fFILE_TYPE_OTHER\x10\x042\x9d\b\n" +
+	"\x0fFILE_TYPE_OTHER\x10\x042\xfb\b\n" +
 	"\rRunnerService\x12G\n" +
 	"\x06Health\x12\x1d.dsh.sandbox.v1.HealthRequest\x1a\x1e.dsh.sandbox.v1.HealthResponse\x12C\n" +
 	"\x04Exec\x12\x1b.dsh.sandbox.v1.ExecRequest\x1a\x1c.dsh.sandbox.v1.ExecResponse0\x01\x12h\n" +
 	"\x11ResolveExecutable\x12(.dsh.sandbox.v1.ResolveExecutableRequest\x1a).dsh.sandbox.v1.ResolveExecutableResponse\x12V\n" +
 	"\vResolvePath\x12\".dsh.sandbox.v1.ResolvePathRequest\x1a#.dsh.sandbox.v1.ResolvePathResponse\x12M\n" +
-	"\bReadFile\x12\x1f.dsh.sandbox.v1.ReadFileRequest\x1a .dsh.sandbox.v1.ReadFileResponse\x12P\n" +
+	"\bReadFile\x12\x1f.dsh.sandbox.v1.ReadFileRequest\x1a .dsh.sandbox.v1.ReadFileResponse\x12\\\n" +
+	"\rReadFileRange\x12$.dsh.sandbox.v1.ReadFileRangeRequest\x1a%.dsh.sandbox.v1.ReadFileRangeResponse\x12P\n" +
 	"\tWriteFile\x12 .dsh.sandbox.v1.WriteFileRequest\x1a!.dsh.sandbox.v1.WriteFileResponse\x12M\n" +
 	"\bEditFile\x12\x1f.dsh.sandbox.v1.EditFileRequest\x1a .dsh.sandbox.v1.EditFileResponse\x12A\n" +
 	"\x04Stat\x12\x1b.dsh.sandbox.v1.StatRequest\x1a\x1c.dsh.sandbox.v1.StatResponse\x12A\n" +
@@ -1976,7 +2091,7 @@ func file_dsh_sandbox_v1_runner_proto_rawDescGZIP() []byte {
 }
 
 var file_dsh_sandbox_v1_runner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_dsh_sandbox_v1_runner_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_dsh_sandbox_v1_runner_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_dsh_sandbox_v1_runner_proto_goTypes = []any{
 	(FileType)(0),                     // 0: dsh.sandbox.v1.FileType
 	(*HealthRequest)(nil),             // 1: dsh.sandbox.v1.HealthRequest
@@ -1991,69 +2106,73 @@ var file_dsh_sandbox_v1_runner_proto_goTypes = []any{
 	(*ResolvePathResponse)(nil),       // 10: dsh.sandbox.v1.ResolvePathResponse
 	(*ReadFileRequest)(nil),           // 11: dsh.sandbox.v1.ReadFileRequest
 	(*ReadFileResponse)(nil),          // 12: dsh.sandbox.v1.ReadFileResponse
-	(*WriteFileRequest)(nil),          // 13: dsh.sandbox.v1.WriteFileRequest
-	(*WriteFileResponse)(nil),         // 14: dsh.sandbox.v1.WriteFileResponse
-	(*EditFileRequest)(nil),           // 15: dsh.sandbox.v1.EditFileRequest
-	(*EditFileResponse)(nil),          // 16: dsh.sandbox.v1.EditFileResponse
-	(*StatRequest)(nil),               // 17: dsh.sandbox.v1.StatRequest
-	(*StatResponse)(nil),              // 18: dsh.sandbox.v1.StatResponse
-	(*ListRequest)(nil),               // 19: dsh.sandbox.v1.ListRequest
-	(*ListEntry)(nil),                 // 20: dsh.sandbox.v1.ListEntry
-	(*ListResponse)(nil),              // 21: dsh.sandbox.v1.ListResponse
-	(*TreeRequest)(nil),               // 22: dsh.sandbox.v1.TreeRequest
-	(*TreeEntry)(nil),                 // 23: dsh.sandbox.v1.TreeEntry
-	(*TreeResponse)(nil),              // 24: dsh.sandbox.v1.TreeResponse
-	(*SetSecretsRequest)(nil),         // 25: dsh.sandbox.v1.SetSecretsRequest
-	(*SetSecretsResponse)(nil),        // 26: dsh.sandbox.v1.SetSecretsResponse
-	(*GitCredential)(nil),             // 27: dsh.sandbox.v1.GitCredential
-	(*SetGitCredentialsRequest)(nil),  // 28: dsh.sandbox.v1.SetGitCredentialsRequest
-	(*SetGitCredentialsResponse)(nil), // 29: dsh.sandbox.v1.SetGitCredentialsResponse
-	(*SetupRequest)(nil),              // 30: dsh.sandbox.v1.SetupRequest
-	(*SetupResponse)(nil),             // 31: dsh.sandbox.v1.SetupResponse
-	nil,                               // 32: dsh.sandbox.v1.ExecRequest.EnvEntry
-	nil,                               // 33: dsh.sandbox.v1.ResolveExecutableRequest.EnvEntry
-	nil,                               // 34: dsh.sandbox.v1.SetSecretsRequest.SecretsEntry
+	(*ReadFileRangeRequest)(nil),      // 13: dsh.sandbox.v1.ReadFileRangeRequest
+	(*ReadFileRangeResponse)(nil),     // 14: dsh.sandbox.v1.ReadFileRangeResponse
+	(*WriteFileRequest)(nil),          // 15: dsh.sandbox.v1.WriteFileRequest
+	(*WriteFileResponse)(nil),         // 16: dsh.sandbox.v1.WriteFileResponse
+	(*EditFileRequest)(nil),           // 17: dsh.sandbox.v1.EditFileRequest
+	(*EditFileResponse)(nil),          // 18: dsh.sandbox.v1.EditFileResponse
+	(*StatRequest)(nil),               // 19: dsh.sandbox.v1.StatRequest
+	(*StatResponse)(nil),              // 20: dsh.sandbox.v1.StatResponse
+	(*ListRequest)(nil),               // 21: dsh.sandbox.v1.ListRequest
+	(*ListEntry)(nil),                 // 22: dsh.sandbox.v1.ListEntry
+	(*ListResponse)(nil),              // 23: dsh.sandbox.v1.ListResponse
+	(*TreeRequest)(nil),               // 24: dsh.sandbox.v1.TreeRequest
+	(*TreeEntry)(nil),                 // 25: dsh.sandbox.v1.TreeEntry
+	(*TreeResponse)(nil),              // 26: dsh.sandbox.v1.TreeResponse
+	(*SetSecretsRequest)(nil),         // 27: dsh.sandbox.v1.SetSecretsRequest
+	(*SetSecretsResponse)(nil),        // 28: dsh.sandbox.v1.SetSecretsResponse
+	(*GitCredential)(nil),             // 29: dsh.sandbox.v1.GitCredential
+	(*SetGitCredentialsRequest)(nil),  // 30: dsh.sandbox.v1.SetGitCredentialsRequest
+	(*SetGitCredentialsResponse)(nil), // 31: dsh.sandbox.v1.SetGitCredentialsResponse
+	(*SetupRequest)(nil),              // 32: dsh.sandbox.v1.SetupRequest
+	(*SetupResponse)(nil),             // 33: dsh.sandbox.v1.SetupResponse
+	nil,                               // 34: dsh.sandbox.v1.ExecRequest.EnvEntry
+	nil,                               // 35: dsh.sandbox.v1.ResolveExecutableRequest.EnvEntry
+	nil,                               // 36: dsh.sandbox.v1.SetSecretsRequest.SecretsEntry
 }
 var file_dsh_sandbox_v1_runner_proto_depIdxs = []int32{
-	32, // 0: dsh.sandbox.v1.ExecRequest.env:type_name -> dsh.sandbox.v1.ExecRequest.EnvEntry
+	34, // 0: dsh.sandbox.v1.ExecRequest.env:type_name -> dsh.sandbox.v1.ExecRequest.EnvEntry
 	5,  // 1: dsh.sandbox.v1.ExecResponse.started:type_name -> dsh.sandbox.v1.ExecStarted
 	6,  // 2: dsh.sandbox.v1.ExecResponse.exited:type_name -> dsh.sandbox.v1.ExecExited
-	33, // 3: dsh.sandbox.v1.ResolveExecutableRequest.env:type_name -> dsh.sandbox.v1.ResolveExecutableRequest.EnvEntry
+	35, // 3: dsh.sandbox.v1.ResolveExecutableRequest.env:type_name -> dsh.sandbox.v1.ResolveExecutableRequest.EnvEntry
 	0,  // 4: dsh.sandbox.v1.StatResponse.type:type_name -> dsh.sandbox.v1.FileType
 	0,  // 5: dsh.sandbox.v1.ListEntry.type:type_name -> dsh.sandbox.v1.FileType
-	20, // 6: dsh.sandbox.v1.ListResponse.entries:type_name -> dsh.sandbox.v1.ListEntry
+	22, // 6: dsh.sandbox.v1.ListResponse.entries:type_name -> dsh.sandbox.v1.ListEntry
 	0,  // 7: dsh.sandbox.v1.TreeEntry.type:type_name -> dsh.sandbox.v1.FileType
-	23, // 8: dsh.sandbox.v1.TreeResponse.entries:type_name -> dsh.sandbox.v1.TreeEntry
-	34, // 9: dsh.sandbox.v1.SetSecretsRequest.secrets:type_name -> dsh.sandbox.v1.SetSecretsRequest.SecretsEntry
-	27, // 10: dsh.sandbox.v1.SetGitCredentialsRequest.credentials:type_name -> dsh.sandbox.v1.GitCredential
+	25, // 8: dsh.sandbox.v1.TreeResponse.entries:type_name -> dsh.sandbox.v1.TreeEntry
+	36, // 9: dsh.sandbox.v1.SetSecretsRequest.secrets:type_name -> dsh.sandbox.v1.SetSecretsRequest.SecretsEntry
+	29, // 10: dsh.sandbox.v1.SetGitCredentialsRequest.credentials:type_name -> dsh.sandbox.v1.GitCredential
 	1,  // 11: dsh.sandbox.v1.RunnerService.Health:input_type -> dsh.sandbox.v1.HealthRequest
 	3,  // 12: dsh.sandbox.v1.RunnerService.Exec:input_type -> dsh.sandbox.v1.ExecRequest
 	7,  // 13: dsh.sandbox.v1.RunnerService.ResolveExecutable:input_type -> dsh.sandbox.v1.ResolveExecutableRequest
 	9,  // 14: dsh.sandbox.v1.RunnerService.ResolvePath:input_type -> dsh.sandbox.v1.ResolvePathRequest
 	11, // 15: dsh.sandbox.v1.RunnerService.ReadFile:input_type -> dsh.sandbox.v1.ReadFileRequest
-	13, // 16: dsh.sandbox.v1.RunnerService.WriteFile:input_type -> dsh.sandbox.v1.WriteFileRequest
-	15, // 17: dsh.sandbox.v1.RunnerService.EditFile:input_type -> dsh.sandbox.v1.EditFileRequest
-	17, // 18: dsh.sandbox.v1.RunnerService.Stat:input_type -> dsh.sandbox.v1.StatRequest
-	19, // 19: dsh.sandbox.v1.RunnerService.List:input_type -> dsh.sandbox.v1.ListRequest
-	22, // 20: dsh.sandbox.v1.RunnerService.Tree:input_type -> dsh.sandbox.v1.TreeRequest
-	25, // 21: dsh.sandbox.v1.RunnerService.SetSecrets:input_type -> dsh.sandbox.v1.SetSecretsRequest
-	28, // 22: dsh.sandbox.v1.RunnerService.SetGitCredentials:input_type -> dsh.sandbox.v1.SetGitCredentialsRequest
-	30, // 23: dsh.sandbox.v1.RunnerService.Setup:input_type -> dsh.sandbox.v1.SetupRequest
-	2,  // 24: dsh.sandbox.v1.RunnerService.Health:output_type -> dsh.sandbox.v1.HealthResponse
-	4,  // 25: dsh.sandbox.v1.RunnerService.Exec:output_type -> dsh.sandbox.v1.ExecResponse
-	8,  // 26: dsh.sandbox.v1.RunnerService.ResolveExecutable:output_type -> dsh.sandbox.v1.ResolveExecutableResponse
-	10, // 27: dsh.sandbox.v1.RunnerService.ResolvePath:output_type -> dsh.sandbox.v1.ResolvePathResponse
-	12, // 28: dsh.sandbox.v1.RunnerService.ReadFile:output_type -> dsh.sandbox.v1.ReadFileResponse
-	14, // 29: dsh.sandbox.v1.RunnerService.WriteFile:output_type -> dsh.sandbox.v1.WriteFileResponse
-	16, // 30: dsh.sandbox.v1.RunnerService.EditFile:output_type -> dsh.sandbox.v1.EditFileResponse
-	18, // 31: dsh.sandbox.v1.RunnerService.Stat:output_type -> dsh.sandbox.v1.StatResponse
-	21, // 32: dsh.sandbox.v1.RunnerService.List:output_type -> dsh.sandbox.v1.ListResponse
-	24, // 33: dsh.sandbox.v1.RunnerService.Tree:output_type -> dsh.sandbox.v1.TreeResponse
-	26, // 34: dsh.sandbox.v1.RunnerService.SetSecrets:output_type -> dsh.sandbox.v1.SetSecretsResponse
-	29, // 35: dsh.sandbox.v1.RunnerService.SetGitCredentials:output_type -> dsh.sandbox.v1.SetGitCredentialsResponse
-	31, // 36: dsh.sandbox.v1.RunnerService.Setup:output_type -> dsh.sandbox.v1.SetupResponse
-	24, // [24:37] is the sub-list for method output_type
-	11, // [11:24] is the sub-list for method input_type
+	13, // 16: dsh.sandbox.v1.RunnerService.ReadFileRange:input_type -> dsh.sandbox.v1.ReadFileRangeRequest
+	15, // 17: dsh.sandbox.v1.RunnerService.WriteFile:input_type -> dsh.sandbox.v1.WriteFileRequest
+	17, // 18: dsh.sandbox.v1.RunnerService.EditFile:input_type -> dsh.sandbox.v1.EditFileRequest
+	19, // 19: dsh.sandbox.v1.RunnerService.Stat:input_type -> dsh.sandbox.v1.StatRequest
+	21, // 20: dsh.sandbox.v1.RunnerService.List:input_type -> dsh.sandbox.v1.ListRequest
+	24, // 21: dsh.sandbox.v1.RunnerService.Tree:input_type -> dsh.sandbox.v1.TreeRequest
+	27, // 22: dsh.sandbox.v1.RunnerService.SetSecrets:input_type -> dsh.sandbox.v1.SetSecretsRequest
+	30, // 23: dsh.sandbox.v1.RunnerService.SetGitCredentials:input_type -> dsh.sandbox.v1.SetGitCredentialsRequest
+	32, // 24: dsh.sandbox.v1.RunnerService.Setup:input_type -> dsh.sandbox.v1.SetupRequest
+	2,  // 25: dsh.sandbox.v1.RunnerService.Health:output_type -> dsh.sandbox.v1.HealthResponse
+	4,  // 26: dsh.sandbox.v1.RunnerService.Exec:output_type -> dsh.sandbox.v1.ExecResponse
+	8,  // 27: dsh.sandbox.v1.RunnerService.ResolveExecutable:output_type -> dsh.sandbox.v1.ResolveExecutableResponse
+	10, // 28: dsh.sandbox.v1.RunnerService.ResolvePath:output_type -> dsh.sandbox.v1.ResolvePathResponse
+	12, // 29: dsh.sandbox.v1.RunnerService.ReadFile:output_type -> dsh.sandbox.v1.ReadFileResponse
+	14, // 30: dsh.sandbox.v1.RunnerService.ReadFileRange:output_type -> dsh.sandbox.v1.ReadFileRangeResponse
+	16, // 31: dsh.sandbox.v1.RunnerService.WriteFile:output_type -> dsh.sandbox.v1.WriteFileResponse
+	18, // 32: dsh.sandbox.v1.RunnerService.EditFile:output_type -> dsh.sandbox.v1.EditFileResponse
+	20, // 33: dsh.sandbox.v1.RunnerService.Stat:output_type -> dsh.sandbox.v1.StatResponse
+	23, // 34: dsh.sandbox.v1.RunnerService.List:output_type -> dsh.sandbox.v1.ListResponse
+	26, // 35: dsh.sandbox.v1.RunnerService.Tree:output_type -> dsh.sandbox.v1.TreeResponse
+	28, // 36: dsh.sandbox.v1.RunnerService.SetSecrets:output_type -> dsh.sandbox.v1.SetSecretsResponse
+	31, // 37: dsh.sandbox.v1.RunnerService.SetGitCredentials:output_type -> dsh.sandbox.v1.SetGitCredentialsResponse
+	33, // 38: dsh.sandbox.v1.RunnerService.Setup:output_type -> dsh.sandbox.v1.SetupResponse
+	25, // [25:39] is the sub-list for method output_type
+	11, // [11:25] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -2070,7 +2189,7 @@ func file_dsh_sandbox_v1_runner_proto_init() {
 		(*ExecResponse_Stderr)(nil),
 		(*ExecResponse_Exited)(nil),
 	}
-	file_dsh_sandbox_v1_runner_proto_msgTypes[12].OneofWrappers = []any{
+	file_dsh_sandbox_v1_runner_proto_msgTypes[14].OneofWrappers = []any{
 		(*WriteFileRequest_CreateIfAbsent)(nil),
 		(*WriteFileRequest_ExpectedVersion)(nil),
 	}
@@ -2080,7 +2199,7 @@ func file_dsh_sandbox_v1_runner_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dsh_sandbox_v1_runner_proto_rawDesc), len(file_dsh_sandbox_v1_runner_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   34,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

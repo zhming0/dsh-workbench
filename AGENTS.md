@@ -12,14 +12,14 @@ READMEs are unusually detailed and precise. Read them directly:
 
 ```sh
 cd "$(mktemp -d)"
-npm pack @deepseek-ai/dsh-base@0.1.2-rc.1
+npm pack @deepseek-ai/dsh-base@0.1.5-rc.1
 tar xzf *.tgz
 # package/README.md is the spec. package/lib/*.js is the built source, which is
 # readable and worth grepping when a README leaves a detail open. A bundle also
 # carries package/cordis.patch.yml, the rows it contributes.
 ```
 
-This repository pins `0.1.2-rc.1`. Match it, because the surface moves between
+This repository pins `0.1.5-rc.1`. Match it, because the surface moves between
 release candidates.
 
 ### The model
@@ -88,6 +88,14 @@ likely to mislead you.
 - A plugin appears in the Web Plugins settings tab only if it both registers a
   settings namespace on the host and ships a hand-written browser card. A
   namespace alone renders nothing.
+- A patch entry's `name:` is an assertion, not a rename. When it differs from
+  the matched row's module, `dsh-app-boot` skips the entry with a warning and
+  the stock row stays as it was.
+- The Web app serves a package's browser half (`dsh.client` in its
+  `package.json`) only while a row of that package is mounted. Disabling
+  `workspace-files` alone leaves the sidebar's Files and Preview tabs without
+  their file resource provider, so the tab rows go with it. To change what a
+  stock host service does, keep its row and wrap the live instance.
 
 ## Write code people can maintain
 
