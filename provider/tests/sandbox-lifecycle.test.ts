@@ -11,7 +11,7 @@ import { SandboxLifecycle } from "../src/manager/sandbox-lifecycle.js";
 import { ProfileRegistry } from "../src/manager/profile-registry.js";
 import { RunnerAttachment } from "../src/manager/runner-attachment.js";
 import { SessionStore } from "../src/state-store.js";
-import type { SandboxProfile } from "../src/types.js";
+import type { SandboxProfile, SessionRecord } from "../src/types.js";
 import { FakeBackend, gatewayFor } from "./fakes.js";
 
 const PROFILE: SandboxProfile = {
@@ -56,6 +56,7 @@ describe("sandbox lifecycle engine", () => {
       pendingProfile: () => PROFILE,
       attachment,
       checkpoints: new CheckpointStore(join(directory, "checkpoints")),
+      idleMs: 30_000,
       expiresAfterMs: 60_000,
       warn: () => {},
     });
@@ -103,6 +104,96 @@ describe("sandbox lifecycle engine", () => {
     await engine.ensureRunning("session-one", async () => REPOSITORY);
     expect(backend.wakes).toBe(1);
     expect(backend.provisions).toBe(1);
+  });
+
+  it("arms the running expiry at provision, swaps it for retention at hibernate, and renews it at wake", async () => {
+    await engine.initialize();
+    const t0 = Date.now();
+    await engine.ensureRunning("session-one", async () => REPOSITORY);
+    // Provision arms the expiry: a full idle-plus-retention cycle.
+    const provisionDeadline = backend.expiryDeadlines[0]?.getTime();
+    expect(provisionDeadline).toBeGreaterThanOrEqual(t0 + 90_000);
+    expect(provisionDeadline).toBeLessThanOrEqual(Date.now() + 90_000);
+    expect(store.get("session-one")?.expiresAt).toBeDefined();
+
+    // Suspension replaces the running expiry with the plain retention
+    // deadline.
+    await engine.hibernate("session-one");
+    const hibernateDeadline = backend.expiryDeadlines.at(-1)?.getTime();
+    expect(hibernateDeadline).toBeGreaterThanOrEqual(t0 + 60_000);
+    expect(hibernateDeadline).toBeLessThanOrEqual(Date.now() + 60_000);
+
+    // Waking renews it: the KAS wake clears the claim's expiry first.
+    const t1 = Date.now();
+    await engine.ensureRunning("session-one", async () => REPOSITORY);
+    expect(backend.wakes).toBe(1);
+    const wakeDeadline = backend.expiryDeadlines.at(-1)?.getTime();
+    expect(wakeDeadline).toBeGreaterThanOrEqual(t1 + 90_000);
+    expect(wakeDeadline).toBeLessThanOrEqual(Date.now() + 90_000);
+    expect(store.get("session-one")?.state).toBe("running");
+  });
+
+  it("re-arms a running record's exact expiry at boot", async () => {
+    await store.initialize();
+    const deadline = new Date(Date.now() + 5 * 60_000);
+    await store.set({
+      sessionId: "live",
+      backend: "fake",
+      profile: "standard",
+      sandboxId: "sandbox-one",
+      reference: { id: "one" },
+      repositoryUrl: REPOSITORY,
+      state: "running",
+      expiresAt: deadline.toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    await engine.initialize();
+    expect(backend.expiryDeadlines.at(-1)?.getTime()).toBe(deadline.getTime());
+    expect(backend.destroys).toBe(0);
+    expect(store.get("live")?.state).toBe("running");
+  });
+
+  it("releases a running sandbox whose expiry passed while the host was down", async () => {
+    await store.initialize();
+    await store.set({
+      sessionId: "stale",
+      backend: "fake",
+      profile: "standard",
+      sandboxId: "sandbox-one",
+      reference: { id: "one" },
+      repositoryUrl: REPOSITORY,
+      state: "running",
+      expiresAt: new Date(Date.now() - 1_000).toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    await engine.initialize();
+    expect(store.get("stale")).toBeUndefined();
+    expect(backend.destroys).toBe(1);
+  });
+
+  it("arms a fresh expiry for a legacy running record without one", async () => {
+    await store.initialize();
+    // No expiresAt: how records written before the running expiry look on
+    // disk.
+    await store.set({
+      sessionId: "legacy",
+      backend: "fake",
+      profile: "standard",
+      sandboxId: "sandbox-one",
+      reference: { id: "one" },
+      repositoryUrl: REPOSITORY,
+      state: "running",
+      updatedAt: new Date().toISOString(),
+    } as unknown as SessionRecord);
+
+    const t0 = Date.now();
+    await engine.initialize();
+    const deadline = backend.expiryDeadlines.at(-1)?.getTime();
+    expect(deadline).toBeGreaterThanOrEqual(t0 + 90_000);
+    expect(deadline).toBeLessThanOrEqual(Date.now() + 90_000);
+    expect(store.get("legacy")?.expiresAt).toBeDefined();
   });
 
   it("releases a sandbox whose retention expired while the host was down", async () => {
@@ -200,7 +291,10 @@ describe("sandbox lifecycle engine", () => {
       expect(client.execs[0]?.cwd).toBe("/workspace/repository");
       expect(backend.hibernations).toBe(0);
       expect(backend.destroys).toBe(1);
-      expect(backend.expiries).toBe(0);
+      // One expiry: the running expiry armed at provision. Checkpointing
+      // sets none — the sandbox is destroyed, and its bundle expires by
+      // deadline on the next turn.
+      expect(backend.expiries).toBe(1);
       const saved = store.get("session-one");
       if (saved?.state !== "checkpointed") {
         throw new Error("expected a checkpointed record");
@@ -223,7 +317,9 @@ describe("sandbox lifecycle engine", () => {
       const resumed = store.get("session-one");
       expect(resumed?.state).toBe("running");
       expect(resumed).not.toHaveProperty("checkpoint");
-      expect(resumed).not.toHaveProperty("expiresAt");
+      // The restored sandbox is running, so it carries a fresh running
+      // expiry again.
+      expect(resumed?.expiresAt).toBeDefined();
       expect(existsSync(bundlePath())).toBe(false);
     });
 
@@ -379,9 +475,10 @@ describe("sandbox lifecycle engine", () => {
       expect(backend.destroys).toBe(1);
 
       // Boot: no deadline to set on a sandbox that no longer exists.
+      const expiredSoFar = backend.expiries;
       const restarted = await engineFor(store, backend);
       await restarted.initialize();
-      expect(backend.expiries).toBe(0);
+      expect(backend.expiries).toBe(expiredSoFar);
       expect(store.get("session-one")?.state).toBe("checkpointed");
 
       // Expiry: the record and its bundle go, without a second destroy.

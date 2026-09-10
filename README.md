@@ -36,6 +36,11 @@ While a session idles, the sandbox's pod is removed; its workspace volume
 survives until expiry. In this repository, "sandbox" always means one such
 provisioned environment.
 
+A running sandbox has its own expiry too: the backend deletes it only after
+`idleMs + expiresAfterMs` past its last turn. A sandbox that outlives its
+host — a crash, a closed laptop — is therefore still cleaned up, and never
+sooner than the idle delay and retention would allow anyway.
+
 A session's subagents work in the same sandbox: each subagent session resolves
 to its root session's sandbox, so delegation shares one working copy — the
 same contract as dsh without this provider. A rogue subagent can therefore
@@ -192,8 +197,8 @@ Every setting, with its default, is in
 | `read`, `write`, `edit`, `present`            | your disk                 | sandbox workspace                      |
 | `bash`                                        | your machine              | sandbox                                |
 | `glob`, `grep`                                | ripgrep on your machine   | sandbox workspace, ripgrep in the sandbox |
-| Working directory                             | wherever you launched dsh | `/workspace/repository` in the sandbox |
-| Session logs, attachments, spill files        | your disk                 | unchanged, still your disk             |
+| Working directory                             | wherever you launched dsh | `/workspace/repository` in the sandbox    |
+| Session logs, attachments, spill files        | your disk                 | unchanged, still your disk                |
 
 Replacing the filesystem row also turns off dsh's host-side permission model:
 `workspace-write` and the approval prompts came from that row, and the bundle

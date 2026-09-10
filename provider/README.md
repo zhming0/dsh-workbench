@@ -213,6 +213,15 @@ and `write_builds` on the pipeline. The pipeline shape, the registration token,
 and the limits are described in
 [`docs/buildkite.md`](https://github.com/zhming0/dsh-workbench/blob/main/docs/buildkite.md).
 
+### Running-sandbox expiry
+
+A running sandbox also carries a backend-side deletion deadline of
+`idleMs + expiresAfterMs` past its last turn — armed when the sandbox is
+provisioned or woken, refreshed at each turn's end, and re-armed at boot. A
+sandbox that outlives its host — a crash, a closed laptop — is therefore
+still removed, and never sooner than the idle delay and hibernation
+retention would remove it anyway.
+
 ### Archived sessions
 
 Archiving a session in the Web UI is one-way: dsh keeps the session log but
