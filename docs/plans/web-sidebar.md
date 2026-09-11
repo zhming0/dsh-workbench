@@ -22,7 +22,7 @@ can be carried without rediscovering the facts it depends on.
 
 ## Why the stock rows fail
 
-Every fact below was checked against the 0.1.5-rc.1 package sources.
+Every fact below was checked against the 0.1.5-rc.2 package sources.
 
 - `@deepseek-ai/dsh-api-workspace-files` (`static inject = ["fs",
 "sandboxPolicy", "sessions", "typert"]`) serves the browser over the RPC

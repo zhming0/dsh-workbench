@@ -40,7 +40,7 @@ export const SANDBOX_ENVIRONMENT_PROMPT =
 
 /**
  * Fragments that identify dsh's host-only prompt sections (observed in
- * 0.1.5-rc.1): the implementation-checkout paragraph and the Web GUI
+ * 0.1.5-rc.2): the implementation-checkout paragraph and the Web GUI
  * paragraph. Deliberately narrow, so only sections making those claims are
  * dropped.
  */

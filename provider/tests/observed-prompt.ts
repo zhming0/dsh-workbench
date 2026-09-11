@@ -3,7 +3,7 @@
  * them, including their interpolation placeholders rendered here as
  * \${…} literal text. Both the marker fixtures and the wording tripwire
  * derive from this file, so a dsh rewording has one place to land. Sources
- * at 0.1.5-rc.1: addHarnessSourceSection in @deepseek-ai/dsh-app-boot and
+ * at 0.1.5-rc.2: addHarnessSourceSection in @deepseek-ai/dsh-app-boot and
  * webSurfacePrompt in @deepseek-ai/dsh-web-app.
  */
 
