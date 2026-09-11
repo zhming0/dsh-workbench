@@ -193,7 +193,14 @@ Every setting, with its default, is in
 | `bash`                                        | your machine              | sandbox                                |
 | `glob`, `grep`                                | ripgrep on your machine   | sandbox workspace, ripgrep in the sandbox |
 | Working directory                             | wherever you launched dsh | `/workspace/repository` in the sandbox |
-| Session logs, attachments, spill files        | your disk                 | unchanged, still your disk             |
+| Session logs, spill files                     | your disk                 | unchanged, still your disk             |
+| Uploaded attachments                          | your disk                 | copied into the sandbox workspace      |
+
+An uploaded file is copied into the sandbox before the model request that
+references it, under `/workspace/.dsh-attachments`, so the model's file tools
+can read it; the host keeps the stored original. One copy is capped at 64 MiB,
+the size of the single write RPC that carries it, so a larger upload keeps
+dsh's "cannot access a readable path" placeholder.
 
 Replacing the filesystem row also turns off dsh's host-side permission model:
 `workspace-write` and the approval prompts came from that row, and the bundle

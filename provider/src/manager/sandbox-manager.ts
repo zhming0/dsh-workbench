@@ -281,6 +281,20 @@ export class SandboxManager extends TypertRemoteService {
     return this.ensureRunning(this.ctx.agents.requireInitiator());
   }
 
+  /**
+   * The root session owning the calling agent's sandbox, or undefined outside
+   * an agent boundary. Attachment copies are keyed by this id, so a subagent
+   * and its root session resolve to the same copy. Synchronous: the
+   * filesystem mapping runs during request assembly and cannot await.
+   */
+  rootSessionIdForCurrentAgent(): string | undefined {
+    try {
+      return this.rootSessionId(this.ctx.agents.requireInitiator());
+    } catch {
+      return undefined;
+    }
+  }
+
   /** Create and register the host Workspace selected by repository URL in Web. */
   async createRepositoryWorkspace(repositoryUrl: string): Promise<string> {
     const registry =
