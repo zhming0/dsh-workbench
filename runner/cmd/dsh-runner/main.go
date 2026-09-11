@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -57,7 +58,22 @@ func registrationToken() (string, error) {
 	}
 	return "", errors.New("REGISTRATION_TOKEN or REGISTRATION_TOKEN_FILE is required")
 }
+
+// ensureHome creates the directory HOME names. The image ships one, but a
+// Kubernetes sandbox mounts its workspace volume over /workspace and hides
+// that copy, so the runner makes it before any command can need it.
+func ensureHome() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return os.MkdirAll(home, 0o755)
+}
+
 func serve(socket string) error {
+	if err := ensureHome(); err != nil {
+		return fmt.Errorf("create home directory: %w", err)
+	}
 	sandboxID := os.Getenv("SANDBOX_ID")
 	if sandboxID == "" {
 		return errors.New("SANDBOX_ID is required")

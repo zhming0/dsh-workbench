@@ -317,12 +317,13 @@ previously staged changes are now unstaged, so the model can re-run the setup
 steps it needs.
 
 A wake carries its own one-shot notice on the first prompt, worded for what the
-machine kept. On Kubernetes the new pod kept only the workspace, so the notice
-names running processes, `/tmp`, the home directory, and tools installed
-elsewhere as gone; on Docker the files survived and the notice says only that
-the processes did not. Only a backend that hibernates sends this notice: a
-backend that checkpoints never wakes, so its first prompt after a restore is
-the only one that carries a note.
+machine kept. On Kubernetes the new pod kept only the workspace volume, so the
+notice names running processes, `/tmp`, and anything installed outside
+`/workspace` as gone; the home directory lives on that volume and comes back
+with it. On Docker the files survived and the notice says only that the
+processes did not. Only a backend that hibernates sends this notice: a backend
+that checkpoints never wakes, so its first prompt after a restore is the only
+one that carries a note.
 
 The bundle lives in the host's state directory next to the credential store,
 with the same file permissions, so a checkpoint has the same exposure as a

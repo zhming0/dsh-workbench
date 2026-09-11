@@ -73,6 +73,7 @@ pvc="$(kubectl -n "$NAMESPACE" get pod "$pod" -o jsonpath='{.spec.volumes[?(@.na
 [[ -n "$pvc" ]] || { echo "error: workspace PVC not mounted" >&2; exit 1; }
 sentinel="dsh-kas-$suffix"
 kubectl -n "$NAMESPACE" exec "$pod" -c runner -- sh -c 'printf %s "$1" > /workspace/.kas-smoke-sentinel' sh "$sentinel"
+kubectl -n "$NAMESPACE" exec "$pod" -c runner -- sh -c '[ "$HOME" = /workspace/home ] || { echo "unexpected HOME: $HOME" >&2; exit 1; }; printf %s "$1" > "$HOME/.kas-smoke-home-sentinel"' sh "$sentinel"
 
 kubectl -n "$NAMESPACE" patch sandbox "$sandbox" --type=merge -p '{"spec":{"operatingMode":"Suspended"}}'
 deadline=$((SECONDS + 120))
@@ -89,8 +90,10 @@ kubectl -n "$NAMESPACE" wait --for=condition=Ready "sandbox/$sandbox" --timeout=
 pod="$(kubectl -n "$NAMESPACE" get pods -l "$selector" -o jsonpath='{.items[0].metadata.name}')"
 actual="$(kubectl -n "$NAMESPACE" exec "$pod" -c runner -- cat /workspace/.kas-smoke-sentinel)"
 [[ "$actual" == "$sentinel" ]] || { echo "error: sentinel did not survive resume" >&2; exit 1; }
+actual_home="$(kubectl -n "$NAMESPACE" exec "$pod" -c runner -- sh -c 'cat "$HOME/.kas-smoke-home-sentinel"')"
+[[ "$actual_home" == "$sentinel" ]] || { echo "error: home directory sentinel did not survive resume" >&2; exit 1; }
 resume_ms=$(( $(python3 -c 'import time; print(time.time_ns() // 1_000_000)') - resume_start_ms ))
-echo "Resumed in ${resume_ms}ms; workspace sentinel verified"
+echo "Resumed in ${resume_ms}ms; workspace and home sentinels verified"
 
 DISPOSABLE_CLAIM="kas-expiry-$suffix"
 shutdown_time="$(python3 -c 'from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc) + timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%SZ"))')"

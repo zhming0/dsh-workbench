@@ -68,6 +68,13 @@ try {
     content: new TextEncoder().encode("workspace survived"),
     guard: { case: "overwrite", value: true },
   });
+  const home = (await run(client, ["sh", "-c", 'printf %s "$HOME"'])).stdout;
+  assertEqual(home, "/workspace/home", "home directory");
+  await client.writeFile({
+    path: `${home}/home-sentinel`,
+    content: new TextEncoder().encode("home survived"),
+    guard: { case: "overwrite", value: true },
+  });
 
   // Suspension removes the pod and its socket. Wake recreates the pod, whose
   // runner must dial back in while retaining the workspace volume.
@@ -85,6 +92,15 @@ try {
     new TextDecoder().decode(sentinel.content),
     "workspace survived",
     "workspace content after wake",
+  );
+  const homeSentinel = await client.readFile({
+    path: `${home}/home-sentinel`,
+    maxBytes: 1024n,
+  });
+  assertEqual(
+    new TextDecoder().decode(homeSentinel.content),
+    "home survived",
+    "home content after wake",
   );
 
   success = true;

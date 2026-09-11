@@ -78,7 +78,7 @@ then verifies:
 3. `.agents/setup` runs exactly once (marked in `.git/.agents-setup-done`), and
    `.agents/resume` runs on wake;
 4. hibernate/wake reconnects the runner and preserves its setup marker,
-   workspace files, and mise-managed tools.
+   workspace files, home-directory files, and mise-managed tools.
 
 Success ends with:
 
@@ -110,8 +110,8 @@ The transport probe verifies:
 1. `KasBackend` claims a real warm Sandbox;
 2. its runner registers and answers an identity-checked health RPC;
 3. secret injection, command streaming, and file RPCs cross the tunnel;
-4. hibernate/wake recreates the runner connection and preserves workspace
-   data.
+4. hibernate/wake recreates the runner connection and preserves workspace and
+   home-directory data.
 
 It then runs the controller lifecycle smoke test, which additionally verifies
 sub-second warm adoption, backing-pod identity, PVC survival across
