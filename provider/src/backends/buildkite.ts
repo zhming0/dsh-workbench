@@ -39,7 +39,7 @@ export interface BuildkiteBackendOptions {
   pipeline: string;
   /** Runner image, handed to the job so it matches the host's release. */
   image: string;
-  /** The tunnel endpoint runners dial, such as tls://dsh.example.com:8081. */
+  /** The tunnel endpoint runners dial, such as wss://dsh.example.com/tunnel. */
   hostUrl: string;
   /** How long a build may sit in the queue before its job starts. */
   readyTimeoutMs: number;

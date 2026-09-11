@@ -160,7 +160,9 @@ The default backend uses Docker on the same machine as dsh. The Kubernetes
 backend uses Kubernetes SIG agent-sandbox. The Buildkite backend runs each
 sandbox as one build on a pipeline you create. Runners connect out to the host's
 tunnel listener, so the host never dials into a sandbox; it only needs to be
-reachable by the runners it manages.
+reachable by the runners it manages. The tunnel is a WebSocket, so an HTTPS
+proxy or Ingress can carry it next to the Web UI; see
+[Tunnel](#tunnel) below.
 
 A host can offer several **sandbox profiles**. A profile is a complete
 description of one kind of sandbox: which backend provisions it and that
@@ -199,7 +201,7 @@ Configuration is YAML in the profile's own layer,
 | `expiresAfterMs`    | 7 days                  | How long a hibernated workspace is retained                      |
 | `stateDir`          | `~/.dsh-sandbox`        | Records, broker data, token, instructions, and Workspace anchors |
 | `registrationToken` | see below               | Token(s) runners must present, comma-separated                   |
-| `tunnel.port`       | `8081`                  | Port the host listens on for runner tunnels                      |
+| `tunnel.port`       | `8081`                  | Port the host listens on for runner tunnels (see Tunnel)         |
 | `tunnel.bind`       | `0.0.0.0`               | Address the tunnel listener binds to                             |
 
 Each profile carries the settings of its own backend. Profiles do not share
@@ -211,7 +213,7 @@ name that namespace.
 | `backend`        | all                   | required               | `docker`, `kas`, or `buildkite`                 |
 | `image`          | `docker`, `buildkite` | matching release tag   | Runner image                                    |
 | `binary`         | `docker`              | `docker`               | Docker-compatible command                       |
-| `hostUrl`        | `docker`              | `host.docker.internal` | `HOST_URL` runners dial, `tcp://` or `tls://`   |
+| `hostUrl`        | `docker`, `buildkite` | `host.docker.internal` | `HOST_URL` runners dial, `ws://` or `wss://`    |
 | `namespace`      | `kas`                 | `dsh-sandbox`          | Namespace containing claims and warm sandboxes  |
 | `warmPool`       | `kas`                 | `dsh-universal`        | Warm pool used for claims                       |
 | `readyTimeoutMs` | `kas`                 | 3 minutes              | How long to wait for a claimed sandbox          |
@@ -418,6 +420,34 @@ Provider state belongs on the dsh host, not in a sandbox. Files in `stateDir`
 are created with owner-only permissions. The runner receives current values in
 memory before it starts a command. Git credentials are served through a Unix
 socket and are never written to the workspace.
+
+## Tunnel
+
+Runners reach the host by opening a WebSocket at `/tunnel` on the tunnel
+listener (`tunnel.port`, default 8081). The upgrade request carries the
+registration token as a bearer token and the runner's sandbox ID in the
+`X-Dsh-Sandbox-Id` header; the host answers a refusal with a plain HTTP
+status (401 bad token, 409 sandbox already registered) and an acceptance with
+101, after which the WebSocket carries HTTP/2 with the roles reversed: the
+host is the HTTP/2 client and the runner the server. `GET /healthz` on the
+same port answers 200 so an HTTP load balancer can health-check it.
+
+The listener itself is plaintext. A runner inside the trust domain, such as a
+Kubernetes sandbox in the host's cluster, dials it directly with
+`ws://host:8081/tunnel`. A runner that reaches the host over a network you do
+not control must dial `wss://`, with TLS terminated by the same HTTPS proxy or
+Ingress that fronts the Web UI: route one path (`/tunnel`) of that hostname
+to the tunnel port and hand runners `wss://<hostname>/tunnel`. No second
+certificate, port, or listener is involved, and the proxy's authentication
+layer must not sit on that path; the registration token is the tunnel's
+authentication. Runners trust the system CA bundle, so a private CA has to be
+made available to the runner process, for example through `SSL_CERT_FILE`.
+
+Every proxy on the path must pass WebSocket upgrades and keep a connection
+open for as long as a session lasts. Idle timeouts are satisfied by the
+host's HTTP/2 pings every 30 seconds, but a maximum connection lifetime is
+not: when the proxy cuts the tunnel, the RPC in flight fails and the runner
+redials within seconds. Raise such limits to hours where the proxy has them.
 
 ## Registration token
 

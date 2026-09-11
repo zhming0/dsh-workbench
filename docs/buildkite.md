@@ -89,14 +89,14 @@ gets a replacement build under the same profile.
         backend: buildkite
         organization: acme
         pipeline: dsh-sandbox
-        hostUrl: tls://dsh.example.com:8081
+        hostUrl: wss://dsh.example.com/tunnel
 ```
 
 | Field            | Default               | Meaning                                                                  |
 | ---------------- | --------------------- | ------------------------------------------------------------------------ |
 | `organization`   | required              | Organization slug, as in `buildkite.com/<organization>`                  |
 | `pipeline`       | required              | Pipeline slug                                                            |
-| `hostUrl`        | required              | Tunnel endpoint the runner dials, `tcp://host:port` or `tls://host:port` |
+| `hostUrl`        | required              | Tunnel endpoint the runner dials, `wss://host/tunnel` or `ws://host:port/tunnel` |
 | `image`          | matching release tag  | Runner image the job runs, sent to the build as `DSH_RUNNER_IMAGE`       |
 | `readyTimeoutMs` | `600000`              | How long a build may sit `scheduled` before the provider cancels it      |
 | `tokenEnv`       | `BUILDKITE_API_TOKEN` | Environment variable on the host that holds the API token                |
@@ -112,9 +112,14 @@ The host process must have, at boot:
   the pipeline must hold the same value.
 
 `hostUrl` must be reachable from Buildkite agents, which are never on the host
-machine. The tunnel is plain TCP; put TLS in front of it and use `tls://`
-whenever the agents reach it over a network you do not control. Hosted agents
-always do.
+machine. The tunnel is a WebSocket on the host's plaintext tunnel port, so
+whenever agents reach it over a network you do not control, and hosted agents
+always do, terminate TLS in front of it and hand the agents a `wss://` URL. On
+the Kubernetes distribution that is one `/tunnel` path rule on the Ingress
+that already serves the Web UI, under the same certificate; the exact rule
+and the proxy limits that matter are in
+[`kubernetes.md`](kubernetes.md#connectivity-and-isolation). Any HTTPS reverse
+proxy that passes WebSocket upgrades does the same job elsewhere.
 
 ## The pipeline
 

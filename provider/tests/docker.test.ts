@@ -62,7 +62,7 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     const backend = new DockerBackend({
       image: "runner:large",
       binary: docker,
-      hostUrl: "tcp://host.docker.internal:8081",
+      hostUrl: "ws://host.docker.internal:8081/tunnel",
       registrationToken: "token-value",
     });
 
@@ -87,7 +87,9 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
       "inspect",
       "start",
     ]);
-    expect(commands[0]).toContain("HOST_URL=tcp://host.docker.internal:8081");
+    expect(commands[0]).toContain(
+      "HOST_URL=ws://host.docker.internal:8081/tunnel",
+    );
     expect(commands[0]).toContain("REGISTRATION_TOKEN=token-value");
     expect(commands[0]?.at(-1)).toBe("runner:large");
     expect(commands[2]).toEqual(["start", "existing-container"]);

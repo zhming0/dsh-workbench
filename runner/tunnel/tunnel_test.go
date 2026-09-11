@@ -1,80 +1,110 @@
 package tunnel
 
 import (
-	"bufio"
 	"context"
 	"crypto/tls"
-	"encoding/json"
-	"errors"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"golang.org/x/net/http2"
 )
 
-// acceptOne reads a handshake from the next connection, answers it, and when
-// accepted returns the connection with any read-ahead preserved.
-func acceptOne(t *testing.T, listener net.Listener, accept bool) (net.Conn, hello) {
+// fakeHost accepts runner WebSockets the way the dsh host does: bearer token
+// and sandbox header on the upgrade request, then HTTP/2 over the socket.
+type fakeHost struct {
+	server *httptest.Server
+	token  string
+	// accepted delivers each admitted connection with the sandbox it named.
+	accepted chan acceptedRunner
+	// refused counts handshakes turned away with 401.
+	refused chan struct{}
+}
+
+type acceptedRunner struct {
+	conn      net.Conn
+	sandboxID string
+}
+
+func newFakeHost(t *testing.T, token string) *fakeHost {
 	t.Helper()
-	conn, err := listener.Accept()
-	if err != nil {
-		t.Fatalf("accept: %v", err)
+	host := &fakeHost{token: token, accepted: make(chan acceptedRunner, 4), refused: make(chan struct{}, 4)}
+	host.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tunnel" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer "+host.token {
+			http.Error(w, "invalid registration token", http.StatusUnauthorized)
+			host.refused <- struct{}{}
+			return
+		}
+		ws, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			t.Errorf("accept: %v", err)
+			return
+		}
+		// The request context ends with this handler; the tunnel outlives it.
+		conn := websocket.NetConn(context.Background(), ws, websocket.MessageBinary)
+		host.accepted <- acceptedRunner{conn: conn, sandboxID: r.Header.Get(SandboxIDHeader)}
+	}))
+	t.Cleanup(host.server.Close)
+	return host
+}
+
+func (h *fakeHost) url() string {
+	return "ws" + strings.TrimPrefix(h.server.URL, "http") + "/tunnel"
+}
+
+func (h *fakeHost) next(t *testing.T) acceptedRunner {
+	t.Helper()
+	select {
+	case runner := <-h.accepted:
+		return runner
+	case <-time.After(5 * time.Second):
+		t.Fatal("runner did not register")
+		return acceptedRunner{}
 	}
-	reader := bufio.NewReader(conn)
-	line, err := reader.ReadBytes('\n')
-	if err != nil {
-		t.Fatalf("read handshake: %v", err)
-	}
-	var request hello
-	if err := json.Unmarshal(line, &request); err != nil {
-		t.Fatalf("parse handshake: %v", err)
-	}
-	reply, _ := json.Marshal(helloReply{OK: accept, Error: "not accepted"})
-	if _, err := conn.Write(append(reply, '\n')); err != nil {
-		t.Fatalf("write reply: %v", err)
-	}
-	if !accept {
-		_ = conn.Close()
-	}
-	return bufferedConn{Conn: conn, reader: reader}, request
+}
+
+func startRunner(t *testing.T, host *fakeHost, token string, handler http.Handler) (cancel func(), done <-chan struct{}) {
+	t.Helper()
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		_ = Run(ctx, Config{
+			HostURL:   host.url(),
+			SandboxID: "sandbox-one",
+			Token:     token,
+			Handler:   handler,
+		})
+	}()
+	t.Cleanup(cancelCtx)
+	return cancelCtx, finished
 }
 
 func TestServesRPCsOverRunnerInitiatedConnection(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	defer func() { _ = listener.Close() }()
+	host := newFakeHost(t, "token-one")
+	cancel, runnerDone := startRunner(t, host, "token-one", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "hello "+r.URL.Path)
+	}))
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	runnerDone := make(chan struct{})
-	go func() {
-		defer close(runnerDone)
-		_ = Run(ctx, Config{
-			HostURL:   "tcp://" + listener.Addr().String(),
-			SandboxID: "sandbox-one",
-			Token:     "token-one",
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				_, _ = io.WriteString(w, "hello "+r.URL.Path)
-			}),
-		})
-	}()
-
-	conn, request := acceptOne(t, listener, true)
-	if request.SandboxID != "sandbox-one" || request.Token != "token-one" {
-		t.Fatalf("unexpected handshake: %+v", request)
+	runner := host.next(t)
+	if runner.sandboxID != "sandbox-one" {
+		t.Fatalf("unexpected sandbox header %q", runner.sandboxID)
 	}
 
-	// The host side speaks plain HTTP/2 over the accepted connection.
+	// The host side speaks plain HTTP/2 over the accepted WebSocket.
 	client := &http.Client{Transport: &http2.Transport{
 		AllowHTTP: true,
 		DialTLSContext: func(context.Context, string, string, *tls.Config) (net.Conn, error) {
-			return conn, nil
+			return runner.conn, nil
 		},
 	}}
 	response, err := client.Get("http://runner.invalid/health")
@@ -96,84 +126,52 @@ func TestServesRPCsOverRunnerInitiatedConnection(t *testing.T) {
 }
 
 func TestRejectedRegistrationRedials(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	defer func() { _ = listener.Close() }()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		_ = Run(ctx, Config{
-			HostURL:   "tcp://" + listener.Addr().String(),
-			SandboxID: "sandbox-one",
-			Token:     "wrong",
-			Handler:   http.NewServeMux(),
-		})
-	}()
+	host := newFakeHost(t, "token-one")
+	startRunner(t, host, "wrong", http.NewServeMux())
 
 	// A rejected runner must come back on its own.
-	acceptOne(t, listener, false)
-	acceptOne(t, listener, false)
+	for range 2 {
+		select {
+		case <-host.refused:
+		case <-time.After(5 * time.Second):
+			t.Fatal("runner did not redial after rejection")
+		}
+	}
 }
 
 func TestAcceptedRegistrationRedialsAfterClose(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	defer func() { _ = listener.Close() }()
+	host := newFakeHost(t, "token-one")
+	startRunner(t, host, "token-one", http.NewServeMux())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		_ = Run(ctx, Config{
-			HostURL:   "tcp://" + listener.Addr().String(),
-			SandboxID: "sandbox-one",
-			Token:     "token-one",
-			Handler:   http.NewServeMux(),
-		})
-	}()
-
-	conn, _ := acceptOne(t, listener, true)
-	_ = conn.Close()
-	conn, _ = acceptOne(t, listener, true)
-	_ = conn.Close()
+	_ = host.next(t).conn.Close()
+	_ = host.next(t).conn.Close()
 }
 
-func TestServeOnceBoundsDialAttempt(t *testing.T) {
-	_, err := serveOnce(context.Background(), func(ctx context.Context) (net.Conn, error) {
-		deadline, ok := ctx.Deadline()
-		if !ok {
-			t.Fatal("dial context has no deadline")
-		}
-		remaining := time.Until(deadline)
-		if remaining <= 0 || remaining > dialTimeout {
-			t.Fatalf("dial deadline is in %v, want (0, %v]", remaining, dialTimeout)
-		}
-		return nil, errors.New("dial failed")
-	}, Config{})
-	if err == nil {
-		t.Fatal("serveOnce succeeded after dial failure")
+func TestRejectionReportsHostReason(t *testing.T) {
+	host := newFakeHost(t, "token-one")
+	_, err := serveOnce(context.Background(), Config{
+		HostURL:   host.url(),
+		SandboxID: "sandbox-one",
+		Token:     "wrong",
+		Handler:   http.NewServeMux(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "401 Unauthorized: invalid registration token") {
+		t.Fatalf("error %v should carry the host's status and reason", err)
 	}
 }
 
-func TestDialerForRejectsInvalidURLs(t *testing.T) {
-	for _, invalid := range []string{"", "host:8081", "http://host:8081", "tcp://host"} {
-		if _, err := dialerFor(invalid); err == nil {
-			t.Errorf("dialerFor(%q) succeeded, want error", invalid)
+func TestValidateHostURL(t *testing.T) {
+	for _, invalid := range []string{"", "host:8081", "tcp://host:8081", "tls://host:8081", "http://host/tunnel", "ws:///tunnel"} {
+		if err := validateHostURL(invalid); err == nil {
+			t.Errorf("validateHostURL(%q) succeeded, want error", invalid)
 		}
 	}
-	for _, valid := range []string{"tcp://host:8081", "tls://host:443"} {
-		if _, err := dialerFor(valid); err != nil {
-			t.Errorf("dialerFor(%q): %v", valid, err)
+	for _, valid := range []string{"ws://host:8081/tunnel", "wss://dsh.example.com/tunnel"} {
+		if err := validateHostURL(valid); err != nil {
+			t.Errorf("validateHostURL(%q): %v", valid, err)
 		}
 	}
-	if !strings.Contains(func() string {
-		_, err := dialerFor("unix:///run/dsh.sock")
-		return err.Error()
-	}(), "not tcp or tls") {
+	if err := validateHostURL("tcp://host:8081"); !strings.Contains(err.Error(), "not ws or wss") {
 		t.Error("scheme error should name the accepted schemes")
 	}
 }

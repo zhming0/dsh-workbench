@@ -13,7 +13,7 @@ spec:
   networkPolicy:
     ingress: []
     egress:
-      # The runner-initiated tunnel to the host; all RPCs flow over it.
+      # The runner-initiated WebSocket tunnel to the host; all RPCs flow over it.
       - to:
           - namespaceSelector:
               matchLabels:
@@ -74,7 +74,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: HOST_URL
-              value: tcp://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081
+              value: ws://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081/tunnel
             # Create this Secret before the warm pool:
             #   kubectl -n dsh-sandbox create secret generic \
             #     dsh-registration-token --from-literal=token=$(openssl rand -hex 32)

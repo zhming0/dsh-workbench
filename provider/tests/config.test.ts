@@ -26,7 +26,7 @@ describe("sandbox provider settings", () => {
         standard: { backend: "kas", namespace: "team-a" },
         large: { backend: "kas", warmPool: "dsh-large" },
         local: { backend: "docker", image: "runner:dev" },
-        remote: { backend: "docker", hostUrl: "tcp://10.0.0.1:8081" },
+        remote: { backend: "docker", hostUrl: "ws://10.0.0.1:8081/tunnel" },
       },
     });
     expect(explicit.defaultProfile).toBe("large");
@@ -49,13 +49,13 @@ describe("sandbox provider settings", () => {
         name: "local",
         backend: "docker",
         image: "runner:dev",
-        hostUrl: "tcp://host.docker.internal:9000",
+        hostUrl: "ws://host.docker.internal:9000/tunnel",
       },
       remote: {
         name: "remote",
         backend: "docker",
         image: DEFAULT_RUNNER_IMAGE,
-        hostUrl: "tcp://10.0.0.1:8081",
+        hostUrl: "ws://10.0.0.1:8081/tunnel",
       },
     });
 
@@ -68,5 +68,12 @@ describe("sandbox provider settings", () => {
     expect(() => resolveConfig({ profiles: {} })).toThrow(
       "at least one profile",
     );
+    expect(() =>
+      resolveConfig({
+        profiles: {
+          old: { backend: "docker", hostUrl: "tcp://10.0.0.1:8081" },
+        },
+      }),
+    ).toThrow("profile old: hostUrl must be a ws:// or wss:// URL");
   });
 });

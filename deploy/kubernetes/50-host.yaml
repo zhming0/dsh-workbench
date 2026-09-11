@@ -132,9 +132,11 @@ spec:
             claimName: dsh-host-data
 ---
 # The stable in-cluster address runners dial; the sandbox template's HOST_URL
-# points here. The tunnel is h2c inside the cluster: host authenticity rests
-# on the cluster network being inside the trust domain. Put TLS in front of
-# any tunnel endpoint exposed beyond the cluster.
+# points here. The tunnel is a plaintext WebSocket inside the cluster: host
+# authenticity rests on the cluster network being inside the trust domain.
+# Runners outside the cluster reach this Service through a /tunnel path rule
+# on the Ingress that serves the Web UI, so TLS comes from that certificate;
+# see docs/kubernetes.md.
 apiVersion: v1
 kind: Service
 metadata:

@@ -89,9 +89,10 @@ authenticates users; it does not isolate them. One dsh host is one trust
 domain: everyone the issuer admits shares the same sessions, credentials, and
 sandboxes.
 
-Runners dial out to the host's tunnel Service and authenticate with that
-registration token, so no route into a sandbox is ever needed — rotation and
-details are in
+Runners dial out to the host's tunnel Service over a WebSocket and
+authenticate with that registration token, so no route into a sandbox is ever
+needed. Runners outside the cluster reach the tunnel through a `/tunnel` path
+on the same Ingress, under the UI's certificate. Rotation and details are in
 [docs/kubernetes.md](docs/kubernetes.md#the-in-cluster-dsh-host).
 
 ### Start a session

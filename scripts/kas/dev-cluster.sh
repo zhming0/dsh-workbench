@@ -26,7 +26,7 @@ the caller.
 
 With --host-image, the dsh host runs in-cluster and runners dial its
 dsh-host-tunnel Service. With --host-url, dsh runs outside the cluster and
-runners dial URL instead (tcp://... or tls://...; the address must be
+runners dial URL instead (ws://.../tunnel or wss://.../tunnel; the address must be
 reachable from pods, and the sandbox NetworkPolicy must be widened to it).
 
 The registration token is read from FILE when given, otherwise generated.
@@ -113,7 +113,7 @@ fi
 TEMPLATE="$(sed "s|DSH_RUNNER_IMAGE_PLACEHOLDER|${RUNNER_IMAGE//&/\\&}|g" \
   "$ROOT_DIR/deploy/kubernetes/20-sandbox-template.yaml")"
 if [[ -n "$HOST_URL" ]]; then
-  TEMPLATE="$(sed "s|tcp://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081|${HOST_URL//&/\\&}|g" <<<"$TEMPLATE")"
+  TEMPLATE="$(sed "s|ws://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081/tunnel|${HOST_URL//&/\\&}|g" <<<"$TEMPLATE")"
 fi
 kubectl apply -f - <<<"$TEMPLATE"
 

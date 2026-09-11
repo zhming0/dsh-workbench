@@ -18,7 +18,7 @@ const PROFILE: SandboxProfile = {
   name: "standard",
   backend: "docker",
   image: "runner:test",
-  hostUrl: "tcp://host.docker.internal:8081",
+  hostUrl: "ws://host.docker.internal:8081/tunnel",
 };
 
 const REPOSITORY = "https://github.com/example/repo.git";
