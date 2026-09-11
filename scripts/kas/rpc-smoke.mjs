@@ -63,6 +63,17 @@ try {
   assertEqual(first.stdout, "connected", "initial command output");
   assertEqual(first.stderr, "diagnostic", "initial command error output");
 
+  // The runner forwards the template's DOCKER_HOST to commands, and the
+  // rootless daemon sidecar answers on that socket.
+  const dockerHost = await run(client, ["/bin/bash", "-lc", 'printf %s "$DOCKER_HOST"']);
+  assertEqual(
+    dockerHost.stdout,
+    "unix:///run/user/1000/docker.sock",
+    "DOCKER_HOST in a runner command",
+  );
+  const docker = await run(client, ["docker", "version", "--format", "{{.Server.Os}}"]);
+  assertEqual(docker.stdout.trim(), "linux", "Docker daemon reachable from a runner command");
+
   await client.writeFile({
     path: sentinelPath,
     content: new TextEncoder().encode("workspace survived"),

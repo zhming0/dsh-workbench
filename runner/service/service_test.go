@@ -136,6 +136,18 @@ func TestSecretsReplaceAndSafeEnvironment(t *testing.T) {
 	}
 }
 
+func TestEnvironmentForwardsDockerHost(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "unix:///run/user/1000/docker.sock")
+	t.Setenv("DOCKER_TLS_VERIFY", "1")
+	env := New("box").environment(nil)
+	if envValue(env, "DOCKER_HOST") != "unix:///run/user/1000/docker.sock" {
+		t.Fatalf("DOCKER_HOST not forwarded: %v", env)
+	}
+	if envValue(env, "DOCKER_TLS_VERIFY") != "" {
+		t.Fatalf("only DOCKER_HOST is on the allow-list: %v", env)
+	}
+}
+
 func TestResolveMissingLeafThroughSymlink(t *testing.T) {
 	d := t.TempDir()
 	real := filepath.Join(d, "real")

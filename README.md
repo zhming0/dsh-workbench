@@ -196,6 +196,7 @@ Every setting, with its default, is in
 | `bash`                                        | your machine              | sandbox                                |
 | `glob`, `grep`                                | ripgrep on your machine   | sandbox workspace, ripgrep in the sandbox |
 | Working directory                             | wherever you launched dsh | `/workspace/repository` in the sandbox |
+| `docker`                                      | your Docker daemon        | a rootless daemon in the sandbox pod   |
 | Session logs, spill files                     | your disk                 | unchanged, still your disk             |
 | Uploaded attachments                          | your disk                 | copied into the sandbox workspace      |
 
@@ -204,6 +205,13 @@ references it, under `/workspace/.dsh-attachments`, so the model's file tools
 can read it; the host keeps the stored original. One copy is capped at 64 MiB,
 the size of the single write RPC that carries it, so a larger upload keeps
 dsh's "cannot access a readable path" placeholder.
+
+Each Kubernetes sandbox pod runs a rootless `dockerd` sidecar, and the runner's
+`DOCKER_HOST` points at its socket, so `docker build` and `docker run` work
+inside a session. The daemon's images and containers are discarded when the
+sandbox hibernates; see
+[Docker inside a sandbox](docs/kubernetes.md#docker-inside-a-sandbox) for the
+security trade this makes and how to remove it.
 
 Replacing the filesystem row also turns off dsh's host-side permission model:
 `workspace-write` and the approval prompts came from that row, and the bundle

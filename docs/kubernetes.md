@@ -10,7 +10,9 @@ project is pre-1.0; do not assume these manifests work with another release.
 - Linux or macOS with Docker, `kind`, `kubectl`, and Python 3
 - a locally built DSH runner image, or an image the cluster can pull
 - the runner must run as UID 1000, serve port 8080, implement `GET /health`,
-  and contain `sh` and `cat` for the smoke test
+  and contain `sh`, `cat`, and the `docker` CLI for the smoke test
+- nodes that allow a privileged container, which the Docker daemon sidecar
+  needs (see [Docker inside a sandbox](#docker-inside-a-sandbox))
 
 From a blank machine, install Docker, then install
 [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) and
@@ -99,6 +101,63 @@ The template contains no session-specific environment variables or Secrets;
 the registration token is the same for every runner by design. Claim `env` or
 `volumeClaimTemplates` overrides force a cold start instead of adopting a warm
 Sandbox, so both injection policies are deliberately `Disallowed`.
+
+## Docker inside a sandbox
+
+Each sandbox pod runs a second container, `docker`, from the upstream
+`docker:29.8.0-dind-rootless` image. It is a rootless Docker daemon: the
+process is UID 1000 and creates its own user namespace with rootlesskit, so
+"root" inside any container it starts is UID 1000 on the node and nested
+containers never hold real root. The runner container has the Docker CLI,
+Buildx, and Compose, and its `DOCKER_HOST` points at the daemon's socket,
+`unix:///run/user/1000/docker.sock`, on a tmpfs both containers mount. The
+runner forwards `DOCKER_HOST` to every command, so a model can `docker run`,
+`docker build`, and `docker compose up` with no setup.
+
+Bind mounts work because the sidecar mounts the workspace volume at the same
+`/workspace` path as the runner: `docker run -v /workspace/repository:/src`
+sees the session's checkout. Files the runner owns appear as root-owned inside
+a container, and files a container writes as root land as UID 1000, so the
+runner can edit them afterwards. A published port (`-p 8080:80`) binds in the
+pod, so the runner reaches it at `localhost:8080`; containers cannot reach the
+pod's own loopback (`--disable-host-loopback`), including the runner's health
+port.
+
+Container traffic leaves through the pod's network namespace, so the sandbox
+NetworkPolicy applies to it unchanged: registries on 443 and kube-dns are
+reachable, nothing else is. Both image pulls and the model's own commands share
+that allow-list.
+
+Images, containers, and volumes live on an `emptyDir` sized at 10Gi, not on
+the workspace volume. Hibernation removes the pod and that storage with it, so
+a woken session keeps its files but pulls images again. This is deliberate:
+the workspace volume is small, and kubelet's `fsGroup` ownership pass at every
+pod start would rewrite the group of every file inside every image layer. A
+sandbox that fills the 10Gi limit is evicted by kubelet; raise `sizeLimit` in
+the template if your sessions build large images.
+
+**Why the sidecar is `privileged`.** rootlesskit needs to create user and
+mount namespaces, and the nested runc needs to mount a fresh `/proc`. Both are
+refused under the default seccomp profile, AppArmor, and the masked `/proc`
+paths runtimes apply to ordinary containers. The only Kubernetes switch that
+lifts all three is `privileged: true`; the alternative, `procMount: Unmasked`,
+is accepted only for pods running in a user namespace (`hostUsers: false`),
+which needs kernel and runtime support not every cluster has. Privileged mode
+does not change the process identity: rootlesskit runs as UID 1000 with an
+empty effective capability set, the daemon's capabilities exist only inside
+the user namespace it creates, and the node's device nodes, although exposed
+to the container, stay root-owned and unreadable to it. What privileged mode
+does remove is the kernel attack-surface reduction from seccomp and AppArmor
+for that one container. Because the pod has no cgroup delegation, the daemon
+also runs without cgroups: `docker run --memory` and similar limits are not
+enforced on nested containers. The runner
+container, where the model's commands run, keeps `RuntimeDefault` seccomp,
+dropped capabilities, and `allowPrivilegeEscalation: false` exactly as before.
+The template no longer satisfies the `baseline` Pod Security Standard; a
+namespace enforcing it rejects the pod. If that trade is wrong for your
+cluster, delete the `docker` container and its two `emptyDir` volumes from the
+template and the runner's `DOCKER_HOST` entry; the CLI then reports that no
+daemon is reachable.
 
 ## The in-cluster dsh host
 
@@ -336,8 +395,10 @@ API server; production deployments should replace it with approved CIDRs or an
 FQDN-aware CNI policy and adapt DNS labels for their DNS provider. NetworkPolicy
 is connectivity control, not a sandbox boundary.
 
-The pod does not mount a service-account token and runs non-root with dropped
-capabilities and RuntimeDefault seccomp. The `dsh-provider` Role is namespace
+The pod does not mount a service-account token and runs non-root. The runner
+container has dropped capabilities and RuntimeDefault seccomp; the `docker`
+sidecar is privileged for the reasons in
+[Docker inside a sandbox](#docker-inside-a-sandbox). The `dsh-provider` Role is namespace
 scoped: it manages claims and reads/patches Sandboxes for lifecycle operations.
 Bind a real provider workload's ServiceAccount to this Role rather than
 granting cluster-admin.
@@ -347,7 +408,9 @@ it works in kind. `runc` provides container isolation, not a VM security
 boundary for hostile code. For gVisor, install and verify a `RuntimeClass` (for
 example `gvisor`) on every eligible node, then add
 `runtimeClassName: gvisor` under `podTemplate.spec`; plain kind does not provide
-it. Use node selectors/tolerations where only some nodes support gVisor.
+it. Use node selectors/tolerations where only some nodes support gVisor. The
+Docker sidecar has only been exercised under `runc`; verify it under gVisor
+before relying on it there.
 
 ## Smoke test and lifecycle
 
@@ -355,8 +418,10 @@ Typical output resembles:
 
 ```text
 Adopted Sandbox/dsh-universal-abc12 in 180ms
+Docker sidecar: container read the workspace sentinel
 Suspended: pod removed; PVC/workspace-dsh-universal-abc12 remains
 Resumed in 2400ms; workspace and home sentinels verified
+Docker sidecar answered after resume
 shutdownTime foreground deletion and workspace cleanup verified
 PASS: agent-sandbox warm adoption, suspend/resume persistence, and expiry
 ```
@@ -365,8 +430,13 @@ The test creates unique claims, discovers the underlying Sandbox through
 `.status.sandbox.name`, and uses `spec.operatingMode: Suspended` on that
 **Sandbox** (there is no `spec.paused`). Suspension removes compute while the
 PVC survives; Running recreates the pod and the test verifies workspace and
-home-directory sentinels. On failure the main claim is intentionally preserved
-for debugging; on success it is removed.
+home-directory sentinels. In between it runs `docker run` from the runner
+container: a busybox image imported from the sidecar itself, so the check does
+not depend on the cluster's external DNS, reads the sentinel through the
+sidecar's own workspace mount. If pods cannot resolve `registry-1.docker.io`,
+the test prints a note that models will not be able to pull images. On failure
+the main claim is intentionally preserved for debugging; on success it is
+removed.
 
 The PVC carries the whole `/workspace` tree: the checkout, mise's data and
 shims in `/workspace/.dsh-state`, and the home directory at `/workspace/home`.
