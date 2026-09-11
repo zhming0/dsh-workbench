@@ -1,7 +1,10 @@
+import { readFile } from "node:fs/promises";
 import { posix } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { Code, ConnectError } from "@connectrpc/connect";
+import type { Context } from "@deepseek-ai/cordis";
+import type { GenerateOptions, StreamChunk } from "@deepseek-ai/dsh-llm";
 import {
   FileSystem,
   FsError,
@@ -17,6 +20,11 @@ import {
   type FsWriteOutcome,
 } from "@deepseek-ai/dsh-fs";
 
+import {
+  AttachmentCopies,
+  collectFileAttachments,
+  type FileAttachmentRef,
+} from "./attachment-copies.js";
 import { FileType } from "./gen/dsh/sandbox/v1/runner_pb.js";
 import { pathInSandbox } from "./sandbox-path.js";
 
@@ -25,6 +33,25 @@ const MAX_TEXT_BYTES = 64 * 1024 * 1024;
 
 export class SandboxFileSystem extends FileSystem {
   static inject = ["sandboxManager", "agents"];
+
+  private readonly attachmentCopies: AttachmentCopies;
+
+  constructor(ctx: Context) {
+    super(ctx);
+    this.attachmentCopies = new AttachmentCopies({
+      workspace: () => ctx.sandboxManager.workspace,
+      sessionKey: () => ctx.sandboxManager.rootSessionIdForCurrentAgent(),
+      client: () => ctx.sandboxManager.clientForCurrentAgent(),
+      hostPath: (ref) => attachmentsOf(ctx)?.fileHostPath(ref),
+      readBytes: (hostPath, signal) =>
+        readFile(hostPath, signal === undefined ? {} : { signal }),
+      warn: (message) =>
+        ctx.logger("sandbox").warn(`attachment copy: ${message}`),
+    });
+    ctx.on("llm/stream", (options, next) =>
+      this.copyAttachmentsThenStream(options, next),
+    );
+  }
 
   async resolve(
     path: string,
@@ -64,6 +91,16 @@ export class SandboxFileSystem extends FileSystem {
 
   fileUrl(target: FsTarget): string {
     return pathToFileURL(this.processPath(target)).href;
+  }
+
+  /**
+   * Map a host attachment path to the copy this request already placed in the
+   * sandbox. Synchronous by contract and called during request assembly, so
+   * it never does I/O and never throws; an unknown path stays unmapped and
+   * the model keeps dsh's placeholder for it.
+   */
+  processPathFromHostPath(hostPath: string): string | undefined {
+    return this.attachmentCopies.lookup(hostPath);
   }
 
   contains(parent: FsTarget, child: FsTarget): boolean {
@@ -282,6 +319,32 @@ export class SandboxFileSystem extends FileSystem {
       throw mapFileError(error, "edit", target.displayPath, signal);
     }
   }
+
+  /**
+   * Copy the request's attachments into the sandbox before request assembly
+   * resolves their handle text. The generator defers the copy to first
+   * iteration, which still runs before `next()` and so before the projection
+   * that asks `processPathFromHostPath` for each reference.
+   */
+  private async *copyAttachmentsThenStream(
+    options: GenerateOptions,
+    next: () => AsyncIterable<StreamChunk>,
+  ): AsyncGenerator<StreamChunk> {
+    await this.attachmentCopies.ensure(
+      collectFileAttachments(options.messages),
+      options.signal,
+    );
+    yield* next();
+  }
+}
+
+/** The attachment fields this module reads; dsh owns the service surface. */
+interface AttachmentsLookup {
+  fileHostPath(ref: FileAttachmentRef): string | undefined;
+}
+
+function attachmentsOf(ctx: Context): AttachmentsLookup | undefined {
+  return ctx.get("attachments");
 }
 
 function mapFileError(

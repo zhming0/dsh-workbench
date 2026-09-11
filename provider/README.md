@@ -51,6 +51,15 @@ is disposed mid-run; a child whose parent cannot be resolved at all (absent
 or disposed ancestor) falls back to its own sandbox, and the fallback is
 logged as a warning.
 
+Uploaded attachments are copied into the sandbox on demand. dsh stores an
+upload on the host and asks the filesystem row to map its host path into the
+tool execution world; a sandbox shares no path with that host, so before each
+model request the filesystem copies every attachment the request references
+into `<workspace>/.dsh-attachments` and answers that mapping. Copies are keyed
+by root session, so a subagent reads its root's copy, and they survive
+hibernation because the workspace volume does. The mapping itself lives in
+host memory, so the first request after a host restart copies again.
+
 In the Web profile, the package replaces directory picking with a repository
 URL dialog. It creates an owner-only host anchor, registers it as a dsh
 Workspace named `owner/repo`, and returns that path through dsh's normal picker
@@ -443,6 +452,10 @@ see
   `code`, or `cordis`.
 - Shell and subprocess output is kept in bounded in-memory tails. Truncated
   output is reported, but it is not copied to a spill file.
+- An uploaded attachment reaches the sandbox through one unary `WriteFile` RPC
+  that both sides buffer in memory, so copies are capped at 64 MiB per file. A
+  larger upload keeps dsh's "cannot access a readable path" placeholder;
+  chunked transfer is not implemented.
 - Docker stop/start keeps the same container. Kubernetes suspension removes the
   pod and keeps its workspace volume.
 - There is no service exposure or portal support yet.
