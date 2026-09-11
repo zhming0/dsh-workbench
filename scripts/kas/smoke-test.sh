@@ -75,6 +75,21 @@ sentinel="dsh-kas-$suffix"
 kubectl -n "$NAMESPACE" exec "$pod" -c runner -- sh -c 'printf %s "$1" > /workspace/.kas-smoke-sentinel' sh "$sentinel"
 kubectl -n "$NAMESPACE" exec "$pod" -c runner -- sh -c '[ "$HOME" = /workspace/home ] || { echo "unexpected HOME: $HOME" >&2; exit 1; }; printf %s "$1" > "$HOME/.kas-smoke-home-sentinel"' sh "$sentinel"
 
+# The runner's Docker CLI reaches the rootless daemon sidecar over the shared
+# socket, and a container sees the workspace volume because the sidecar mounts
+# it at the same path. The daemon starts with an empty image store and a pull
+# needs external DNS from the pod, which a lab cluster may not have, so the
+# test image is imported from the sidecar's own busybox instead.
+if ! kubectl -n "$NAMESPACE" exec "$pod" -c runner -- getent hosts registry-1.docker.io >/dev/null 2>&1; then
+  echo "note: this cluster's pods cannot resolve registry-1.docker.io; models will not be able to pull images" >&2
+fi
+kubectl -n "$NAMESPACE" exec "$pod" -c docker -- sh -c \
+  'tar -C / -c bin/busybox lib/ld-musl-*.so.1 | docker import --change "ENTRYPOINT [\"/bin/busybox\"]" - kas-smoke:local' >/dev/null
+docker_sentinel="$(kubectl -n "$NAMESPACE" exec "$pod" -c runner -- \
+  docker run --rm --pull=never --volume /workspace:/mnt:ro kas-smoke:local cat /mnt/.kas-smoke-sentinel)"
+[[ "$docker_sentinel" == "$sentinel" ]] || { echo "error: a Docker container did not read the workspace sentinel through the sidecar" >&2; exit 1; }
+echo "Docker sidecar: container read the workspace sentinel"
+
 kubectl -n "$NAMESPACE" patch sandbox "$sandbox" --type=merge -p '{"spec":{"operatingMode":"Suspended"}}'
 deadline=$((SECONDS + 120))
 while kubectl -n "$NAMESPACE" get pods -l "$selector" -o name | grep -q .; do
@@ -94,6 +109,10 @@ actual_home="$(kubectl -n "$NAMESPACE" exec "$pod" -c runner -- sh -c 'cat "$HOM
 [[ "$actual_home" == "$sentinel" ]] || { echo "error: home directory sentinel did not survive resume" >&2; exit 1; }
 resume_ms=$(( $(python3 -c 'import time; print(time.time_ns() // 1_000_000)') - resume_start_ms ))
 echo "Resumed in ${resume_ms}ms; workspace and home sentinels verified"
+# A fresh pod means a fresh daemon with empty image storage; the CLI must
+# still reach it.
+kubectl -n "$NAMESPACE" exec "$pod" -c runner -- docker version --format '{{.Server.Version}}' >/dev/null
+echo "Docker sidecar answered after resume"
 
 DISPOSABLE_CLAIM="kas-expiry-$suffix"
 shutdown_time="$(python3 -c 'from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc) + timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%SZ"))')"

@@ -52,6 +52,10 @@ spec:
           requests:
             storage: 2Gi
   podTemplate:
+    metadata:
+      annotations:
+        # `kubectl logs` and `kubectl exec` without `-c` pick the runner.
+        kubectl.kubernetes.io/default-container: runner
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -66,6 +70,11 @@ spec:
           image: DSH_RUNNER_IMAGE_PLACEHOLDER
           imagePullPolicy: IfNotPresent
           env:
+            # The Docker CLI in the runner talks to the rootless daemon in the
+            # `docker` sidecar over this socket. The runner forwards this
+            # variable to every command it runs.
+            - name: DOCKER_HOST
+              value: unix:///run/user/1000/docker.sock
             # agent-sandbox v0.5.4 normally names the backing pod after its
             # Sandbox. The provider expects this same assigned Sandbox name
             # in the tunnel handshake and in Health responses.
@@ -101,3 +110,58 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+            - name: docker-socket
+              mountPath: /run/user/1000
+        # Rootless Docker daemon for the session. It runs as UID 1000 via
+        # rootlesskit, so nested containers never hold root on the node, and
+        # everything it starts shares this pod's network namespace and
+        # NetworkPolicy. The container is nevertheless `privileged`: that is the
+        # only Kubernetes switch that removes the seccomp profile, AppArmor,
+        # and the masked /proc paths that rootlesskit and its nested runc need.
+        # The non-privileged alternative, `procMount: Unmasked`, requires pod
+        # user namespaces (`hostUsers: false`), which not every cluster offers.
+        # Note that privileged mode disables the RuntimeDefault seccomp
+        # profile for this container only; the runner keeps it.
+        - name: docker
+          image: docker:29.8.0-dind-rootless
+          imagePullPolicy: IfNotPresent
+          # Naming `dockerd` explicitly skips the entrypoint's defaults, which
+          # would also listen on TCP 2375/2376 inside the pod.
+          args:
+            - dockerd
+            - --host=unix:///run/user/1000/docker.sock
+          env:
+            - name: DOCKER_HOST
+              value: unix:///run/user/1000/docker.sock
+          readinessProbe:
+            exec:
+              command: [docker, version, --format, '{{.Server.Version}}']
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          securityContext:
+            privileged: true
+          volumeMounts:
+            # Same path as in the runner, so `docker run -v /workspace/...`
+            # bind-mounts the session's files.
+            - name: workspace
+              mountPath: /workspace
+            - name: docker-socket
+              mountPath: /run/user/1000
+            # Images and containers, under the daemon's default data root
+            # `~/.local/share/docker`. Deliberately not on the workspace
+            # volume: they would count against its quota, and fsGroup
+            # ownership fixes at every wake would rewrite the group of every
+            # image layer file. Hibernation therefore keeps the workspace, not
+            # pulled images. The mount is one level above the data root
+            # because a mount point belongs to real root, whom the daemon's
+            # user namespace does not map; the daemon must create and own the
+            # `docker` directory itself.
+            - name: docker-data
+              mountPath: /home/rootless/.local/share
+      volumes:
+        - name: docker-socket
+          emptyDir:
+            medium: Memory
+        - name: docker-data
+          emptyDir:
+            sizeLimit: 10Gi

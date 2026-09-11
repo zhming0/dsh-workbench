@@ -19,6 +19,7 @@ cleanup() {
     kubectl -n "$NAMESPACE" logs "job/$JOB" --all-containers=true || true
     while read -r pod; do
       kubectl -n "$NAMESPACE" logs "$pod" -c runner || true
+      kubectl -n "$NAMESPACE" logs "$pod" -c docker || true
     done < <(kubectl -n "$NAMESPACE" get pods -o name 2>/dev/null)
     kubectl -n agent-sandbox-system logs deployment/agent-sandbox-controller --all-containers=true --tail=200 || true
   fi

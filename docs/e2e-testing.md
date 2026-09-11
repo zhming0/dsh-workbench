@@ -110,12 +110,16 @@ The transport probe verifies:
 1. `KasBackend` claims a real warm Sandbox;
 2. its runner registers and answers an identity-checked health RPC;
 3. secret injection, command streaming, and file RPCs cross the tunnel;
-4. hibernate/wake recreates the runner connection and preserves workspace and
+4. commands receive `DOCKER_HOST` and `docker version` reaches the rootless
+   daemon sidecar over the shared socket;
+5. hibernate/wake recreates the runner connection and preserves workspace and
    home-directory data.
 
 It then runs the controller lifecycle smoke test, which additionally verifies
-sub-second warm adoption, backing-pod identity, PVC survival across
-suspend/resume, and foreground expiry of a claim, Sandbox, and PVC.
+sub-second warm adoption, backing-pod identity, a `docker run` from the runner
+container that reads the workspace through the sidecar's mount, PVC survival
+across suspend/resume, the daemon answering again after resume, and foreground
+expiry of a claim, Sandbox, and PVC.
 
 Success ends with:
 
@@ -174,19 +178,25 @@ its cluster when it finishes.
 4. Ask the model to use its shell and file tools to:
    - print `uname -a` and the working directory;
    - read a known file from the repository;
-   - write a uniquely named file with known content and read it back.
-5. Find the claimed Sandbox and verify the file independently in its runner
-   container:
+   - write a uniquely named file with known content and read it back;
+   - run a Docker container that bind-mounts the repository and writes a
+     second uniquely named file into it, for example
+     `docker run --rm -v "$PWD:/src" alpine sh -c 'echo <content> > /src/<file>'`.
+5. Find the claimed Sandbox and verify both files independently in its runner
+   container, and confirm the daemon ran the container:
 
    ```sh
    kubectl -n dsh-sandbox get sandboxclaims,sandboxes,pods
    kubectl -n dsh-sandbox exec <pod> -c runner -- \
      cat /workspace/repository/<file>
+   kubectl -n dsh-sandbox exec <pod> -c docker -- docker images
    ```
 
 The model's command hostname must be the Sandbox pod rather than the dsh host,
-and the independently read file must contain the expected text. A chat answer
-alone is not evidence that the tool ran in the sandbox.
+and the independently read files must contain the expected text. The file the
+container wrote must be owned by UID 1000 in the runner (rootless Docker maps
+container root to the sidecar's user). A chat answer alone is not evidence
+that the tool ran in the sandbox.
 
 If the host Deployment restarts, restart `kubectl port-forward`; it targets a
 specific pod and does not follow the replacement. The browser cookie survives
