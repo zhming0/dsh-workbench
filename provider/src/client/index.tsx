@@ -10,6 +10,10 @@ import { InstructionsSettings } from "./instructions.js";
 import { SandboxProfileChip } from "./profile.js";
 import { RepositoryDirectoryFlow } from "./repository-directory-flow.js";
 import { SecretsSettings } from "./secrets.js";
+import {
+  installSettingsNavIcons,
+  SETTINGS_SECTION_LABELS,
+} from "./settings-nav-icons.js";
 
 /**
  * The client bundle entry: mounts the Remote endpoints and registers the
@@ -22,6 +26,7 @@ export const inject = ["remote", "slots"];
  * and add the Instructions and Secrets sections to the Settings page. */
 export async function apply(ctx: Context) {
   const disposeRemote = await ctx.remote.$mount(workbenchRemote);
+  const disposeNavIcons = installSettingsNavIcons();
 
   ctx.inject(["remote.sandboxManager"], (remoteCtx) => {
     const unwrap = <T,>(result: RemoteResult<T>): T => {
@@ -64,7 +69,7 @@ export async function apply(ctx: Context) {
             name: "settings.section",
             id: "dsh-workbench.instructions",
             order: 30,
-            label: "Instructions",
+            label: SETTINGS_SECTION_LABELS.instructions,
             inject: injectedInstructions,
           },
           InstructionsSettings,
@@ -74,7 +79,7 @@ export async function apply(ctx: Context) {
             name: "settings.section",
             id: "dsh-workbench.secrets",
             order: 31,
-            label: "Secrets",
+            label: SETTINGS_SECTION_LABELS.secrets,
             inject: injected,
           },
           SecretsSettings,
@@ -146,6 +151,7 @@ export async function apply(ctx: Context) {
   });
 
   return () => {
+    disposeNavIcons();
     void disposeRemote();
   };
 }
