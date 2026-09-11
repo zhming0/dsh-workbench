@@ -170,6 +170,7 @@ its cluster when it finishes.
    kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'
    # prints http://127.0.0.1:3000/?token=…; open http://localhost:3000/?token=…
    ```
+
 4. Ask the model to use its shell and file tools to:
    - print `uname -a` and the working directory;
    - read a known file from the repository;
@@ -235,6 +236,12 @@ alone does not prove persistence or model-context injection.
 - **A development image does not reflect the checkout:** rebuild with
   `docker buildx bake dev host-dev --load`, then rerun `dev-cluster.sh` with
   `--load-runner-image`.
+- **A rebuilt host image still runs the old bundle:** `dsh-host-seed`
+  refreshes the profile on the host volume only when the image version
+  changes, and every development build is `0.0.0-dev`. Remove the marker and
+  restart:
+  `kubectl -n dsh-sandbox exec deploy/dsh-host -c dsh-host -- rm /data/.dsh/profiles/web/.dsh-host-image-version`,
+  then `kubectl -n dsh-sandbox rollout restart deploy/dsh-host`.
 - **The warm pool never becomes ready:** inspect agent-sandbox controller
   deployments, the `dsh-universal` `SandboxWarmPool`, and runner pod events.
 - **The browser stops loading after a rollout:** restart the port-forward.

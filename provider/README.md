@@ -92,19 +92,25 @@ its host anchor path, which does not exist inside the sandbox; the model only
 ever needs sandbox paths, and it finds its working directory the way any shell
 user does.
 
-Three Web features stay off. The right sidebar's **Files** and **Preview**
-tabs and the clickable file references under each turn (`workspace-files`,
-`ui-sidebar-files`, `ui-sidebar-documentpreview`, `ui-deliverables`) read the
-session workspace through dsh's filesystem service from plain browser
-requests, outside any agent turn, and this package's filesystem finds a
-session's sandbox through the agent that is asking, so they cannot reach the
-sandbox as shipped. The right sidebar itself stays mounted, because the chat
-UI depends on it, and renders no tabs.
-[`docs/plans/web-sidebar.md`](../docs/plans/web-sidebar.md) records what
-running them against the sandbox takes, for when the sidebar earns it.
+The right sidebar's **Files** and **Preview** tabs and the file cards under
+each turn (`workspace-files`, `ui-sidebar-files`, `ui-sidebar-documentpreview`,
+`ui-deliverables`) read the session workspace through dsh's filesystem service
+from plain browser requests, outside any agent turn, while this package's
+filesystem finds a session's sandbox through the agent that is asking. The
+bundle keeps those stock rows and adds two of its own: `sandbox-workspace-files`
+wraps the live `workspaceFiles` service so each request runs as the agent of the
+session it names, and `sandbox-workspace-policy` publishes the `sandboxPolicy`
+service those rows require, reporting the sandbox workspace and adding nothing
+to the prompt. Browsing a file behaves like any other request against the
+session: it wakes a hibernated sandbox and counts as activity for the idle
+timer. [`docs/plans/web-sidebar.md`](../docs/plans/web-sidebar.md) records why
+the stock rows fail on their own and a deferred design in which browsing never
+wakes a sandbox. One cosmetic limit remains: the Files tab's header label
+comes from the session `cwd` in the browser, so it shows the host anchor
+directory while every entry under it is a sandbox path.
 
-The header's **Open in...** button (`open-in-app`, `ui-open-in-app`) is also
-off: it launches a desktop application on the host against the session `cwd`.
+The header's **Open in...** button (`open-in-app`, `ui-open-in-app`) is off:
+it launches a desktop application on the host against the session `cwd`.
 That `cwd` is the anchor, and the application probe would run through the
 sandbox subprocess seam and report programs installed in the sandbox.
 
@@ -419,8 +425,8 @@ see
 - Interactive terminals and streaming subprocess input are not implemented.
   One-shot stdin, streamed stdout/stderr, cancellation, and background process
   handles are supported. The shipped `minimal` agent preset is built on a
-  terminal and also requires the disabled `sandbox-policy` service, so a
-  session on that preset fails to compose; use `standard`, `code`, or `cordis`.
+  persistent terminal, so its only tool fails on every call; use `standard`,
+  `code`, or `cordis`.
 - Shell and subprocess output is kept in bounded in-memory tails. Truncated
   output is reported, but it is not copied to a spill file.
 - Docker stop/start keeps the same container. Kubernetes suspension removes the

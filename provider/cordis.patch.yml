@@ -27,41 +27,27 @@
 - id: permission
   disabled: true
 
-# The file policy line dsh adds to every session's context ("Current DSH file
-# policy: workspace-write ... may modify files under the session workspace:
-# <path>") renders the session cwd, which here is the host anchor and does not
-# exist inside the sandbox. It also describes a host boundary the rows above
-# turn off. Both halves would mislead the model, whose paths are sandbox
-# paths, so the row goes. Nothing left enabled needs the service: the stock
-# tool rows only resolve `sandboxPolicy` when the fs or shell backend confines,
-# and the sandbox backends do not, and the Web rows that inject it are
-# disabled below.
+# dsh's sandbox policy describes the host's own file sandbox: a per-session
+# mode switch, a host directory the agent may write under, and a line in every
+# model request ("Current DSH file policy: workspace-write ... may modify files
+# under the session workspace: <path>") that renders the session cwd. That cwd
+# is the host anchor here and does not exist inside the sandbox, and the rows
+# above turn off the boundary the line describes, so the stock row would
+# mislead the model. The sandbox-workspace-policy row inserted below stands in
+# for it: it answers the Web rows that read `workspaceRoot` with the sandbox
+# workspace and adds nothing to the prompt.
 - id: sandbox-policy
   disabled: true
 
-# The Web right sidebar's Files and Preview tabs, and the clickable file
-# references under each turn, read through `workspace-files`, which serves the
-# browser from plain HTTP requests outside any agent turn. This package's
-# filesystem finds a session's sandbox through the calling agent, so the stock
-# service fails on every request, and `ui-deliverables` also injects
-# `sandboxPolicy`, which is disabled above. The four rows go together: the
-# Web app serves a package's browser half only for a mounted row, so the two
-# tab rows cannot load their `workspace-files` client dependency once that
-# row is off. The sidebar surface itself (`ui-sidebar-right`) stays, because
-# the chat UI injects it; it renders no tabs. docs/plans/web-sidebar.md
-# records what running these against the sandbox takes. Web-only, like
-# directory-picker below.
-- id: workspace-files
-  disabled: true
-
-- id: ui-sidebar-files
-  disabled: true
-
-- id: ui-sidebar-documentpreview
-  disabled: true
-
-- id: ui-deliverables
-  disabled: true
+# The Web right sidebar's Files and Preview tabs, and the deliverables cards
+# under each turn, read through `workspace-files`, which serves the browser
+# from plain HTTP requests outside any agent turn. This package's filesystem
+# finds a session's sandbox through the calling agent, so on its own the stock
+# service fails on every request. The sandbox-workspace-files row inserted
+# below wraps its methods on the live service and runs each one as the agent
+# of the session named on the wire. The stock row stays mounted under its own
+# name: the Web app serves a package's browser half only for a mounted row of
+# that package, and the sidebar's file resource provider lives in that half.
 
 # Replace the Web app's host-directory chooser with this package's repository
 # URL flow. This patch is skipped with a warning in profiles, such as headless,
@@ -114,3 +100,14 @@
     # inside a sandbox.
     - id: sandbox-context
       name: '@zhming0/dsh-workbench/sandbox-context'
+
+    # `ctx.sandboxPolicy` for the Web rows that read it: reports the sandbox
+    # workspace as the root and adds no prompt line (see the stock row above).
+    - id: sandbox-workspace-policy
+      name: '@zhming0/dsh-workbench/sandbox-policy'
+
+    # Runs the Web Files and Preview sidebar (the stock workspace-files row
+    # above) as the session it serves. Waits for the Web-only services instead
+    # of injecting them, so a headless profile still boots with this row.
+    - id: sandbox-workspace-files
+      name: '@zhming0/dsh-workbench/workspace-files'
