@@ -35,6 +35,16 @@ try {
     'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version && python --version && uv --version && uvx --version && node --version && npm --version && jq --version && yq --version && docker --version && docker buildx version && docker compose version && for command in cc make pkg-config unzip zip xz file patch ssh rsync ps gh pnpm yarn; do command -v "$command" || exit 1; done && ! command -v pip && ! command -v dockerd && ! command -v containerd',
   ]);
 
+  const home = (await run(client, ["sh", "-c", 'printf %s "$HOME"'])).trim();
+  if (home !== "/workspace/home") {
+    throw new Error(`unexpected home directory: ${home}`);
+  }
+  await run(client, [
+    "sh",
+    "-c",
+    'printf "home survived" > "$HOME/home-sentinel"',
+  ]);
+
   await run(client, ["mkdir", "-p", `${workspace}/.git`, `${workspace}/.agents`]);
   await client.writeFile({
     path: `${workspace}/mise.toml`,
@@ -92,6 +102,13 @@ try {
   });
   if (new TextDecoder().decode(sentinel.content) !== "workspace survived") {
     throw new Error("workspace content did not survive hibernation");
+  }
+  const homeSentinel = await client.readFile({
+    path: `${home}/home-sentinel`,
+    maxBytes: 1024n,
+  });
+  if (new TextDecoder().decode(homeSentinel.content) !== "home survived") {
+    throw new Error("home directory content did not survive hibernation");
   }
   const nodeVersionAfterWake = await run(
     client,

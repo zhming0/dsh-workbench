@@ -574,7 +574,7 @@ describe("sandbox lifecycle", () => {
           content: [
             {
               type: "text",
-              text: "This sandbox was suspended and woke on a newly created machine. Files in the workspace survived, but anything outside it is gone: running processes, /tmp, your home directory, and tools installed elsewhere. Re-create what you need before continuing.",
+              text: "This sandbox was suspended and woke on a newly created machine. Files under /workspace survived, including your home directory, but running processes, /tmp, and anything installed outside /workspace are gone. Re-create what you need before continuing.",
             },
           ],
           source: {

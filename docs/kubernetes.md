@@ -334,7 +334,7 @@ Typical output resembles:
 ```text
 Adopted Sandbox/dsh-universal-abc12 in 180ms
 Suspended: pod removed; PVC/workspace-dsh-universal-abc12 remains
-Resumed in 2400ms; workspace sentinel verified
+Resumed in 2400ms; workspace and home sentinels verified
 shutdownTime foreground deletion and workspace cleanup verified
 PASS: agent-sandbox warm adoption, suspend/resume persistence, and expiry
 ```
@@ -342,9 +342,16 @@ PASS: agent-sandbox warm adoption, suspend/resume persistence, and expiry
 The test creates unique claims, discovers the underlying Sandbox through
 `.status.sandbox.name`, and uses `spec.operatingMode: Suspended` on that
 **Sandbox** (there is no `spec.paused`). Suspension removes compute while the
-PVC survives; Running recreates the pod and the test verifies a workspace
-sentinel. On failure the main claim is intentionally preserved for debugging;
-on success it is removed.
+PVC survives; Running recreates the pod and the test verifies workspace and
+home-directory sentinels. On failure the main claim is intentionally preserved
+for debugging; on success it is removed.
+
+The PVC carries the whole `/workspace` tree: the checkout, mise's data and
+shims in `/workspace/.dsh-state`, and the home directory at `/workspace/home`.
+A wake therefore keeps mise-installed toolchains, package caches, and any file
+written under `$HOME`, while `/tmp`, apt packages, processes, and anything
+installed elsewhere in the container are gone. Home caches share the claim's
+storage quota, so size it for the toolchains a session installs.
 
 Expiry/deletion is terminal and the owned PVC is garbage-collected. A
 hibernated PVC survives only while its Sandbox/Claim remain. Suspended or

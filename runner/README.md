@@ -26,6 +26,13 @@ the container user's permissions; they are not a filesystem sandbox. Run the
 image as its non-root `sandbox` user and isolate its filesystem/network at the
 container platform boundary.
 
+The home directory is `/workspace/home`, also on the workspace volume, so
+package caches, tool configuration, and anything installed under `$HOME`
+survive hibernation. The runner creates the directory at startup because a
+Kubernetes sandbox mounts its workspace volume over `/workspace` and hides the
+image's copy. Files outside `/workspace`, `/tmp` among them, do not survive a
+wake.
+
 `GET /health` on `ADDR` (default `:8080`) is an unauthenticated
 process-readiness probe for the kubelet; it is the only listener the runner
 opens and does not expose sandbox data or RPCs.

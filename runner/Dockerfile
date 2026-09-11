@@ -69,11 +69,15 @@ RUN set -eux; \
     echo "${yq_sha}  /usr/local/bin/yq" | sha256sum -c -; \
     chmod +x /usr/local/bin/yq; \
     rm -rf /tmp/jj.tar.gz /tmp/mise.tar.gz /tmp/mise-cache /tmp/rg.tar.gz /tmp/uv.tar.gz; \
-    useradd --create-home --uid 1000 sandbox; \
     mkdir -p /workspace /run/dsh; \
-    chown sandbox:sandbox /workspace /run/dsh
+    useradd --create-home --uid 1000 --home-dir /workspace/home sandbox; \
+    chown -R sandbox:sandbox /workspace /run/dsh
 COPY --from=build /dsh-runner /usr/local/bin/dsh-runner
-ENV MISE_DATA_DIR=/workspace/.dsh-state/mise \
+# $HOME lives on the workspace volume so home files and caches survive a
+# Kubernetes wake. A sandbox mounts its workspace volume over /workspace, which
+# hides this image's copy, so the runner recreates the directory at startup.
+ENV HOME=/workspace/home \
+    MISE_DATA_DIR=/workspace/.dsh-state/mise \
     MISE_CACHE_DIR=/workspace/.dsh-state/mise-cache \
     PATH=/workspace/.dsh-state/mise/shims:/opt/mise/installs/node/${NODE_VERSION}/bin:$PATH
 USER sandbox

@@ -119,8 +119,10 @@ The session claims a warm sandbox, clones the repository into
 `/workspace/repository`, runs the repository's one-time `.agents/setup` hook,
 and re-runs its idempotent `.agents/resume` hook on every wake.
 The parent `/workspace` is the persistent volume root, so storage metadata such
-as `lost+found` remains outside the checkout. Every session gets its own
-sandbox; two sessions never share files.
+as `lost+found` remains outside the checkout. The home directory is
+`/workspace/home` on that volume, so caches and tool configuration written
+under `$HOME` survive a wake; `/tmp` and installs elsewhere in the container do
+not. Every session gets its own sandbox; two sessions never share files.
 
 ### AGENTS.md instructions
 
