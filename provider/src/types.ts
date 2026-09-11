@@ -58,6 +58,15 @@ export interface SandboxHandle {
 
 export interface BackendCapabilities {
   supportsHibernate: boolean;
+  /**
+   * Declared only by a backend that hibernates: whether waking returns the
+   * machine that stopped (Docker starts the container it stopped) or builds a
+   * new one around the surviving workspace (Kubernetes recreates the pod). A
+   * backend that cannot hibernate never wakes from one, so it leaves this out.
+   * A hibernating backend that leaves it out is read as `false`, the
+   * cautious answer.
+   */
+  wakeKeepsFilesystem?: boolean;
 }
 
 export class SandboxNotFoundError extends Error {

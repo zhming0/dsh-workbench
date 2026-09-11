@@ -56,7 +56,8 @@ have to a Git bundle, and pulls that bundle out over the tunnel into the host's
 `stateDir/checkpoints/`. Nothing is pushed to the repository and no Git write
 access is needed. The build is cancelled only after the bundle is on the host;
 if the save fails the build keeps running and the idle timer retries. The
-session record stays, marked hibernated, and `expiresAfterMs` starts counting.
+session record stays, marked checkpointed, and `expiresAfterMs` starts
+counting.
 
 On the next prompt the provider triggers a new build, the runner clones the
 repository and runs `.agents/setup` exactly as for a new session, and the
@@ -191,9 +192,8 @@ One dsh host is one trust domain, and a Buildkite profile widens it:
 ## Limits
 
 - No hibernation. Idle saves the Git working tree as a bundle on the host and
-  cancels the build; everything else in the sandbox is lost.
-- The model is not told that its sandbox was replaced. Files it created outside
-  the repository, or tools it installed, are gone without notice.
+  cancels the build; everything else in the sandbox is lost. The first prompt
+  after the restore tells the model what did not come back.
 - A build is polled every two seconds while waiting for an agent. With a busy
   self-hosted queue, raise `readyTimeoutMs`.
 - `health` is a Build API read on every resume of a session whose tunnel has

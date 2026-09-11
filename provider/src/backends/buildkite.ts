@@ -54,6 +54,7 @@ export interface BuildkiteBackendOptions {
  */
 export class BuildkiteBackend implements SandboxBackend {
   readonly name = "buildkite";
+  // A build cannot pause, so there is no wake to describe.
   readonly capabilities = { supportsHibernate: false };
 
   constructor(

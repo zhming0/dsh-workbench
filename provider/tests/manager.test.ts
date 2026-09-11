@@ -448,6 +448,210 @@ describe("sandbox lifecycle", () => {
     await store.initialize();
     expect(store.get("session-one")?.state).toBe("hibernated");
   });
+
+  it("tells the model its workspace was restored from a checkpoint, once", async () => {
+    const backend = new FakeBackend();
+    backend.capabilities.supportsHibernate = false;
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
+      {
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 60_000,
+        expiresAfterMs: 60_000,
+      },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: {}, events: [], surface: { nodes: [] } },
+    } as unknown as Agent;
+    const prompt = createUserMessage({
+      content: [{ type: "text", text: "Continue the work." }],
+      source: { kind: "user" },
+    });
+    const preStep = () =>
+      agentEvents(ctx, agent).waterfall(
+        "agent/pre-step",
+        {
+          messages: [prompt],
+          turn: 1,
+          step: 1,
+          signal: new AbortController().signal,
+        },
+        () => Promise.resolve({ kind: "enter" as const, messages: [prompt] }),
+      );
+
+    // The backend cannot hibernate, so idling saves the tree and destroys
+    // the sandbox; the next turn's pre-step restores it into a fresh one.
+    await manager.ensureRunning(agent);
+    const commit = "0123456789abcdef0123456789abcdef01234567";
+    const bundle = new TextEncoder().encode("# v2 git bundle\nobjects");
+    backend.client.execReplies.push({
+      stdout: new Uint8Array([
+        ...new TextEncoder().encode(`feature\n${commit}\n`),
+        ...bundle,
+      ]),
+    });
+    await manager.hibernate("session-one");
+    expect(backend.destroys).toBe(1);
+
+    // The restore turn's prompt carries the notice ahead of the user's text.
+    const restored = await preStep();
+    expect(restored).toMatchObject({
+      kind: "enter",
+      messages: [
+        {
+          content: [
+            {
+              type: "text",
+              text: "This sandbox was recreated from a checkpoint. Your Git changes and commits are back, but anything not tracked by Git is gone: installed tools, ignored files, and files outside the repository. Previously staged changes are now unstaged. Re-run setup steps you need before continuing.",
+            },
+          ],
+          source: {
+            kind: "plugin",
+            plugin: "@zhming0/dsh-workbench:sandbox",
+            form: "notice",
+          },
+        },
+        prompt,
+      ],
+    });
+
+    // The turn after the restore reports nothing.
+    const following = await preStep();
+    expect(following).toEqual({ kind: "enter", messages: [prompt] });
+  });
+
+  it("tells the model its sandbox woke on a new machine, once", async () => {
+    const backend = new FakeBackend();
+    backend.capabilities.wakeKeepsFilesystem = false;
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
+      {
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 60_000,
+        expiresAfterMs: 60_000,
+      },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: {}, events: [], surface: { nodes: [] } },
+    } as unknown as Agent;
+    const prompt = createUserMessage({
+      content: [{ type: "text", text: "Continue the work." }],
+      source: { kind: "user" },
+    });
+    const preStep = () =>
+      agentEvents(ctx, agent).waterfall(
+        "agent/pre-step",
+        {
+          messages: [prompt],
+          turn: 1,
+          step: 1,
+          signal: new AbortController().signal,
+        },
+        () => Promise.resolve({ kind: "enter" as const, messages: [prompt] }),
+      );
+
+    // The sandbox hibernates, then the next turn's pre-step wakes it.
+    await manager.ensureRunning(agent);
+    await manager.hibernate("session-one");
+    expect(backend.hibernations).toBe(1);
+
+    // The waking turn's prompt carries the notice ahead of the user's text.
+    const woken = await preStep();
+    expect(woken).toMatchObject({
+      kind: "enter",
+      messages: [
+        {
+          content: [
+            {
+              type: "text",
+              text: "This sandbox was suspended and woke on a newly created machine. Files in the workspace survived, but anything outside it is gone: running processes, /tmp, your home directory, and tools installed elsewhere. Re-create what you need before continuing.",
+            },
+          ],
+          source: {
+            kind: "plugin",
+            plugin: "@zhming0/dsh-workbench:sandbox",
+            form: "notice",
+            summary: "Sandbox woke from hibernation",
+          },
+        },
+        prompt,
+      ],
+    });
+
+    // The turn after the wake reports nothing.
+    const following = await preStep();
+    expect(following).toEqual({ kind: "enter", messages: [prompt] });
+  });
+
+  it("tells the model a wake reused the machine when the backend keeps it", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
+      {
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 60_000,
+        expiresAfterMs: 60_000,
+      },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: {}, events: [], surface: { nodes: [] } },
+    } as unknown as Agent;
+    const prompt = createUserMessage({
+      content: [{ type: "text", text: "Continue the work." }],
+      source: { kind: "user" },
+    });
+    const preStep = () =>
+      agentEvents(ctx, agent).waterfall(
+        "agent/pre-step",
+        {
+          messages: [prompt],
+          turn: 1,
+          step: 1,
+          signal: new AbortController().signal,
+        },
+        () => Promise.resolve({ kind: "enter" as const, messages: [prompt] }),
+      );
+
+    await manager.ensureRunning(agent);
+    await manager.hibernate("session-one");
+    const woken = await preStep();
+
+    expect(woken).toMatchObject({
+      kind: "enter",
+      messages: [
+        {
+          content: [
+            {
+              type: "text",
+              text: "This sandbox was suspended and woke on the same machine. Its files are intact, but the processes that were running before the suspension are gone. Restart what you need before continuing.",
+            },
+          ],
+          source: {
+            kind: "plugin",
+            plugin: "@zhming0/dsh-workbench:sandbox",
+            form: "notice",
+            summary: "Sandbox woke from hibernation",
+          },
+        },
+        prompt,
+      ],
+    });
+  });
 });
 
 describe("archive release", () => {

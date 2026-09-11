@@ -74,11 +74,23 @@ describe("sandbox lifecycle engine", () => {
 
   it("provisions, serves from the cache, then wakes after hibernation", async () => {
     await engine.initialize();
+    const restores: string[] = [];
+    const wakes: Array<{ sessionId: string; keepsFilesystem: boolean }> = [];
+    engine.addHooks({
+      afterRestore: async ({ sessionId }) => {
+        restores.push(sessionId);
+      },
+      afterWake: async ({ sessionId, keepsFilesystem }) => {
+        wakes.push({ sessionId, keepsFilesystem });
+      },
+    });
     const first = await engine.ensureRunning(
       "session-one",
       async () => REPOSITORY,
     );
     expect(first).toBe(backend.client);
+    expect(restores).toEqual([]);
+    expect(wakes).toEqual([]);
     expect(backend.provisions).toBe(1);
     expect(store.get("session-one")?.state).toBe("running");
 
@@ -90,9 +102,55 @@ describe("sandbox lifecycle engine", () => {
     expect(backend.hibernations).toBe(1);
     expect(store.get("session-one")?.state).toBe("hibernated");
 
-    await engine.ensureRunning("session-one", async () => REPOSITORY);
+    // A wake is not a checkpoint restore: the bundle seam stays quiet while
+    // the wake seam names the machine the backend handed back.
+    const woken = await engine.ensureRunning(
+      "session-one",
+      async () => REPOSITORY,
+    );
+    expect(woken).toBe(backend.client);
+    expect(restores).toEqual([]);
+    expect(wakes).toEqual([
+      { sessionId: "session-one", keepsFilesystem: true },
+    ]);
     expect(backend.wakes).toBe(1);
     expect(backend.provisions).toBe(1);
+  });
+
+  it("reports a wake that rebuilt the machine instead of reusing it", async () => {
+    backend.capabilities.wakeKeepsFilesystem = false;
+    const wakes: Array<{ sessionId: string; keepsFilesystem: boolean }> = [];
+    engine.addHooks({
+      afterWake: async ({ sessionId, keepsFilesystem }) => {
+        wakes.push({ sessionId, keepsFilesystem });
+      },
+    });
+    await engine.initialize();
+    await engine.ensureRunning("session-one", async () => REPOSITORY);
+    await engine.hibernate("session-one");
+    await engine.ensureRunning("session-one", async () => REPOSITORY);
+    expect(wakes).toEqual([
+      { sessionId: "session-one", keepsFilesystem: false },
+    ]);
+  });
+
+  it("says nothing when a wake only probes a backend that cannot hibernate", async () => {
+    backend.capabilities.supportsHibernate = false;
+    const announced: unknown[] = [];
+    engine.addHooks({
+      afterWake: async (context) => {
+        announced.push(context);
+      },
+    });
+    await engine.initialize();
+    await engine.ensureRunning("session-one", async () => REPOSITORY);
+    // The record says running and the runner is gone; the backend hands back
+    // the same machine, which was never put away.
+    backend.running = false;
+    backend.client.healthy = false;
+    await engine.ensureRunning("session-one", async () => REPOSITORY);
+    expect(backend.wakes).toBe(1);
+    expect(announced).toEqual([]);
   });
 
   it("recovers a dead runner by waking its sandbox", async () => {
@@ -188,6 +246,12 @@ describe("sandbox lifecycle engine", () => {
 
     it("saves the tree on idle and restores it into a new sandbox", async () => {
       const client = backend.client;
+      const restores: string[] = [];
+      engine.addHooks({
+        afterRestore: async ({ sessionId }) => {
+          restores.push(sessionId);
+        },
+      });
       await engine.initialize();
       await engine.ensureRunning("session-one", async () => REPOSITORY);
       expect(client.setupRequests).toEqual([{ revision: "v1" }]);
@@ -210,7 +274,13 @@ describe("sandbox lifecycle engine", () => {
       expect(saved).not.toHaveProperty("sandboxId");
       expect(new Uint8Array(await readFile(bundlePath()))).toEqual(BUNDLE);
 
-      await engine.ensureRunning("session-one", async () => REPOSITORY);
+      // The restore turn is the one that fires the seam, once.
+      const restored = await engine.ensureRunning(
+        "session-one",
+        async () => REPOSITORY,
+      );
+      expect(restored).toBe(backend.client);
+      expect(restores).toEqual(["session-one"]);
       expect(backend.wakes).toBe(0);
       expect(backend.provisions).toBe(2);
       // The clone is the usual one; the restore brings the work in afterwards.
@@ -225,6 +295,15 @@ describe("sandbox lifecycle engine", () => {
       expect(resumed).not.toHaveProperty("checkpoint");
       expect(resumed).not.toHaveProperty("expiresAt");
       expect(existsSync(bundlePath())).toBe(false);
+
+      // The next turn serves the restored sandbox and fires nothing.
+      const again = await engine.ensureRunning(
+        "session-one",
+        async () => REPOSITORY,
+      );
+      expect(again).toBe(backend.client);
+      expect(restores).toEqual(["session-one"]);
+      expect(backend.provisions).toBe(2);
     });
 
     it("keeps the sandbox when the save fails", async () => {
@@ -285,6 +364,12 @@ describe("sandbox lifecycle engine", () => {
 
     it("gives the sandbox up when the restore fails and retries on the next turn", async () => {
       const client = backend.client;
+      const restores: string[] = [];
+      engine.addHooks({
+        afterRestore: async ({ sessionId }) => {
+          restores.push(sessionId);
+        },
+      });
       await engine.initialize();
       await engine.ensureRunning("session-one", async () => REPOSITORY);
       client.execReplies.push({ stdout: SAVE_OUTPUT });
@@ -294,11 +379,13 @@ describe("sandbox lifecycle engine", () => {
         throw new Error("expected a checkpointed record");
       }
 
-      // The restore script fails in the replacement sandbox.
+      // The restore script fails in the replacement sandbox; nothing is
+      // announced, because there is nothing to tell the model yet.
       client.execReplies.push({ exitCode: 1 });
       await expect(
         engine.ensureRunning("session-one", async () => REPOSITORY),
       ).rejects.toThrow(/checkpoint script failed/);
+      expect(restores).toEqual([]);
       expect(backend.provisions).toBe(2);
       expect(backend.destroys).toBe(2);
       expect(store.get("session-one")).toMatchObject({
@@ -309,6 +396,7 @@ describe("sandbox lifecycle engine", () => {
 
       // The next turn provisions again and restores from the same bundle.
       await engine.ensureRunning("session-one", async () => REPOSITORY);
+      expect(restores).toEqual(["session-one"]);
       expect(backend.provisions).toBe(3);
       expect(client.execs).toHaveLength(3);
       expect(client.execs[2]?.env.DSH_CHECKPOINT_COMMIT).toBe(COMMIT);

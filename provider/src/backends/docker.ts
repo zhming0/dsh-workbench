@@ -27,7 +27,11 @@ export interface DockerBackendOptions {
 
 export class DockerBackend implements SandboxBackend {
   readonly name = "docker";
-  readonly capabilities = { supportsHibernate: true };
+  readonly capabilities = {
+    supportsHibernate: true,
+    // docker stop/start keeps the container's writable layer.
+    wakeKeepsFilesystem: true,
+  };
   private readonly expiryTimers = new Map<string, NodeJS.Timeout>();
   private readonly binary: string;
 
