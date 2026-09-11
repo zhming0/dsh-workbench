@@ -2,26 +2,23 @@
 
 ## Status
 
-Deferred. dsh 0.1.5-rc.1 added a right sidebar to the Web surface, with a
-**Files** tab (workspace tree), a **Preview** tab (Markdown, code, HTML, PDF,
-plain text), and clickable file references under each assistant turn. This
-bundle disables those rows (`workspace-files`, `ui-sidebar-files`,
-`ui-sidebar-documentpreview`, `ui-deliverables` in `provider/cordis.patch.yml`)
-because making them work against the sandbox costs more code than the sidebar
-is worth today: it shows the same files GitHub shows once the agent pushes,
-and the part a user cannot get from GitHub — unpushed work in progress — is
-readable by asking the model.
+Slice one shipped; slice two deferred. dsh 0.1.5-rc.1 added a right sidebar
+to the Web surface, with a **Files** tab (workspace tree), a **Preview** tab
+(Markdown, code, HTML, PDF, images, plain text), and file cards under each
+assistant turn for files the model presents. The stock rows (`workspace-files`,
+`ui-sidebar-files`, `ui-sidebar-documentpreview`, `ui-deliverables`) stay
+mounted, and the bundle adds two rows of its own, described under "Slice one"
+below, that run them against the session's sandbox. The reason to ship this
+was the file cards: without them a presented image is a bare path in the chat,
+and the sidebar's Preview tab is the one place in dsh that renders it.
 
-Revisit when the sidebar carries something the sandbox alone can give: a
-terminal tab, a browser preview of a port inside the sandbox, or a workflow
-where people review unpushed deliverables in dsh rather than on GitHub. Neither
-a terminal nor a browser tab would reuse the work below; they need a streaming
-shell over the runner tunnel and port forwarding out of the sandbox.
-
-A complete implementation, verified end to end on Docker with a real model
-session, exists as commit `0ec541d` (branch `sidebar/never-wake`). Its design
-and the facts it depends on are recorded here so the branch can be rebased or
-redone without rediscovering them.
+Browsing wakes a hibernated sandbox and counts as idle-timer activity, like
+any other request against the session. That was accepted deliberately: the
+never-wake design in "Slice two" made the earlier implementation (commit
+`0ec541d`, branch `sidebar/never-wake`, verified on Docker) three times the
+size, and only usage can tell whether people leave a Files or Preview tab open
+on idle sessions often enough to matter. Slice two stays recorded here so it
+can be carried without rediscovering the facts it depends on.
 
 ## Why the stock rows fail
 
@@ -60,25 +57,27 @@ Every fact below was checked against the 0.1.5-rc.1 package sources.
   `tool-bash` call `ctx.get("sandboxPolicy")` only when a confining backend
   sets a default mode, and the sandbox backends do not. `dsh-terminal-bash`
   hard-injects it but is not mounted by the Web patch; the shipped `minimal`
-  preset uses it and already fails to compose on this bundle.
+  preset uses it, and with the stand-in it composes, but its persistent
+  terminal still fails because the sandbox subprocess seam has no
+  `spawnTerminal`.
 
-## Design of the deferred implementation
+## Design
 
 ### Slice one: run the stock service as the session's agent
 
-Two host rows, both in the bundle's `insert:` list; the stock `workspace-files`
-row stays mounted.
+Shipped. Two host rows, both in the bundle's `insert:` list; the stock
+`workspace-files` row stays mounted.
 
-`sandbox-workspace-policy` (`provider/src/sandbox-policy.ts`, 73 lines)
-publishes `sandboxPolicy` with the sandbox workspace as `workspaceRoot`, no
-per-session mode override, and no prompt line. It exists only so the two Web
-rows can compose.
+`sandbox-workspace-policy` (`provider/src/sandbox-policy.ts`) publishes
+`sandboxPolicy` with the sandbox workspace as `workspaceRoot`, no per-session
+mode override, and no prompt line. It exists only so the two Web rows can
+compose.
 
-`sandbox-workspace-files` (`provider/src/workspace-files.ts`, 175 lines in
-this slice) waits for `workspaceFiles`, `agents`, `sessionController`, and
-`sandboxManager` with `ctx.inject` rather than `static inject`, so a headless
-profile without the Web-only services still boots. It takes the live stock
-instance (`Reflect.get(scope.workspaceFiles, symbols.original)`) and installs
+`sandbox-workspace-files` (`provider/src/workspace-files.ts`) waits for
+`workspaceFiles`, `agents`, and `sessionController` with `ctx.inject` rather
+than `static inject`, so a headless profile without the Web-only services
+still boots. It takes the live stock instance
+(`Reflect.get(scope.workspaceFiles, symbols.original)`) and installs
 own-property wrappers for `read`, `readBytes`, `readAll`, `readRelated`,
 `stat`, `list`, and `changes`. Each wrapper resolves the scope's session to an
 agent with `sessionController.resolveAgent(sessionId)` (live agent, or a
@@ -99,12 +98,12 @@ the idle timer, like any other request. `sandbox-manager` is untouched.
 
 ### Slice two: the sidebar never wakes a sandbox
 
-The browser lists the root whenever a Files tab opens, re-reads a previewed
-file after every WebSocket reconnect, and re-opens its change feed the same
-way, so none of that may decide when a sandbox runs. This slice is what made
-the implementation large (+707 lines across 10 files, including
-`sandbox-manager` and `sandbox-lifecycle`). Only carry it if wake-on-browse
-turns out to matter in practice.
+Deferred. The browser lists the root whenever a Files tab opens, re-reads a
+previewed file after every WebSocket reconnect, and re-opens its change feed
+the same way, so none of that may decide when a sandbox runs. This slice is what made
+the `sidebar/never-wake` implementation large (+707 lines across 10 files,
+including `sandbox-manager` and `sandbox-lifecycle`). Only carry it if
+wake-on-browse turns out to matter in practice.
 
 - `SandboxLifecycle.runningClient(sessionId)`: under the session lock, returns
   the live runner only when the record state is `running` (cached attachment,
@@ -137,6 +136,6 @@ its idle schedule.
 
 ## Open question
 
-Whether slice two is needed at all, or wake-on-browse is acceptable. The
+Whether slice two is needed at all. Wake-on-browse shipped as acceptable; the
 answer depends on how often people leave a Files or Preview tab open on an
-idle session; only usage decides it.
+idle session, and only usage decides it.
