@@ -41,7 +41,7 @@ cluster instead, omit it and tell the runners where to dial:
 ```sh
 scripts/kas/dev-cluster.sh \
   --runner-image dsh-runner:dev \
-  --host-url tcp://192.0.2.10:8081 \
+  --host-url ws://192.0.2.10:8081/tunnel \
   --load-runner-image
 ```
 
@@ -243,6 +243,16 @@ spec:
                 name: dsh-host
                 port:
                   name: http
+          # Only for runners outside the cluster, such as Buildkite agents:
+          # the runner tunnel, bypassing oauth2-proxy. Omit it when every
+          # runner is in-cluster. See "Connectivity and isolation".
+          - path: /tunnel
+            pathType: Exact
+            backend:
+              service:
+                name: dsh-host-tunnel
+                port:
+                  name: tunnel
   tls:
     - hosts: [dsh.example.com]
       secretName: dsh-host-tls
@@ -297,13 +307,25 @@ same sessions, credentials, and sandboxes. Restrict
 ## Connectivity and isolation
 
 A Sandbox has no Service (`service: false`) and accepts no ingress at all. The
-runner dials out to the host's `dsh-host-tunnel` Service on port 8081,
+runner opens a WebSocket to the host's `dsh-host-tunnel` Service on port 8081
+(`ws://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081/tunnel`),
 authenticates with the registration token, and all RPCs flow host→runner over
 that runner-initiated tunnel. The claim's `status.sandbox.name` identifies the
 Sandbox; the runner presents the same name in its handshake and the provider
-verifies it. In-cluster the tunnel is h2c: host authenticity rests on the
-cluster network being inside the trust domain. Put TLS (`tls://` in
-`HOST_URL`) in front of any tunnel endpoint exposed beyond the cluster.
+verifies it. In-cluster the tunnel is plaintext: host authenticity rests on
+the cluster network being inside the trust domain.
+
+Runners outside the cluster, such as the [Buildkite backend's](buildkite.md)
+agents, get TLS from the Ingress that already fronts the Web UI: the
+`/tunnel` path rule in the Ingress above sends that one path to the
+`dsh-host-tunnel` Service, so those runners dial
+`wss://dsh.example.com/tunnel` under the UI's certificate while oauth2-proxy
+never sees the tunnel. The tunnel authenticates itself with the registration
+token, which is also why the rule is `Exact`: nothing else on the tunnel port
+should be reachable. Keep the ingress-nginx read and send timeouts above the
+UI's 3600 seconds on this Ingress as well; a tunnel that the proxy cuts costs
+the runner one redial and the RPC in flight. `GET /healthz` on the tunnel
+port answers 200 for load balancers that need an HTTP health check.
 
 The template asks the extension controller to manage a default-deny
 NetworkPolicy. Ingress is empty. The egress allow-list contains the tunnel to

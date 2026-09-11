@@ -140,7 +140,9 @@ token plus the host's public tunnel URL.
 - Per-sandbox runner identity (TOFU pinning) — documented residual risk.
 - WebSocket or HTTP-upgrade framing for the tunnel. v1 is a raw TCP/TLS
   connection to a dedicated port; revisit only if a target environment blocks
-  non-HTTP egress.
+  non-HTTP egress. (Revisited: the tunnel is now a WebSocket so the Buildkite
+  backend's external runners get TLS from the Web UI's Ingress instead of a
+  second certificate and listener.)
 - UI for generating or rotating the token. The Secret is the source of
   truth; a view/rotate page can come later.
 - Any change to session lifecycle semantics (hibernate keeps the workspace,

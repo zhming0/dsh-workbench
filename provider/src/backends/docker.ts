@@ -20,7 +20,7 @@ interface DockerReference extends BackendReference {
 export interface DockerBackendOptions {
   image: string;
   binary?: string;
-  /** The tunnel endpoint runners dial, such as tcp://host.docker.internal:8081. */
+  /** The tunnel endpoint runners dial, such as ws://host.docker.internal:8081/tunnel. */
   hostUrl: string;
   registrationToken: string;
 }

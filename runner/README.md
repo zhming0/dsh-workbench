@@ -2,12 +2,16 @@
 
 `dsh-runner` is the in-sandbox ConnectRPC server. It dials the host rather
 than accepting inbound connections: `HOST_URL` names the host's tunnel
-listener (`tcp://host:port`, or `tls://host:port` to dial over TLS), and the
+endpoint as a WebSocket URL (`ws://host:port/tunnel`, or `wss://host/tunnel`
+through an HTTPS proxy that terminates TLS in front of the host), and the
 runner registers with `SANDBOX_ID` plus the shared secret in
-`REGISTRATION_TOKEN` (or a file named by `REGISTRATION_TOKEN_FILE`). After a
-registration is accepted, the runner serves its RPCs over that same
-connection with HTTP/2 roles reversed, and redials with backoff whenever the
+`REGISTRATION_TOKEN` (or a file named by `REGISTRATION_TOKEN_FILE`), sent as
+a bearer token and the `X-Dsh-Sandbox-Id` header on the upgrade request.
+After a registration is accepted, the runner serves its RPCs over that same
+WebSocket with HTTP/2 roles reversed, and redials with backoff whenever the
 tunnel drops. RPCs are reachable only over tunnels the runner itself opened.
+`wss://` certificates are checked against the system CA bundle; point
+`SSL_CERT_FILE` at a private CA if the proxy uses one.
 
 Secrets and Git credentials exist only in process memory. Child processes get a
 small allowlisted base environment, the current secrets, and RPC-supplied

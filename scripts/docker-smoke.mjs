@@ -16,7 +16,7 @@ const tunnel = new TunnelServer({
 await tunnel.listen();
 const backend = new DockerBackend({
   image,
-  hostUrl: `tcp://host.docker.internal:${tunnel.port()}`,
+  hostUrl: `ws://host.docker.internal:${tunnel.port()}/tunnel`,
   registrationToken,
 });
 let handle;

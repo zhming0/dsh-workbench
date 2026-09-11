@@ -67,7 +67,7 @@ HOST_SERVICE_IP="$(kubectl -n "$NAMESPACE" get service dsh-host-tunnel -o jsonpa
 "$ROOT_DIR/scripts/kas/dev-cluster.sh" \
   --name "$CLUSTER_NAME" \
   --runner-image "$RUNNER_IMAGE" \
-  --host-url "tcp://${HOST_SERVICE_IP}:8081" \
+  --host-url "ws://${HOST_SERVICE_IP}:8081/tunnel" \
   --registration-token-file "$TOKEN_FILE" \
   --load-runner-image \
   --skip-warm-pool

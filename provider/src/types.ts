@@ -17,7 +17,7 @@ export interface DockerProfile {
   /** Runner image; its size limits are whatever Docker gives a container. */
   image: string;
   binary?: string;
-  /** The tunnel endpoint runners dial, such as tcp://host.docker.internal:8081. */
+  /** The tunnel endpoint runners dial, such as ws://host.docker.internal:8081/tunnel. */
   hostUrl: string;
 }
 

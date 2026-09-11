@@ -191,7 +191,10 @@ function resolveProfile(
       ...(profile.binary === undefined ? {} : { binary: profile.binary }),
       // host-gateway resolves the Docker host from inside a container on
       // every Docker platform, so runners reach the host tunnel by default.
-      hostUrl: profile.hostUrl ?? `tcp://host.docker.internal:${tunnelPort}`,
+      hostUrl: checkHostUrl(
+        name,
+        profile.hostUrl ?? `ws://host.docker.internal:${tunnelPort}/tunnel`,
+      ),
     };
   }
   if (profile.backend === "buildkite") {
@@ -201,7 +204,7 @@ function resolveProfile(
       organization: profile.organization,
       pipeline: profile.pipeline,
       image: profile.image ?? DEFAULT_RUNNER_IMAGE,
-      hostUrl: profile.hostUrl,
+      hostUrl: checkHostUrl(name, profile.hostUrl),
       readyTimeoutMs:
         profile.readyTimeoutMs ?? DEFAULT_BUILDKITE_READY_TIMEOUT_MS,
       tokenEnv: profile.tokenEnv ?? DEFAULT_BUILDKITE_TOKEN_ENV,
@@ -217,6 +220,26 @@ function resolveProfile(
       ? {}
       : { kubeconfig: profile.kubeconfig }),
   };
+}
+
+/**
+ * Runners open a WebSocket to the tunnel, so the URL they are handed must be
+ * one. Catching a stale tcp:// or tls:// value here fails the host at boot
+ * instead of leaving every runner unable to register.
+ */
+function checkHostUrl(profileName: string, hostUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(hostUrl);
+  } catch {
+    throw new Error(`profile ${profileName}: hostUrl ${hostUrl} is not a URL`);
+  }
+  if (parsed.protocol !== "ws:" && parsed.protocol !== "wss:") {
+    throw new Error(
+      `profile ${profileName}: hostUrl must be a ws:// or wss:// URL, such as wss://dsh.example.com/tunnel`,
+    );
+  }
+  return hostUrl;
 }
 
 const TOKEN_ENV = "DSH_WORKBENCH_REGISTRATION_TOKEN";

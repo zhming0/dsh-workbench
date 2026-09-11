@@ -4,6 +4,7 @@ go 1.26.7
 
 require (
 	connectrpc.com/connect v1.19.1
+	github.com/coder/websocket v1.8.15
 	go.opentelemetry.io/contrib/exporters/autoexport v0.63.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
 	go.opentelemetry.io/otel v1.38.0
