@@ -104,7 +104,7 @@ func (s *Service) Health(_ context.Context, _ *connect.Request[v1.HealthRequest]
 func safeBase() map[string]string {
 	// DOCKER_HOST points the Docker CLI at the sandbox's own daemon sidecar,
 	// which the pod template sets; there is none on the Docker backend.
-	keep := []string{"PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "MISE_DATA_DIR", "MISE_CACHE_DIR", "DOCKER_HOST", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"}
+	keep := []string{"PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "MISE_DATA_DIR", "MISE_CACHE_DIR", "NPM_CONFIG_PREFIX", "DOCKER_HOST", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"}
 	environment := map[string]string{"PATH": "/usr/local/bin:/usr/bin:/bin"}
 	for _, name := range keep {
 		if value, ok := os.LookupEnv(name); ok {

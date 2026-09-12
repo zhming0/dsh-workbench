@@ -133,6 +133,16 @@ describe("installSandboxContext", () => {
     expect(SANDBOX_ENVIRONMENT_PROMPT).toContain('"this page"');
     expect(isHostOnlySection(SANDBOX_ENVIRONMENT_PROMPT)).toBe(false);
   });
+
+  it("tells the model how to install tools without root", () => {
+    expect(SANDBOX_ENVIRONMENT_PROMPT).toContain("no sudo");
+    expect(SANDBOX_ENVIRONMENT_PROMPT).toContain("mise use -g");
+    expect(SANDBOX_ENVIRONMENT_PROMPT).toContain("uv tool install");
+    expect(SANDBOX_ENVIRONMENT_PROMPT).toContain("npm install -g");
+    expect(SANDBOX_ENVIRONMENT_PROMPT).toContain(
+      "discarded when the sandbox hibernates",
+    );
+  });
 });
 
 describe("apply", () => {

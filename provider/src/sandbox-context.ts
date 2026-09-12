@@ -30,13 +30,15 @@ export const SANDBOX_ENVIRONMENT_SECTION = "environment:sandbox";
 
 /**
  * The environment section text. `{{cwd}}` renders the sandbox workspace
- * through the shadowed prompt variable. The last sentence carries the
- * "this page means the GUI" mapping from the Web GUI paragraph dsh composes:
- * that mapping stays true for a sandboxed session even though the URL does
- * not, so dropping the paragraph must not lose it.
+ * through the shadowed prompt variable. One sentence carries the "this page
+ * means the GUI" mapping from the Web GUI paragraph dsh composes: that mapping
+ * stays true for a sandboxed session even though the URL does not, so dropping
+ * the paragraph must not lose it. The rest states what the model can install,
+ * so it reaches for mise, uv, or npm instead of a system package manager the
+ * sandbox cannot run.
  */
 export const SANDBOX_ENVIRONMENT_PROMPT =
-  'You are working inside an isolated sandbox: file and shell tools resolve paths inside this sandbox, and the repository checkout is mounted at {{cwd}}. There is no DeepSeek Harness source checkout inside the sandbox; the DeepSeek Harness web UI runs on the host machine and is unreachable from here. When the user says "this page", "this GUI", or "this app", they mean that web UI.';
+  'You are working inside an isolated sandbox: file and shell tools resolve paths inside this sandbox, and the repository checkout is mounted at {{cwd}}. There is no DeepSeek Harness source checkout inside the sandbox; the DeepSeek Harness web UI runs on the host machine and is unreachable from here. When the user says "this page", "this GUI", or "this app", they mean that web UI. The sandbox runs as an unprivileged user with no sudo, so system package managers cannot install software. Install project tools with the preinstalled managers instead: `mise use -g` for toolchains, `uv tool install` for Python tools, and `npm install -g` for Node tools. Those write under $HOME on the persistent workspace volume, so they survive hibernation, while anything installed elsewhere in the container is discarded when the sandbox hibernates.';
 
 /**
  * Fragments that identify dsh's host-only prompt sections (observed in

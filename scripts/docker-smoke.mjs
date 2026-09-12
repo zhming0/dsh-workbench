@@ -34,6 +34,15 @@ try {
     "-lc",
     'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version && python --version && uv --version && uvx --version && node --version && npm --version && jq --version && yq --version && docker --version && docker buildx version && docker compose version && for command in cc make pkg-config unzip zip xz file patch ssh rsync ps gh pnpm yarn; do command -v "$command" || exit 1; done && ! command -v pip && ! command -v dockerd && ! command -v containerd',
   ]);
+  // Commands run as login shells, and Debian's /etc/profile resets PATH.
+  // The image must restore the workspace install directories, and npm must
+  // write global installs under $HOME, or `npm install -g` fails with EACCES.
+  // mise must use its default data directory, not an override.
+  await run(client, [
+    "/bin/bash",
+    "-lc",
+    'case ":$PATH:" in *":$HOME/.local/share/mise/shims:"*) ;; *) exit 1 ;; esac && case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) exit 1 ;; esac && test -z "${MISE_DATA_DIR:-}" && test "$(npm config get prefix)" = "$HOME/.local"',
+  ]);
 
   const home = (await run(client, ["sh", "-c", 'printf %s "$HOME"'])).trim();
   if (home !== "/workspace/home") {
