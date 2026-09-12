@@ -86,6 +86,48 @@ describe("session profile choice", () => {
     ).rejects.toThrow("already has a sandbox");
   });
 
+  it("boots with no profiles and explains the missing profile on the first prompt", async () => {
+    const warnings: string[] = [];
+    const ctx = new Context();
+    // A bare context logs only error and info by default; raise the sink's
+    // threshold so the boot warning is captured.
+    ctx.logger.exporter({
+      levels: { default: 3 },
+      export: (message) => {
+        if (message.type === "warn") {
+          warnings.push(String(message.args[0]));
+        }
+      },
+    });
+    const manager = new SandboxManager(
+      ctx,
+      {
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        profiles: {},
+      },
+      { gateway: gatewayFor(new FakeBackend()) },
+    );
+
+    // The boot warning is what surfaces a mistyped map, before any prompt.
+    expect(warnings).toContain(
+      "no sandbox profiles configured; add one to the sandbox-manager settings or no session can start a sandbox",
+    );
+    expect(await manager.getSessionProfile("session-one")).toEqual({
+      profiles: [],
+      selected: "",
+      locked: false,
+    });
+    await expect(
+      manager.ensureRunning({
+        id: "session-one",
+        session: { header: {} },
+      } as unknown as Agent),
+    ).rejects.toThrow(
+      "no sandbox profile is configured; add one to the sandbox-manager settings",
+    );
+  });
+
   it("keeps sessions whose profile is no longer configured", async () => {
     const store = new SessionStore(join(directory, "sessions.json"));
     await store.initialize();

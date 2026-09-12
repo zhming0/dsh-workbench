@@ -10,7 +10,7 @@ import type { SandboxProfile } from "../types.js";
 export class ProfileChoice {
   constructor(
     private readonly profiles: Record<string, SandboxProfile>,
-    private readonly defaultProfile: string,
+    private readonly defaultProfile: string | undefined,
     private readonly store: SessionStore,
   ) {}
 
@@ -22,8 +22,9 @@ export class ProfileChoice {
         name,
         backend,
       })),
-      selected:
-        record === undefined ? this.pending(sessionId).name : record.profile,
+      // A read for the UI never throws: with no profiles configured the chip
+      // hides itself (it needs two choices), so the empty name is not shown.
+      selected: record?.profile ?? this.pendingName(sessionId) ?? "",
       locked: record !== undefined,
     };
   }
@@ -42,7 +43,12 @@ export class ProfileChoice {
 
   /** The profile a session without a sandbox would be provisioned with. */
   pending(sessionId: string): SandboxProfile {
-    const name = this.store.pendingProfile(sessionId) ?? this.defaultProfile;
+    const name = this.pendingName(sessionId);
+    if (name === undefined) {
+      throw new Error(
+        "no sandbox profile is configured; add one to the sandbox-manager settings",
+      );
+    }
     const profile = this.profiles[name];
     if (profile === undefined) {
       throw new Error(
@@ -50,5 +56,10 @@ export class ProfileChoice {
       );
     }
     return profile;
+  }
+
+  /** The profile name a new sandbox would try to use, if any. */
+  private pendingName(sessionId: string): string | undefined {
+    return this.store.pendingProfile(sessionId) ?? this.defaultProfile;
   }
 }

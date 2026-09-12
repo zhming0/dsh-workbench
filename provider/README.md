@@ -198,11 +198,16 @@ Configuration is YAML in the profile's own layer,
     idleMs: 300000
 ```
 
-`profiles` is the one required setting.
+`profiles` may be empty. The host then boots and serves sessions normally,
+but the first prompt fails with `no sandbox profile is configured` until a
+profile is added; nothing is provisioned and no backend is contacted. That is
+the intended state while installing the control plane before its sandbox
+backend exists, and it keeps a mistyped profile map from stopping the host
+from starting so the settings file can still be fixed in place.
 
 | Setting             | Default                 | Meaning                                                          |
 | ------------------- | ----------------------- | ---------------------------------------------------------------- |
-| `profiles.<name>`   | required                | One sandbox profile; its fields are listed in the next table     |
+| `profiles.<name>`   | none                    | One sandbox profile; its fields are listed in the next table     |
 | `defaultProfile`    | first profile           | Profile used when a session does not pick one                    |
 | `repository`        | session repository      | Fallback repository for non-anchor sessions                      |
 | `revision`          | repository default      | Optional branch, tag, or commit to check out                     |
@@ -294,6 +299,11 @@ provisioned with. Removing a profile from the configuration keeps its existing
 sessions readable, but they cannot wake until a profile with that name is
 restored on the same backend. A session whose pending choice was removed falls
 back to an error at its first prompt, asking the user to pick again.
+
+With an empty map the host still boots, and sessions, history, secrets,
+instructions, and repository workspaces all keep working; only provisioning
+fails, and its error names the missing setting. Add a profile to the
+`sandbox-manager` row, then send the prompt again.
 
 ### Idle and hibernation
 
