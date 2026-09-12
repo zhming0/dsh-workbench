@@ -32,8 +32,23 @@ try {
   await run(client, [
     "/bin/bash",
     "-lc",
-    'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version && python --version && uv --version && uvx --version && node --version && npm --version && jq --version && yq --version && docker --version && docker buildx version && docker compose version && for command in cc make pkg-config unzip zip xz file patch ssh rsync ps gh pnpm yarn; do command -v "$command" || exit 1; done && ! command -v pip && ! command -v dockerd && ! command -v containerd',
+    'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version && python --version && uv --version && uvx --version && node --version && npm --version && jq --version && yq --version && docker --version && docker buildx version && docker compose version && for command in cc make pkg-config unzip zip xz file patch ssh rsync ps gh pnpm yarn agent-browser google-chrome; do command -v "$command" || exit 1; done && ! command -v pip && ! command -v dockerd && ! command -v containerd',
   ]);
+
+  // The `agent-browser` skill needs the CLI to find the browser baked into the
+  // image. It searches PATH for `google-chrome`, and the browser cannot live
+  // under $HOME because the workspace volume shadows that directory. A failed
+  // search makes doctor report a missing Chrome, which exits non-zero here.
+  const browserDoctor = await run(client, [
+    "/bin/bash",
+    "-lc",
+    "agent-browser doctor --offline --quick",
+  ]);
+  if (!browserDoctor.includes("google-chrome")) {
+    throw new Error(
+      `agent-browser did not report the installed browser: ${browserDoctor}`,
+    );
+  }
 
   const home = (await run(client, ["sh", "-c", 'printf %s "$HOME"'])).trim();
   if (home !== "/workspace/home") {
@@ -44,6 +59,23 @@ try {
     "-c",
     'printf "home survived" > "$HOME/home-sentinel"',
   ]);
+
+  // The `using-agent-browser` skill writes media here. It is on the workspace
+  // volume but outside the checkout, so a wake keeps it and a capture never
+  // shows up as an untracked file in a repository.
+  await run(client, [
+    "sh",
+    "-c",
+    'mkdir -p /workspace/.agents/artifacts && printf "media" > /workspace/.agents/artifacts/smoke-sentinel',
+  ]);
+  const artifactsSentinel = (
+    await run(client, ["cat", "/workspace/.agents/artifacts/smoke-sentinel"])
+  ).trim();
+  if (artifactsSentinel !== "media") {
+    throw new Error(
+      `artifacts directory is not writable: ${artifactsSentinel}`,
+    );
+  }
 
   await run(client, ["mkdir", "-p", `${workspace}/.git`, `${workspace}/.agents`]);
   await client.writeFile({
@@ -109,6 +141,13 @@ try {
   });
   if (new TextDecoder().decode(homeSentinel.content) !== "home survived") {
     throw new Error("home directory content did not survive hibernation");
+  }
+  const artifactsAfterWake = await client.readFile({
+    path: "/workspace/.agents/artifacts/smoke-sentinel",
+    maxBytes: 1024n,
+  });
+  if (new TextDecoder().decode(artifactsAfterWake.content) !== "media") {
+    throw new Error("artifacts outside the checkout did not survive hibernation");
   }
   const nodeVersionAfterWake = await run(
     client,

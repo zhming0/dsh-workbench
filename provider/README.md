@@ -151,6 +151,39 @@ pinned composer packages (`@deepseek-ai/dsh-app-boot`, `@deepseek-ai/dsh-web-app
 and fails CI when either paragraph changes, so a dsh bump cannot silently
 reword them. The markers themselves are pinned to the observed wording.
 
+The bundle also serves skills authored in this package. dsh's stock local
+provider discovers skills from disk, and this package's filesystem seam reads
+that disk inside the sandbox, so a `SKILL.md` under `$DSH_HOME/skills` on the
+host is never seen by a sandboxed session: the path does not exist in the pod.
+The `skills` row instead registers a provider over the TypeScript modules in
+[`src/skills/`](src/skills/) into the global layer of dsh's skill registry,
+which every agent's merged catalog carries. To add a skill, write a module
+exporting an `AuthoredSkill`, put its prose in the Markdown file beside it,
+and list the module in `src/skills/index.ts`; the list is explicit rather than
+a directory scan, because a scan of TypeScript sources can only find compiled
+files and would leave the catalog silently empty when the layout changes. An
+unlisted module is not served, and a listed one fails as it loads if its import
+does not resolve or its body file is missing. Each module reads its own body
+through `skillMarkdown(import.meta.url)`, so the prose is ordinary Markdown
+and the read is synchronous: a missing body names its path at load instead of
+surfacing later as a skill that lists but cannot be read. The build copies
+those bodies into `dist`, and the served bodies are held in host memory, so no
+machine's disk is read at session time. Authored skills take the bundled rank,
+so a repository's own `.agents/skills` still wins a name collision. dsh's
+`minimal` agent preset mounts no skill tool, so a session on it sees no
+catalog regardless.
+
+The one shipped skill, `using-agent-browser`, documents the `agent-browser`
+CLI that the runner image installs alongside its Chrome for Testing browser.
+That image puts the browser outside `$HOME`, because a browser under `$HOME`
+would be hidden by the workspace volume, and exposes it as `google-chrome` on
+`PATH`, which is one of the names the CLI searches by itself; no environment
+variable has to reach the session. The skill writes the screenshots and
+recordings a user should see to `/workspace/.agents/artifacts/`, which is on
+the sandbox's workspace volume but outside the checkout: media reads reach
+paths outside the workspace root, that directory survives a wake, and a
+capture never appears as an untracked file in the repository.
+
 One module is not part of the bundle patch:
 `@zhming0/dsh-workbench/launch-token`. Mounted as a row, it serves
 `GET /launch-token`, which redirects the browser to dsh's tokenized login URL so

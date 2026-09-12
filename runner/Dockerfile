@@ -30,6 +30,18 @@ ARG UV_SHA256_arm64=7eb9bf48516448c9db6a9e436d8e747ac9c8a9cac74717160a29918249b0
 ARG YQ_VERSION=4.53.6
 ARG YQ_SHA256_amd64=c5f056448f973ae7d39b5401949648a78f2dc1947d6a8eb65be60d5c504b9385
 ARG YQ_SHA256_arm64=88a1016bc1d657375a35864e4f44b6f333df8ff97b559f51bba0adcb2169df09
+# agent-browser backs the `using-agent-browser` skill. Chrome for Testing is
+# deliberately installed outside $HOME: the image sets HOME=/workspace/home,
+# and a session mounts its workspace volume over /workspace, so a browser under
+# $HOME would be hidden at runtime. It is exposed as `google-chrome` on PATH
+# instead, a name the CLI searches for itself.
+#
+# Chrome's shared libraries are installed below by hand. `agent-browser install
+# --with-deps` would install the same list, but it shells out to `sudo apt-get`,
+# and this image has no sudo and already runs the build as root. The package
+# names are the t64 ones Debian trixie uses.
+ARG AGENT_BROWSER_VERSION=0.37.1
+ARG CHROME_INSTALL_DIR=/opt/agent-browser
 RUN set -eux; \
     case "${TARGETARCH}" in \
       amd64) jj_arch=x86_64-unknown-linux-musl;  mise_arch=linux-x64-musl;   jj_sha="${JJ_SHA256_amd64}"; mise_sha="${MISE_SHA256_amd64}"; rg_arch=x86_64-unknown-linux-musl;  rg_sha="${RIPGREP_SHA256_amd64}"; uv_arch=x86_64-unknown-linux-musl;  uv_sha="${UV_SHA256_amd64}"; yq_sha="${YQ_SHA256_amd64}" ;; \
@@ -68,14 +80,38 @@ RUN set -eux; \
     curl -fsSL "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_${TARGETARCH}" -o /usr/local/bin/yq; \
     echo "${yq_sha}  /usr/local/bin/yq" | sha256sum -c -; \
     chmod +x /usr/local/bin/yq; \
+    npm install -g "agent-browser@${AGENT_BROWSER_VERSION}"; \
+    useradd --create-home --uid 1000 --home-dir /workspace/home sandbox; \
+    install -d -o sandbox -g sandbox "${CHROME_INSTALL_DIR}"; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      libxcb-shm0 libx11-xcb1 libx11-6 libxcb1 libxext6 libxrandr2 \
+      libxcomposite1 libxcursor1 libxdamage1 libxfixes3 libxi6 \
+      libgtk-3-0t64 libpangocairo-1.0-0 libpango-1.0-0 \
+      libatk1.0-0t64 libcairo-gobject2 libcairo2 \
+      libgdk-pixbuf-2.0-0 libxrender1 libasound2t64 libfreetype6 \
+      libfontconfig1 libdbus-1-3 libnss3 libnss3-tools libnspr4 \
+      libatk-bridge2.0-0t64 libdrm2 libxkbcommon0 libatspi2.0-0t64 \
+      libcups2t64 libxshmfence1 libgbm1 \
+      fonts-noto-color-emoji fonts-noto-cjk fonts-freefont-ttf; \
+    rm -rf /var/lib/apt/lists/*; \
+    HOME="${CHROME_INSTALL_DIR}" "/opt/mise/installs/node/${NODE_VERSION}/bin/agent-browser" install; \
+    chrome_bin="$(find "${CHROME_INSTALL_DIR}" -type f -name chrome -print -quit)"; \
+    test -n "${chrome_bin}"; \
+    ln -s "${chrome_bin}" /usr/local/bin/google-chrome; \
+    ln -sf "/opt/mise/installs/node/${NODE_VERSION}/bin/agent-browser" /usr/local/bin/agent-browser; \
+    chown -R sandbox:sandbox "${CHROME_INSTALL_DIR}"; \
     rm -rf /tmp/jj.tar.gz /tmp/mise.tar.gz /tmp/mise-cache /tmp/rg.tar.gz /tmp/uv.tar.gz; \
     mkdir -p /workspace /run/dsh; \
-    useradd --create-home --uid 1000 --home-dir /workspace/home sandbox; \
     chown -R sandbox:sandbox /workspace /run/dsh
 COPY --from=build /dsh-runner /usr/local/bin/dsh-runner
 # $HOME lives on the workspace volume so home files and caches survive a
 # Kubernetes wake. A sandbox mounts its workspace volume over /workspace, which
 # hides this image's copy, so the runner recreates the directory at startup.
+# Chrome sits outside $HOME for the same reason: agent-browser searches $HOME
+# for its own download, so a browser there would be invisible to every session.
+# It is exposed as `google-chrome` on PATH instead, which is one of the names
+# the CLI searches and the child-process PATH already includes.
 ENV HOME=/workspace/home \
     MISE_DATA_DIR=/workspace/.dsh-state/mise \
     MISE_CACHE_DIR=/workspace/.dsh-state/mise-cache \
