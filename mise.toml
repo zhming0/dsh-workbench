@@ -11,6 +11,10 @@ go = "1.26.7"
 kind = "0.33.0"
 kubectl = "1.37.0"
 
+# Lints and packages deploy/helm/dsh-workbench. `kubectl kustomize` renders
+# the sandbox pool with the kubectl pin above.
+helm = "4.2.4"
+
 # `buf generate` calls these two plugins as local binaries. Keep the versions
 # equal to the matching modules in runner/go.mod, or generated code and the
 # runtime it compiles against can drift. The third plugin, protoc-gen-es, comes

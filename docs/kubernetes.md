@@ -5,6 +5,11 @@ agent-sandbox. It is intentionally pinned to **agent-sandbox v1.0.2** and its
 `agents.x-k8s.io/v1beta1` and `extensions.agents.x-k8s.io/v1beta1` APIs. Do not
 assume these manifests work with another release.
 
+Setting this backend up is [`installations-kas.md`](installations-kas.md).
+This page is the reference: what the manifests do, the isolation model, the
+tunnel, and the development walkthrough, which builds both images locally and
+applies them to a kind cluster.
+
 ## Prerequisites
 
 - Linux or macOS with Docker, `kind`, `kubectl`, and Python 3
@@ -35,7 +40,7 @@ CI, build both images and run `pnpm test:kas`; see
 [`e2e-testing.md`](e2e-testing.md#kubernetes-transport-and-lifecycle-test).
 
 With `--host-image`, the dsh host itself runs in the cluster and runners dial
-its `dsh-host-tunnel` Service. The script applies the raw manifests, so the
+its `dsh-host-tunnel` Service. The script applies the kustomize base, so the
 dev host runs without the OIDC proxy and is reached over
 `kubectl port-forward` — no identity provider needed. To run dsh outside the
 cluster instead, omit it and tell the runners where to dial:
@@ -56,15 +61,14 @@ host through `DSH_WORKBENCH_REGISTRATION_TOKEN`, make the address reachable
 from pods, and widen the sandbox NetworkPolicy egress to it.
 The script creates `kind-dsh-kas`,
 installs exactly the v1.0.2 release asset `sandbox-with-extensions.yaml`, waits
-for its CRDs and controllers, and applies `deploy/kubernetes`. It is
-noninteractive. Use `--name NAME` on both cluster scripts to choose another
+for its CRDs and controllers, and applies both phases: the control plane from
+the Helm chart (rendered, not installed) and the sandbox pool from kustomize. It
+is noninteractive. Use `--name NAME` on both cluster scripts to choose another
 kind cluster name.
 
-For an existing cluster, install the pinned controller, create the OIDC
-Secret the proxy container reads (see
-[`host-oidc.yaml`](../deploy/kubernetes/host-oidc.yaml) — without it the host
-pod never becomes Ready), and apply the manifests after replacing both image
-placeholders with released tags and `dsh.example.com` with your hostname:
+For an existing cluster, follow
+[`installations-kas.md`](installations-kas.md). The short form is the chart,
+then the sandbox pool:
 
 ```sh
 kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.2/sandbox-with-extensions.yaml
@@ -82,19 +86,21 @@ kubectl -n dsh-sandbox create secret generic dsh-host-oidc \
   --from-literal=OAUTH2_PROXY_CLIENT_SECRET=… \
   --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')"
 
-# The registration token both the host and every runner read. It must exist
-# before the manifests are applied — warm pods and the host mount it.
-kubectl -n dsh-sandbox create secret generic dsh-registration-token \
-  --from-literal=token="$(openssl rand -hex 32)"
+helm install dsh-workbench oci://ghcr.io/zhming0/charts/dsh-workbench \
+  --namespace dsh-sandbox --create-namespace \
+  --set oidc.enabled=true --set oidc.hostname=dsh.example.com
 
-# Edit DSH_RUNNER_IMAGE_PLACEHOLDER, DSH_HOST_IMAGE_PLACEHOLDER, and
-# dsh.example.com in host-oidc.yaml first.
-kubectl apply -k deploy/kubernetes
-kubectl -n dsh-sandbox rollout status deployment/dsh-host --timeout=300s
-
+# Sandbox pool, after the agent-sandbox controllers above are installed. The
+# base names no namespace, so name the release namespace in an overlay.
+mkdir -p dsh-runner
+cat >dsh-runner/kustomization.yaml <<'EOF'
+namespace: dsh-sandbox
+resources:
+  - ../deploy/kubernetes/runner
+EOF
+kubectl apply -k dsh-runner
 kubectl -n dsh-sandbox wait --for=jsonpath='{.status.readyReplicas}'=1 \
   sandboxwarmpool/dsh-universal --timeout=300s
-scripts/kas/smoke-test.sh -n dsh-sandbox
 ```
 
 **Upgrading from v0.5.x.** First check `status.storedVersions` on all four
@@ -178,13 +184,11 @@ daemon is reachable.
 
 ## The in-cluster dsh host
 
-[`50-host.yaml`](../deploy/kubernetes/50-host.yaml) runs the
-`ghcr.io/zhming0/dsh-host` distribution image as a single-replica Deployment.
-Replace `DSH_HOST_IMAGE_PLACEHOLDER` with a released tag. Its home directory is
-the `dsh-host-data` volume, which carries everything durable: dsh sessions and
-storages, the seeded `web` profile with your `cordis.patch.yml`, and the
-provider's session records. Deleting the pod loses nothing; deleting the PVC
-loses all of it.
+The control plane chart runs the `ghcr.io/zhming0/dsh-host` distribution image
+as a single-replica Deployment. Its home directory is the data volume, which
+carries everything durable: dsh sessions and storages, the seeded `web` profile
+with your `cordis.patch.yml`, and the provider's session records. Deleting the
+pod loses nothing; deleting the PVC loses all of it.
 
 The pod sets `fsGroup` so uid 1000 can write the volume, which on block-CSI
 StorageClasses makes the kubelet re-add group-read/write to every file on the
@@ -203,24 +207,26 @@ Deployment therefore sets
 `NODE_OPTIONS=--network-family-autoselection-attempt-timeout=3000` to give
 each attempt 3 s while keeping dual-stack failover.
 
-The seeded configuration already declares one `standard` profile on the `kas`
-backend with this namespace and warm pool, and the provider talks to the API
-server with the automounted
-`dsh-provider` ServiceAccount token, so the host needs no further wiring. Edit
-settings in place — the file is watched, no restart needed:
+The host starts with no sandbox profile: it serves the Web UI, and sessions
+provision once the pool exists and the settings name it. On a chart install the
+sandbox-manager settings come from `provider.sandboxManager` values, which the
+chart renders into a read-only patch layer at `/data/.dsh/cordis.patch.yml`,
+applied after the image's seeded profile file. A values change restarts the pod.
 
-```sh
-kubectl -n dsh-sandbox exec -it deploy/dsh-host -- \
-  vi /data/.dsh/profiles/web/cordis.patch.yml
-```
+The provider talks to the API server with the automounted `dsh-provider`
+ServiceAccount token; the chart's Role and RoleBinding are what give it
+`sandboxclaims` and `sandboxes` access.
 
 **Several pod sizes.** A sandbox's resources come from its warm pool's
 template, so a second size is a second `SandboxTemplate` and `SandboxWarmPool`
-pair: copy [`20-sandbox-template.yaml`](../deploy/kubernetes/20-sandbox-template.yaml)
-and [`30-warm-pool.yaml`](../deploy/kubernetes/30-warm-pool.yaml) under a new
-name such as `dsh-large`, change the container `resources` and the volume
-request, and apply them. Then list both pools as sandbox profiles in the
-provider settings; the composer shows a profile chip when more than one exists:
+pair: copy
+[`20-sandbox-template.yaml`](../deploy/kubernetes/runner/20-sandbox-template.yaml)
+and [`30-warm-pool.yaml`](../deploy/kubernetes/runner/30-warm-pool.yaml) under a
+new name such as `dsh-large`, change the container `resources` and the volume
+request, and add them as resources in your kustomization. The
+[`installations-kas.md`](installations-kas.md#several-pools) walkthrough
+lists both pools in the provider settings; the composer shows a profile chip
+when more than one exists:
 
 ```yaml
 - id: sandbox-manager
@@ -260,15 +266,15 @@ separated, new first — the host accepts every listed token), then update the
 Secret to the new token alone, recycle the warm pods, and finally drop the old
 token from the host.
 
-**Credentials and secrets** go through the Web UI's **Settings → Secrets**
-page, never through YAML. Add them there once you can reach the UI (next
-section). A secret named `GITHUB_TOKEN` also serves as the Git credential for
-github.com.
+**Credentials and secrets** are in [`credentials.md`](credentials.md): which
+secrets sandbox commands receive, how to set them in the Web UI's
+**Settings → Secrets** page, and which two credentials belong to the host
+instead. Never put secret values in YAML.
 
 **Reaching the UI.** dsh binds pod loopback by design and has no user
 authentication of its own, so the distribution fronts it with
 [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/): the
-[`host-oidc.yaml`](../deploy/kubernetes/host-oidc.yaml) patch runs the proxy
+`host-oidc.yaml` patch in the Helm chart runs the proxy
 next to dsh, terminating OIDC and forwarding over pod-local loopback. The
 manifests deliberately stop at the proxy's pod port, 4180 — how to expose it
 is your cluster's business. A ClusterIP Service plus an ingress-nginx Ingress
@@ -351,7 +357,7 @@ is exposed some other way. Without the variable the route does not exist and
 the token has to come from the host log:
 
 ```sh
-kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'
+kubectl -n dsh-sandbox logs deploy/dsh-workbench | grep 'dsh web:'
 # prints http://127.0.0.1:3000/?token=…; open https://dsh.example.com/?token=…
 ```
 
@@ -363,7 +369,7 @@ For yourself, a port-forward always works, with or without the proxy
 configured:
 
 ```sh
-kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
+kubectl -n dsh-sandbox port-forward deploy/dsh-workbench 3000:3000
 ```
 
 then open `http://localhost:3000/launch-token`, or `http://localhost:3000/?token=…`
@@ -397,6 +403,60 @@ UI's 3600 seconds on this Ingress as well; a tunnel that the proxy cuts costs
 the runner one redial and the RPC in flight. `GET /healthz` on the tunnel
 port answers 200 for load balancers that need an HTTP health check.
 
+### Exposing the runner tunnel beyond the cluster
+
+The Kubernetes backend reaches the tunnel over the cluster network, but a
+runner on a network you do not control — a Buildkite hosted agent, or any
+machine outside the cluster — needs an internet-reachable endpoint. The tunnel
+is a WebSocket that, once upgraded, carries plain HTTP/2 with the roles
+reversed, so an HTTPS proxy or Ingress can terminate TLS in front of it with
+the same certificate the Web UI uses. Two shapes work:
+
+- **An HTTP ingress with a WebSocket-capable path rule**, exactly as above:
+  `/tunnel` goes straight to the `dsh-host-tunnel` Service, under the UI's
+  certificate, with `proxy-read-timeout` and `proxy-send-timeout` above the
+  UI's 3600 seconds. This is the simplest option when your ingress controller
+  supports WebSocket upgrades, which ingress-nginx does by default.
+- **An L4 stream proxy** (nginx `stream`, HAProxy) or a Gateway API `TLSRoute`
+  in passthrough mode, forwarding to the Service on 8081. Use this when the
+  endpoint must not share the UI's listener, or when policy forbids the
+  ingress from carrying it.
+
+What does not work is a proxy that terminates the WebSocket and buffers or
+inspects it — an HTTP-aware CDN in front of the ingress, for example. The
+agent-facing name also needs a DNS record pointing at the proxy; on Cloudflare
+and similar, use a DNS-only record when you terminate TLS yourself.
+
+An nginx `stream` proxy in front of the tunnel Service:
+
+```nginx
+stream {
+  server {
+    listen 8443 ssl;
+    ssl_certificate     /etc/nginx/tls/tls.crt;
+    ssl_certificate_key /etc/nginx/tls/tls.key;
+    proxy_pass dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081;
+  }
+}
+```
+
+Then give the profile the name agents dial; the port is whatever the proxy
+listens on, 8443 here only as an example:
+
+```yaml
+- id: sandbox-manager
+  config:
+    profiles:
+      hosted:
+        backend: buildkite
+        organization: acme
+        pipeline: dsh-sandbox
+        hostUrl: tls://dsh.example.com:8443
+```
+
+The registration token still authenticates every runner; exposure changes
+reachability, not trust.
+
 The template asks the extension controller to manage a default-deny
 NetworkPolicy. Ingress is empty. The egress allow-list contains the tunnel to
 the dsh-host pod (TCP 8081), DNS to kube-dns (TCP/UDP 53), and HTTPS (TCP 443).
@@ -409,10 +469,10 @@ is connectivity control, not a sandbox boundary.
 The pod does not mount a service-account token and runs non-root. The runner
 container has dropped capabilities and RuntimeDefault seccomp; the `docker`
 sidecar is privileged for the reasons in
-[Docker inside a sandbox](#docker-inside-a-sandbox). The `dsh-provider` Role is namespace
-scoped: it manages claims and reads/patches Sandboxes for lifecycle operations.
-Bind a real provider workload's ServiceAccount to this Role rather than
-granting cluster-admin.
+[Docker inside a sandbox](#docker-inside-a-sandbox). The `dsh-provider` Role is
+namespace scoped: it manages claims and reads/patches Sandboxes for lifecycle
+operations. It ships with the control plane chart, in the namespace the pool
+lives in, and grants nothing cluster-wide or outside sandbox operations.
 
 The checked-in template uses the cluster's default runtime (normally `runc`) so
 it works in kind. `runc` provides container isolation, not a VM security

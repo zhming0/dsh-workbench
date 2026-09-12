@@ -1,5 +1,10 @@
 # Buildkite backend
 
+Setting this backend up is
+[`installations-buildkite.md`](installations-buildkite.md): the pipeline, the
+host profile, and how agents reach the tunnel. This page is the reference for
+what the backend does and the limits it has.
+
 The Buildkite backend runs one sandbox as one build on a pipeline you own. The
 provider triggers the build through the Build API and tells the job which
 sandbox it is, where to dial, and which runner image to run; your pipeline
@@ -116,61 +121,36 @@ machine. The tunnel is a WebSocket on the host's plaintext tunnel port, so
 whenever agents reach it over a network you do not control, and hosted agents
 always do, terminate TLS in front of it and hand the agents a `wss://` URL. On
 the Kubernetes distribution that is one `/tunnel` path rule on the Ingress
-that already serves the Web UI, under the same certificate; the exact rule
-and the proxy limits that matter are in
-[`kubernetes.md`](kubernetes.md#connectivity-and-isolation). Any HTTPS reverse
-proxy that passes WebSocket upgrades does the same job elsewhere.
+that already serves the Web UI, under the same certificate; the exact rule,
+the L4 alternative, and the proxy limits that matter are in
+[`kubernetes.md`](kubernetes.md#exposing-the-runner-tunnel-beyond-the-cluster).
+Any HTTPS reverse proxy that passes WebSocket upgrades does the same job
+elsewhere.
 
 ## The pipeline
 
-Create a pipeline with these steps in the Buildkite pipeline editor. One
-command step is all it needs. The provider never uploads steps: the pipeline's
-own definition is the whole contract.
+The pipeline is one command step that runs the runner image the host names.
+[`installations-buildkite.md`](installations-buildkite.md#create-the-pipeline)
+has the YAML and the setup steps. What matters to the backend:
 
-```yaml
-steps:
-  - label: dsh sandbox
-    command: >-
-      docker run --rm
-      -e SANDBOX_ID -e HOST_URL -e REGISTRATION_TOKEN
-      "$DSH_RUNNER_IMAGE"
-    checkout:
-      skip: true
-    secrets:
-      REGISTRATION_TOKEN: dsh_registration_token
-    timeout_in_minutes: 240
-    agents:
-      queue: hosted
-```
-
-- The command runs the runner image the host named in `DSH_RUNNER_IMAGE`. The
-  host and runner are released together and the provider defaults to the tag
-  matching its own version, so the pipeline never pins an image and cannot
-  drift from the host. `-e VAR` with no value copies that variable from the
-  job environment: `SANDBOX_ID` and `HOST_URL` come from the build env the
-  provider set, `REGISTRATION_TOKEN` from `secrets`. The image's entrypoint is
-  `dsh-runner`. Docker is present on Buildkite hosted Linux agents and on any
-  self-hosted agent you give it to.
-- `agents.queue` picks the fleet a sandbox runs on, and it has to be set here:
-  steps defined in the pipeline editor interpolate only a fixed list of
-  `BUILDKITE_*` variables, before the build exists, so a variable in the build
-  env cannot choose the queue. To offer two fleets, create two pipelines and
-  point two profiles at them.
+- `-e VAR` with no value copies that variable from the job environment, which
+  is how `SANDBOX_ID`, `HOST_URL`, and `REGISTRATION_TOKEN` reach the runner.
+  The image's entrypoint is `dsh-runner`.
+- The provider sets `DSH_RUNNER_IMAGE` to the tag matching its own version, so
+  the pipeline never pins an image and cannot drift from the host.
+- `agents.queue` picks the fleet, and it has to be set in the pipeline: steps
+  defined in the editor interpolate only a fixed list of `BUILDKITE_*`
+  variables, before the build exists. Two fleets mean two pipelines.
 - `checkout: { skip: true }` stops the agent from cloning the pipeline's own
   repository. The runner clones the session's repository itself, into
   `/workspace/repository` inside the container, with credentials the host
   pushes over the tunnel. The pipeline's repository setting is irrelevant to
   the sandbox; point it at any repository the agent may read, or an empty one.
-- `secrets` maps a [Buildkite secret](https://buildkite.com/docs/pipelines/security/secrets/buildkite-secrets)
-  into the job environment. Create the `dsh_registration_token` secret in the
-  cluster the agents belong to, with the same value the host uses. This needs
-  agent 3.106.0 or later. A pipeline environment variable would also work but
-  is stored in plain text on the pipeline.
 - `timeout_in_minutes` bounds a sandbox's life even if the host never cancels
-  it. The provider cancels on idle, so this is a backstop. Buildkite applies
-  its own ceiling on top: the Personal plan caps a job at 4 hours, hosted
-  agents at 8 hours unless Buildkite support raises it, and an organization or
-  pipeline may set a maximum command step timeout.
+  it, so it is a backstop. Buildkite applies its own ceiling on top: the
+  Personal plan caps a job at 4 hours, hosted agents at 8 hours unless
+  Buildkite support raises it, and an organization or pipeline may set a
+  maximum command step timeout.
 
 The pipeline should not trigger builds on its own. Turn off the repository
 webhook, or leave the pipeline without a repository integration, so the only

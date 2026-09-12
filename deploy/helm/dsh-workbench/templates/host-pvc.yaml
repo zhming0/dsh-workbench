@@ -1,0 +1,23 @@
+{{- include "dsh-workbench.validate" . }}
+{{- if .Values.host.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "dsh-workbench.fullname" . }}-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-workbench.labels" . | nindent 4 }}
+  annotations:
+    # Everything durable — sessions, credentials, the seeded profile — lives
+    # on this volume. Keep it when the release is uninstalled; deleting the
+    # PVC deletes all of it.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.host.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.host.persistence.size }}
+{{- end }}

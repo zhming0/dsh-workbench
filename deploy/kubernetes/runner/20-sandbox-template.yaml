@@ -2,7 +2,6 @@ apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxTemplate
 metadata:
   name: dsh-universal
-  namespace: dsh-sandbox
 spec:
   # Runners dial the host tunnel, so a per-sandbox Service is unnecessary and
   # no ingress is allowed at all.
@@ -67,7 +66,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: runner
-          image: DSH_RUNNER_IMAGE_PLACEHOLDER
+          image: ghcr.io/zhming0/dsh-runner
           imagePullPolicy: IfNotPresent
           env:
             # The Docker CLI in the runner talks to the rootless daemon in the
@@ -82,11 +81,16 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            # The control plane writes both: HOST_URL in the dsh-runner-config
+            # ConfigMap, the shared token in the dsh-registration-token Secret
+            # under the key `token`. Naming each key explicitly is what keeps
+            # this manifest free of install-specific values; the names and
+            # keys are the fixed contract, so there is nothing to fill in.
             - name: HOST_URL
-              value: ws://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081/tunnel
-            # Create this Secret before the warm pool:
-            #   kubectl -n dsh-sandbox create secret generic \
-            #     dsh-registration-token --from-literal=token=$(openssl rand -hex 32)
+              valueFrom:
+                configMapKeyRef:
+                  name: dsh-runner-config
+                  key: HOST_URL
             - name: REGISTRATION_TOKEN
               valueFrom:
                 secretKeyRef:

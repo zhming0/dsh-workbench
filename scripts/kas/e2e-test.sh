@@ -8,6 +8,7 @@ HOST_IMAGE="${DSH_HOST_IMAGE:-dsh-host:dev}"
 NAMESPACE="dsh-sandbox"
 JOB="dsh-kas-rpc-smoke"
 TOKEN_FILE="$(mktemp)"
+OVERLAY="$(mktemp -d "$ROOT_DIR/.dsh-e2e-overlay.XXXXXX")"
 SUCCESS=false
 
 cleanup() {
@@ -24,6 +25,7 @@ cleanup() {
     kubectl -n agent-sandbox-system logs deployment/agent-sandbox-controller --all-containers=true --tail=200 || true
   fi
   rm -f "$TOKEN_FILE"
+  rm -rf "$OVERLAY"
   if [[ "${KEEP_KAS_CLUSTER:-0}" == "1" ]]; then
     echo "Keeping kind cluster '$CLUSTER_NAME' for debugging"
   else
@@ -48,7 +50,10 @@ if ! kind get clusters | grep -Fxq "$CLUSTER_NAME"; then
   kind create cluster --name "$CLUSTER_NAME" --wait 120s
 fi
 kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
-kubectl apply -f "$ROOT_DIR/deploy/kubernetes/00-namespace.yaml"
+# dev-cluster.sh creates the namespace, the provider ServiceAccount, and the
+# runner-config ConfigMap from the chart; this test only needs its own tunnel
+# Service, created now so its ClusterIP is stable before the runner starts.
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Service
@@ -126,7 +131,31 @@ EOF
 # Do not start a runner until the host Job is accepting tunnel connections.
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod \
   -l job-name="$JOB" --timeout=120s
-kubectl apply -f "$ROOT_DIR/deploy/kubernetes/30-warm-pool.yaml"
+# The runner template reads HOST_URL and the token from the names the control
+# plane writes. This test runs its own host Job, so it supplies the ConfigMap
+# itself and applies the sandbox pool through an overlay that pins the locally
+# built image instead of the released tag in the base.
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dsh-runner-config
+  namespace: $NAMESPACE
+data:
+  HOST_URL: ws://${HOST_SERVICE_IP}:8081/tunnel
+EOF
+cat >"$OVERLAY/kustomization.yaml" <<EOF
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: $NAMESPACE
+resources:
+  - ../deploy/kubernetes/runner
+images:
+  - name: ghcr.io/zhming0/dsh-runner
+    newName: ${RUNNER_IMAGE%%:*}
+    newTag: ${RUNNER_IMAGE##*:}
+EOF
+kubectl kustomize "$OVERLAY" | kubectl apply -f -
 
 deadline=$((SECONDS + 300))
 while true; do

@@ -1,0 +1,205 @@
+{{- include "dsh-workbench.validate" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dsh-workbench.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-workbench.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # The data volume is ReadWriteOnce and dsh is a stateful single process, so
+  # the old pod must release both before a new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "dsh-workbench.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "dsh-workbench.selectorLabels" . | nindent 8 }}
+        {{- with .Values.host.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if or .Values.host.podAnnotations .Values.provider.sandboxManager }}
+      annotations:
+        {{- with .Values.host.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.provider.sandboxManager }}
+        # Restarts the pod when the rendered settings change; dsh watches the
+        # mounted file, but a ConfigMap subPath mount only updates on rollout.
+        checksum/provider-settings: {{ include "dsh-workbench.providerSettingsPatch" . | sha256sum }}
+        {{- end }}
+      {{- end }}
+    spec:
+      # The Kubernetes backend claims sandboxes with this ServiceAccount's
+      # automounted token. The Role and RoleBinding ship with it, in
+      # provider-rbac.yaml.
+      serviceAccountName: dsh-provider
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      # fsGroup is what lets uid 1000 write a block-CSI volume, but its
+      # permission walk also ORs group-read/write onto every file on the volume
+      # at each pod start, turning dsh's owner-only credentials document
+      # (/data/.dsh/.credentials.yaml, 0600) into 0660 — and the host refuses
+      # to boot on a credentials document readable beyond its owner. The walk
+      # finishes before any container starts, so this runs after it and before
+      # dsh, restoring owner-only mode. The `|| true` covers first boots, where
+      # the document does not exist yet; if the chmod cannot succeed, dsh fails
+      # on the same rule with an actionable error.
+      #
+      # The mkdir matters on a fresh volume with provider.sandboxManager set:
+      # the main container's subPath mount needs /data/.dsh to exist, and a
+      # container runtime that has to create the mountpoint does so as root —
+      # after the fsGroup walk, so nothing would ever chown it back and the
+      # seed step could not write under it. Creating it here, as uid 1000,
+      # gives the runtime an existing directory to mount onto.
+      initContainers:
+        - name: fix-credentials-mode
+          image: "{{ .Values.host.image.repository }}:{{ .Values.host.image.tag | default .Chart.AppVersion }}"
+          command: ["sh", "-c", "mkdir -p /data/.dsh && chmod 600 /data/.dsh/.credentials.yaml || true"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      containers:
+        - name: dsh-host
+          image: "{{ .Values.host.image.repository }}:{{ .Values.host.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.host.image.pullPolicy }}
+          {{- if or .Values.oidc.enabled .Values.host.extraArgs }}
+          args:
+            {{- if .Values.oidc.enabled }}
+            # The proxy passes the browser's Host header through, and dsh's
+            # request fence rejects any /api request whose Host is neither
+            # loopback nor an explicitly trusted authority (its defense
+            # against DNS rebinding). A bare host, no scheme.
+            - --trusted-host
+            - {{ .Values.oidc.hostname | quote }}
+            {{- end }}
+            {{- with .Values.host.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          env:
+            - name: DSH_WORKBENCH_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dsh-workbench.registrationTokenSecret" . }}
+                  key: token
+            # Node >= 20 enables Happy Eyeballs and abandons each address
+            # attempt after 250ms. Model API endpoints that need longer to
+            # connect fail as instant ETIMEDOUT, and pod networks without an
+            # IPv6 route have no working family to fall through to. 3000ms
+            # keeps dual-stack failover while tolerating slow addresses.
+            - name: NODE_OPTIONS
+              value: --network-family-autoselection-attempt-timeout=3000
+            # Mounts GET /launch-token unconditionally. The route hands dsh's
+            # login token to anyone who can reach port 3000, and dsh binds pod
+            # loopback, so that is only this pod's own containers and your
+            # port-forward — no Service can reach it, and the oauth2-proxy,
+            # when enabled, authenticates before ever connecting. Never point
+            # a Service at port 3000.
+            - name: DSH_HOST_LAUNCH_TOKEN_ROUTE
+              value: "1"
+            {{- with .Values.host.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: tunnel
+              containerPort: 8081
+              protocol: TCP
+          # The server binds 127.0.0.1:3000, so a TCP probe against the pod IP
+          # cannot reach it; probe over loopback from inside the container.
+          # An unauthenticated GET / answers 401 once dsh is serving, so that
+          # status counts as ready.
+          readinessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok || r.status === 401 ? 0 : 1), () => process.exit(1))"
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.host.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- if .Values.provider.sandboxManager }}
+            # The chart-owned settings layer; dsh applies it after the seeded
+            # profile file, so these values outrank hand edits for the
+            # sandbox-manager row.
+            - name: provider-settings
+              mountPath: /data/.dsh/cordis.patch.yml
+              subPath: cordis.patch.yml
+          {{- end }}
+        {{- if .Values.oidc.enabled }}
+        - name: oauth2-proxy
+          image: {{ .Values.oidc.image | quote }}
+          env:
+            - name: OAUTH2_PROXY_HTTP_ADDRESS
+              value: 0.0.0.0:4180
+            - name: OAUTH2_PROXY_UPSTREAMS
+              value: http://127.0.0.1:3000
+            - name: OAUTH2_PROXY_PROVIDER
+              value: oidc
+            - name: OAUTH2_PROXY_REDIRECT_URL
+              value: https://{{ .Values.oidc.hostname }}/oauth2/callback
+            - name: OAUTH2_PROXY_EMAIL_DOMAINS
+              value: {{ .Values.oidc.emailDomains | quote }}
+            - name: OAUTH2_PROXY_COOKIE_SECURE
+              value: "true"
+            {{- with .Values.oidc.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.oidc.existingSecret }}
+          ports:
+            - name: http
+              containerPort: 4180
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+        {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.host.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "dsh-workbench.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.provider.sandboxManager }}
+        - name: provider-settings
+          configMap:
+            name: {{ include "dsh-workbench.fullname" . }}-provider-settings
+        {{- end }}
