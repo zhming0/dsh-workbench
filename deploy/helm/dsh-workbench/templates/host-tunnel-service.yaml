@@ -1,0 +1,22 @@
+{{- include "dsh-workbench.validate" . }}
+{{- /* The stable in-cluster address runners dial, and the HOST_URL the runner
+pool's ConfigMap points at. The tunnel is a plaintext WebSocket inside the
+cluster: host authenticity rests on the cluster network being inside the trust
+domain. Runners outside the cluster reach it through the same Ingress that
+serves the Web UI, with a `/tunnel` path rule that sends that one path straight
+to this Service, so TLS comes from the UI's certificate; see
+docs/kubernetes.md. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: dsh-host-tunnel
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-workbench.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "dsh-workbench.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: tunnel
+      port: 8081
+      targetPort: tunnel

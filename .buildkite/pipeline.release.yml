@@ -17,6 +17,19 @@ steps:
 
   - wait
 
+  # Stamps the chart's appVersion and the sandbox pool's image tag with the
+  # release version, commits that change, and pushes the stamp commit and the
+  # chart. It records the stamped SHA in build meta-data for the release step,
+  # whose own checkout is the commit this build started from.
+  - label: ":helm: Package & push chart"
+    secrets:
+      - GITHUB_TOKEN
+    command: .buildkite/steps/package-and-push-chart
+
+  - wait
+
+  # Creates the tag at the stamped commit, not at this step's checkout, so
+  # `?ref=$VERSION` renders the version the tag names.
   - label: ":github: Create GitHub release"
     secrets:
       - GITHUB_TOKEN
