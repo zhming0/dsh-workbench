@@ -57,9 +57,6 @@
     },
     "./package.json": "./package.json"
   },
-  "bin": {
-    "dsh-workbench": "./dist/cli.js"
-  },
   "files": [
     "cordis.patch.yml",
     "dist",
