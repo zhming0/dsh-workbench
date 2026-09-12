@@ -248,7 +248,7 @@ describe("sandbox lifecycle", () => {
     } as unknown as Agent;
     const child = {
       id: "subagent-one",
-      session: { header: { parentSession: "session-one" } },
+      session: { header: { parentSession: "session-one", origin: "subagent" } },
     } as unknown as Agent;
     const manager = new SandboxManager(
       ctx,
@@ -309,7 +309,7 @@ describe("sandbox lifecycle", () => {
     } as unknown as Agent;
     const child = {
       id: "subagent-one",
-      session: { header: { parentSession: "session-one" } },
+      session: { header: { parentSession: "session-one", origin: "subagent" } },
     } as unknown as Agent;
     const manager = new SandboxManager(
       ctx,
@@ -369,7 +369,7 @@ describe("sandbox lifecycle", () => {
     } as unknown as Agent;
     const child = {
       id: "subagent-one",
-      session: { header: { parentSession: "session-one" } },
+      session: { header: { parentSession: "session-one", origin: "subagent" } },
     } as unknown as Agent;
     // The registry is live at resolution time; the Web UI can dispose a
     // top-level agent while a continuable child keeps running.
@@ -406,6 +406,54 @@ describe("sandbox lifecycle", () => {
     await store.initialize();
     expect(store.get("session-one")?.state).toBe("running");
     expect(store.get("subagent-one")).toBeUndefined();
+  });
+
+  it("gives a fork child its own sandbox while the source is live", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const source = {
+      id: "session-source",
+      session: { header: {} },
+    } as unknown as Agent;
+    // dsh records the fork source in `parentSession` and never sets `origin`,
+    // so a fork child is a top-level session with its own sandbox.
+    const child = {
+      id: "session-fork",
+      session: { header: { parentSession: "session-source", isSeeded: true } },
+    } as unknown as Agent;
+    const manager = new SandboxManager(
+      ctx,
+      {
+        profiles: { standard: { backend: "docker" } },
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+        idleMs: 60_000,
+        expiresAfterMs: 60_000,
+      },
+      {
+        backends: { standard: backend },
+        gateway: gatewayFor(backend),
+        agentLookup: (sessionId) =>
+          sessionId === "session-source"
+            ? source
+            : sessionId === "session-fork"
+              ? child
+              : undefined,
+      },
+    );
+    await manager.ensureRunning(source);
+    await manager.hibernate("session-source");
+    expect(backend.hibernations).toBe(1);
+
+    // Starting the fork must not wake the source's hibernated sandbox.
+    await manager.ensureRunning(child);
+    expect(backend.provisions).toBe(2);
+    expect(backend.wakes).toBe(0);
+
+    const store = new SessionStore(join(directory, "sessions.json"));
+    await store.initialize();
+    expect(store.get("session-source")?.state).toBe("hibernated");
+    expect(store.get("session-fork")?.state).toBe("running");
   });
 
   it("leaves provisioning and waking to the first prompt, not session-start", async () => {
