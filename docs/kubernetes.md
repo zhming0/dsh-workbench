@@ -260,16 +260,10 @@ separated, new first — the host accepts every listed token), then update the
 Secret to the new token alone, recycle the warm pods, and finally drop the old
 token from the host.
 
-**Credentials and secrets** go through the Web UI's Secrets page or the same
-CLI, never through YAML. A secret named `GITHUB_TOKEN` also serves as the Git
-credential for github.com:
-
-```sh
-printf '%s' "$GITHUB_TOKEN" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
-  dsh-workbench secret set GITHUB_TOKEN
-printf '%s' "$API_KEY" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
-  dsh-workbench secret set API_KEY
-```
+**Credentials and secrets** go through the Web UI's **Settings → Secrets**
+page, never through YAML. Add them there once you can reach the UI (next
+section). A secret named `GITHUB_TOKEN` also serves as the Git credential for
+github.com.
 
 **Reaching the UI.** dsh binds pod loopback by design and has no user
 authentication of its own, so the distribution fronts it with

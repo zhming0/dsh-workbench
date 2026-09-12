@@ -106,11 +106,6 @@ land on the session record:
       large: { backend: docker, image: dsh-runner:dev }
 ```
 
-On a development machine the CLI is at
-`~/.dsh/profiles/web/node_modules/.bin/dsh-workbench`, and it shares the
-provider's state directory (`~/.dsh-sandbox` unless `stateDir` is configured;
-set `DSH_SANDBOX_STATE_DIR` to match if so).
-
 ## Releasing
 
 Every release publishes two images together, both built for `linux/amd64` and

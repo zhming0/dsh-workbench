@@ -149,18 +149,11 @@ also serves as the Git credential for github.com, so cloning private
 repositories needs nothing else. A fine-grained personal access token scoped
 to the repositories you work on fits best; `gh auth token` works too.
 
-Manage secrets in the Web UI — **Settings → Secrets** — or with the CLI
-inside the host pod:
-
-```sh
-printf '%s' "$GITHUB_TOKEN" | kubectl -n dsh-sandbox exec -i deploy/dsh-host -- \
-  dsh-workbench secret set GITHUB_TOKEN
-```
-
-Changes reach every session before its next command, running sessions
-included. Never put secret values in the configuration file (plain YAML) or
-in chat (transcripts are durable); the UI and CLI exist so values never touch
-either. The full CLI is in [`provider/README.md`](provider/README.md#cli).
+Manage secrets in the Web UI — **Settings → Secrets**. Changes reach every
+session before its next command, running sessions included. Never put secret
+values in the configuration file (plain YAML) or in chat (transcripts are
+durable); the UI exists so values never touch either. The store is described
+in [`provider/README.md`](provider/README.md#secrets).
 
 ## Configuration
 
@@ -250,5 +243,5 @@ routes are alternatives, and running both gives a session two sandboxes.
 | -------------------------------------------- | ---------------------------------------------------------------- |
 | [`docs/kubernetes.md`](docs/kubernetes.md)   | full install walkthrough, host operations, isolation, smoke test |
 | [`docs/buildkite.md`](docs/buildkite.md)     | running sandboxes as Buildkite builds: pipeline shape and limits |
-| [`provider/README.md`](provider/README.md)   | what the bundle patch changes, every setting, the CLI            |
+| [`provider/README.md`](provider/README.md)   | what the bundle patch changes, every setting, secret handling    |
 | [`docs/development.md`](docs/development.md) | repository layout, build and test, checkout installs, releasing  |

@@ -12,8 +12,8 @@ dsh plugin --profile web add "$PWD/provider"
 ```
 
 The [repository README](https://github.com/zhming0/dsh-workbench#getting-started)
-covers the whole setup. This page is the reference: what the bundle patch does,
-every setting, and the CLI.
+covers the whole setup. This page is the reference: what the bundle patch does
+and every setting.
 
 ## What installing it changes
 
@@ -95,8 +95,8 @@ reads it, and the file is removed with the session record. If no index exists
 (the host restarted while the sandbox was running, or the walk failed), `@`
 falls back to waking the sandbox.
 
-The Web profile also gains a **Settings → Secrets** page. It edits the same
-broker store as the CLI: the browser sends names and values in and receives
+The Web profile also gains a **Settings → Secrets** page. It edits the
+provider's broker store: the browser sends names and values in and receives
 only names back, never a value.
 
 The **Settings → Instructions** page manages AGENTS.md-style guidance at two
@@ -401,34 +401,20 @@ checkout. Global plus workspace content is limited to 65,536 UTF-8 bytes for
 each effective workspace. Removing and later re-adding a Workspace with the
 same normalized repository URL restores its saved layer.
 
-## CLI
+## Secrets
 
-Secrets and tokens never go in YAML, because a profile layer is a plain file and
-a chat transcript is durable. They go through this package's CLI, which
-`dsh plugin add` installs at
-`$DSH_HOME/profiles/<name>/node_modules/.bin/dsh-workbench`.
+Secrets and tokens never go in YAML, because a profile layer is a plain file
+and a chat transcript is durable. They go through the Web UI's
+**Settings → Secrets** page, which stores them in the broker file under
+`stateDir`.
 
-```sh
-dsh-workbench secret list
-printf '%s' VALUE | dsh-workbench secret set NAME
-dsh-workbench secret delete NAME
-```
-
-It reads one environment variable and takes no flags:
-
-| Variable                | Default          | Meaning                           |
-| ----------------------- | ---------------- | --------------------------------- |
-| `DSH_SANDBOX_STATE_DIR` | `~/.dsh-sandbox` | Must match the `stateDir` setting |
-
-`secret set` refuses an interactive terminal so a value cannot end up in shell
-history by accident. The provider reloads the broker file before the next
-sandbox command, so CLI changes take effect without restarting dsh. The Web
-UI's Secrets page edits the same store.
+The provider reloads the broker file before the next sandbox command, so a
+saved change takes effect without restarting dsh.
 
 A secret named `GITHUB_TOKEN` doubles as the Git credential for github.com, so
-`secret set GITHUB_TOKEN` with a fine-grained personal access token (or
-`gh auth token`) is the simplest way to reach private repositories — no OAuth
-app required.
+storing a fine-grained personal access token (or `gh auth token`) under that
+name is the simplest way to reach private repositories — no OAuth app
+required.
 
 Sandbox code can read injected secrets, which is their purpose. The broker
 improves storage and cleanup, not confidentiality from the repository being run.
