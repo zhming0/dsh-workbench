@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveConfig } from "../src/config.js";
+import { configSchema, resolveConfig } from "../src/config.js";
 import { DEFAULT_RUNNER_IMAGE } from "../src/runner-image.js";
 
 describe("sandbox provider settings", () => {
@@ -65,9 +65,21 @@ describe("sandbox provider settings", () => {
         profiles: { standard: { backend: "docker" } },
       }),
     ).toThrow("defaultProfile missing is not a configured profile");
-    expect(() => resolveConfig({ profiles: {} })).toThrow(
-      "at least one profile",
-    );
+
+    // A host with no sandbox profile still resolves and boots; the first
+    // prompt explains what to add instead of the process failing at startup.
+    // A leftover defaultProfile does not turn that into a boot error.
+    for (const config of [
+      { profiles: {} },
+      {},
+      { profiles: {}, defaultProfile: "standard" },
+    ]) {
+      expect(configSchema(config).profiles).toEqual({});
+      const empty = resolveConfig(config);
+      expect(empty.profiles).toEqual({});
+      expect(empty.defaultProfile).toBeUndefined();
+    }
+
     expect(() =>
       resolveConfig({
         profiles: {

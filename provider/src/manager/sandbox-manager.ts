@@ -109,6 +109,13 @@ export class SandboxManager extends TypertRemoteService {
     super(ctx, "sandboxManager");
     this.config = resolveConfig(config);
     this.workspace = this.config.workspace;
+    if (Object.keys(this.config.profiles).length === 0) {
+      ctx
+        .logger("sandbox")
+        .warn(
+          "no sandbox profiles configured; add one to the sandbox-manager settings or no session can start a sandbox",
+        );
+    }
     const store =
       dependencies.store ??
       new SessionStore(join(this.config.stateDir, "sessions.json"));

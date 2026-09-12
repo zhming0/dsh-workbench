@@ -39,8 +39,12 @@ export type ProfileConfig =
     };
 
 export interface Config {
-  /** Named sandbox profiles a session can choose from before its first prompt. */
-  profiles: Record<string, ProfileConfig>;
+  /**
+   * Named sandbox profiles a session can choose from before its first prompt.
+   * An empty map is allowed: the host boots and serves sessions, but no
+   * sandbox can be provisioned until a profile is added.
+   */
+  profiles?: Record<string, ProfileConfig>;
   /** Profile used when the session did not pick one. Defaults to the first. */
   defaultProfile?: string;
   stateDir?: string;
@@ -58,7 +62,11 @@ export interface Config {
 
 export interface ResolvedConfig {
   profiles: Record<string, SandboxProfile>;
-  defaultProfile: string;
+  /**
+   * Undefined when no profile is configured. Provisioning then fails with a
+   * message naming the missing settings instead of the host failing to boot.
+   */
+  defaultProfile: string | undefined;
   stateDir: string;
   repository?: string;
   revision: string;
@@ -104,7 +112,7 @@ export const configSchema: Schemastery<Config> = z.object({
         }),
       ]),
     )
-    .required(),
+    .default({}),
   defaultProfile: z.string(),
   stateDir: z.string(),
   repository: z.string(),
@@ -125,22 +133,29 @@ export const configSchema: Schemastery<Config> = z.object({
   }),
 });
 
-/** Apply every default and check the settings hold together. */
+/**
+ * Apply every default and check the settings hold together. A configuration
+ * with no profiles is valid: the host comes up without a backend, and the
+ * first prompt explains what to add.
+ */
 export function resolveConfig(config: Config): ResolvedConfig {
   const stateDir = config.stateDir ?? join(homedir(), ".dsh-sandbox");
   const tunnelPort = config.tunnel?.port ?? 8081;
-  const [firstProfile] = Object.keys(config.profiles);
-  if (firstProfile === undefined) {
-    throw new Error("sandbox-manager needs at least one profile");
-  }
   const profiles = Object.fromEntries(
-    Object.entries(config.profiles).map(([name, profile]) => [
+    Object.entries(config.profiles ?? {}).map(([name, profile]) => [
       name,
       resolveProfile(name, profile, tunnelPort),
     ]),
   );
-  const defaultProfile = config.defaultProfile ?? firstProfile;
-  if (profiles[defaultProfile] === undefined) {
+  const configured = Object.keys(profiles);
+  // With no profiles there is nothing for defaultProfile to select, so a
+  // leftover name is ignored rather than stopping the host from booting; the
+  // first prompt reports the missing profile instead.
+  const defaultProfile =
+    configured.length === 0
+      ? undefined
+      : (config.defaultProfile ?? configured[0]);
+  if (defaultProfile !== undefined && profiles[defaultProfile] === undefined) {
     throw new Error(
       `defaultProfile ${defaultProfile} is not a configured profile`,
     );
