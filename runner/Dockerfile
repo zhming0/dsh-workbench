@@ -69,6 +69,21 @@ RUN set -eux; \
     echo "${yq_sha}  /usr/local/bin/yq" | sha256sum -c -; \
     chmod +x /usr/local/bin/yq; \
     rm -rf /tmp/jj.tar.gz /tmp/mise.tar.gz /tmp/mise-cache /tmp/rg.tar.gz /tmp/uv.tar.gz; \
+    mkdir -p /etc/profile.d; \
+    printf '%s\n' \
+      '# Debian /etc/profile resets PATH for every login shell, discarding the' \
+      '# PATH this image sets. Restore the workspace locations that survive a' \
+      '# wake: user-level installs and mise shims under $HOME/.local.' \
+      'if [ -n "${HOME:-}" ]; then' \
+      '  PATH="${HOME}/.local/bin:${PATH}"' \
+      '  PATH="${HOME}/.local/share/mise/shims:${PATH}"' \
+      'fi' \
+      'if [ -n "${MISE_DATA_DIR:-}" ]; then' \
+      '  PATH="${MISE_DATA_DIR}/shims:${PATH}"' \
+      'fi' \
+      'export PATH' \
+      > /etc/profile.d/dsh-path.sh; \
+    chmod 0755 /etc/profile.d/dsh-path.sh; \
     mkdir -p /workspace /run/dsh; \
     useradd --create-home --uid 1000 --home-dir /workspace/home sandbox; \
     chown -R sandbox:sandbox /workspace /run/dsh
@@ -76,10 +91,13 @@ COPY --from=build /dsh-runner /usr/local/bin/dsh-runner
 # $HOME lives on the workspace volume so home files and caches survive a
 # Kubernetes wake. A sandbox mounts its workspace volume over /workspace, which
 # hides this image's copy, so the runner recreates the directory at startup.
+# npm's default global prefix is the root-owned Node install, where
+# `npm install -g` fails with EACCES; $HOME/.local is writable, is on PATH,
+# and is on the workspace volume, so global installs work and survive a wake.
+# mise keeps its default data directory under $HOME too, so no override is set.
 ENV HOME=/workspace/home \
-    MISE_DATA_DIR=/workspace/.dsh-state/mise \
-    MISE_CACHE_DIR=/workspace/.dsh-state/mise-cache \
-    PATH=/workspace/.dsh-state/mise/shims:/opt/mise/installs/node/${NODE_VERSION}/bin:$PATH
+    NPM_CONFIG_PREFIX=/workspace/home/.local \
+    PATH=/workspace/home/.local/share/mise/shims:/opt/mise/installs/node/${NODE_VERSION}/bin:$PATH
 USER sandbox
 WORKDIR /workspace
 EXPOSE 8080

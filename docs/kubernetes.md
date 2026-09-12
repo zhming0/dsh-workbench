@@ -449,12 +449,13 @@ the test prints a note that models will not be able to pull images. On failure
 the main claim is intentionally preserved for debugging; on success it is
 removed.
 
-The PVC carries the whole `/workspace` tree: the checkout, mise's data and
-shims in `/workspace/.dsh-state`, and the home directory at `/workspace/home`.
-A wake therefore keeps mise-installed toolchains, package caches, and any file
-written under `$HOME`, while `/tmp`, apt packages, processes, and anything
-installed elsewhere in the container are gone. Home caches share the claim's
-storage quota, so size it for the toolchains a session installs.
+The PVC carries the whole `/workspace` tree: the checkout and the home
+directory at `/workspace/home`, which holds mise's data and shims, package
+caches, and anything else installed under `$HOME`. A wake therefore keeps
+mise-installed toolchains and home files, while `/tmp`, apt packages,
+processes, and anything installed elsewhere in the container are gone. Home
+caches share the claim's storage quota, so size it for the toolchains a session
+installs.
 
 Expiry/deletion is terminal and the owned PVC is garbage-collected. A
 hibernated PVC survives only while its Sandbox/Claim remain. Suspended or

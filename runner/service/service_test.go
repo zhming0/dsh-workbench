@@ -148,6 +148,14 @@ func TestEnvironmentForwardsDockerHost(t *testing.T) {
 	}
 }
 
+func TestEnvironmentForwardsNpmPrefix(t *testing.T) {
+	t.Setenv("NPM_CONFIG_PREFIX", "/workspace/home/.local")
+	env := New("box").environment(nil)
+	if envValue(env, "NPM_CONFIG_PREFIX") != "/workspace/home/.local" {
+		t.Fatalf("NPM_CONFIG_PREFIX not forwarded: %v", env)
+	}
+}
+
 func TestResolveMissingLeafThroughSymlink(t *testing.T) {
 	d := t.TempDir()
 	real := filepath.Join(d, "real")

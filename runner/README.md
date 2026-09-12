@@ -37,6 +37,14 @@ Kubernetes sandbox mounts its workspace volume over `/workspace` and hides the
 image's copy. Files outside `/workspace`, `/tmp` among them, do not survive a
 wake.
 
+Global installs need no root: `NPM_CONFIG_PREFIX` sends `npm install -g` to
+`$HOME/.local`, `uv tool install` uses `$HOME/.local/bin`, and mise keeps its
+default data directory at `$HOME/.local/share/mise`. A `/etc/profile.d` script
+puts those directories back on `PATH` for login shells, which Debian's
+`/etc/profile` would otherwise reset. The image has no `sudo` and no writable
+system directory, so `apt-get` and other system package managers cannot install
+anything.
+
 `GET /health` on `ADDR` (default `:8080`) is an unauthenticated
 process-readiness probe for the kubelet; it is the only listener the runner
 opens and does not expose sandbox data or RPCs.
