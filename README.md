@@ -10,7 +10,7 @@ in repositories or chat.
 Running it takes three pieces of infrastructure, all yours to operate: a
 Kubernetes cluster you administer,
 [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) (pinned to
-**v0.5.4**; the install steps apply it), and an OIDC identity provider — dsh
+**v1.0.2**; the install steps apply it), and an OIDC identity provider — dsh
 ships no user authentication, so the distribution fronts it with oauth2-proxy
 and you supply the OIDC client. If that is not your situation, this project is
 not a turnkey tool.
@@ -65,7 +65,7 @@ execute in). You need:
 including what each manifest does and the isolation model. The short form:
 
 ```sh
-kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v0.5.4/sandbox-with-extensions.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.2/sandbox-with-extensions.yaml
 
 kubectl create namespace dsh-sandbox
 kubectl -n dsh-sandbox create secret generic dsh-host-oidc \

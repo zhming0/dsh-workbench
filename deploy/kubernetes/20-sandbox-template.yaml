@@ -75,9 +75,9 @@ spec:
             # variable to every command it runs.
             - name: DOCKER_HOST
               value: unix:///run/user/1000/docker.sock
-            # agent-sandbox v0.5.4 normally names the backing pod after its
-            # Sandbox. The provider expects this same assigned Sandbox name
-            # in the tunnel handshake and in Health responses.
+            # agent-sandbox names the backing pod after its Sandbox, so this
+            # downward-API value is the assigned Sandbox name the provider
+            # expects in the tunnel handshake and in Health responses.
             - name: SANDBOX_ID
               valueFrom:
                 fieldRef:

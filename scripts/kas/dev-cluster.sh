@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly KAS_VERSION="v0.5.4"
+readonly KAS_VERSION="v1.0.2"
 readonly INSTALL_URL="https://github.com/kubernetes-sigs/agent-sandbox/releases/download/${KAS_VERSION}/sandbox-with-extensions.yaml"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CLUSTER_NAME="dsh-kas"
@@ -18,7 +18,7 @@ Usage: dev-cluster.sh --runner-image IMAGE (--host-image IMAGE | --host-url URL)
                       [--registration-token-file FILE]
                       [--load-runner-image] [--skip-warm-pool] [--name NAME]
 
-Creates/reuses a kind cluster, installs agent-sandbox v0.5.4, and applies the
+Creates/reuses a kind cluster, installs agent-sandbox v1.0.2, and applies the
 reference environment. --load-runner-image loads existing local Docker images
 (the runner, and the host when --host-image is set) into kind.
 --skip-warm-pool applies the SandboxTemplate but leaves warm-pool creation to
