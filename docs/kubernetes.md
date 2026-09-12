@@ -1,9 +1,9 @@
 # Kubernetes deployment
 
 This reference runs one universal DSH runner behind Kubernetes SIG
-agent-sandbox. It is intentionally pinned to **agent-sandbox v0.5.4** and its
-`agents.x-k8s.io/v1beta1` and `extensions.agents.x-k8s.io/v1beta1` APIs. The
-project is pre-1.0; do not assume these manifests work with another release.
+agent-sandbox. It is intentionally pinned to **agent-sandbox v1.0.2** and its
+`agents.x-k8s.io/v1beta1` and `extensions.agents.x-k8s.io/v1beta1` APIs. Do not
+assume these manifests work with another release.
 
 ## Prerequisites
 
@@ -55,7 +55,7 @@ runner pods read. With `--host-url`, hand the same token to the external dsh
 host through `DSH_WORKBENCH_REGISTRATION_TOKEN`, make the address reachable
 from pods, and widen the sandbox NetworkPolicy egress to it.
 The script creates `kind-dsh-kas`,
-installs exactly the v0.5.4 release asset `sandbox-with-extensions.yaml`, waits
+installs exactly the v1.0.2 release asset `sandbox-with-extensions.yaml`, waits
 for its CRDs and controllers, and applies `deploy/kubernetes`. It is
 noninteractive. Use `--name NAME` on both cluster scripts to choose another
 kind cluster name.
@@ -67,7 +67,7 @@ pod never becomes Ready), and apply the manifests after replacing both image
 placeholders with released tags and `dsh.example.com` with your hostname:
 
 ```sh
-kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v0.5.4/sandbox-with-extensions.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.2/sandbox-with-extensions.yaml
 kubectl wait --for=condition=Established \
   crd/sandboxes.agents.x-k8s.io \
   crd/sandboxclaims.extensions.agents.x-k8s.io \
@@ -95,6 +95,23 @@ kubectl -n dsh-sandbox rollout status deployment/dsh-host --timeout=300s
 kubectl -n dsh-sandbox wait --for=jsonpath='{.status.readyReplicas}'=1 \
   sandboxwarmpool/dsh-universal --timeout=300s
 scripts/kas/smoke-test.sh -n dsh-sandbox
+```
+
+**Upgrading from v0.5.x.** First check `status.storedVersions` on all four
+CRDs. If any still lists `v1alpha1`, follow the
+[upstream migration guide](https://github.com/kubernetes-sigs/agent-sandbox/blob/v1.0.2/docs/api-migration-guide.md)
+before upgrading, because v1.0.2 serves only `v1beta1` and the API server
+rejects removing a stored version. Then apply the v1.0.2 asset over the old
+one. The upgrade drops the conversion webhook, and its namespaced Service, TLS
+Secret, Role, and RoleBinding are not in the v1.0.2 asset. Delete those four
+leftovers once the controller is available; the `agent-sandbox-controller`
+ClusterRole and ClusterRoleBinding are still current and stay:
+
+```sh
+kubectl -n agent-sandbox-system delete \
+  svc/agent-sandbox-webhook-service secret/agent-sandbox-webhook-certs \
+  role/agent-sandbox-controller rolebinding/agent-sandbox-controller \
+  --ignore-not-found
 ```
 
 The template contains no session-specific environment variables or Secrets;
@@ -448,13 +465,16 @@ storage quota, so size it for the toolchains a session installs.
 Expiry/deletion is terminal and the owned PVC is garbage-collected. A
 hibernated PVC survives only while its Sandbox/Claim remain. Suspended or
 expired Sandboxes never return to the warm pool. A pool replenishes with a new
-Sandbox after adoption; an adopted Sandbox is not recycled.
+Sandbox after adoption; an adopted Sandbox is not recycled. A claim that
+arrives before the controller has observed the warm pod's IP waits two seconds
+and then starts cold instead of adopting.
 
-The v0.5.4 controller normally gives a warm Sandbox and its backing pod the
-same name. The runner reads that pod name through the downward API and presents
-it as its identity in the tunnel handshake and Health responses, which the
-provider checks against the assigned Sandbox name. The smoke test verifies this
-identity rule and fails closed if a future controller changes it.
+Agent-sandbox names a warm Sandbox's backing pod after the Sandbox itself, so
+the pod name the runner reads through the downward API is the assigned Sandbox
+name. The runner presents it as its identity in the tunnel handshake and Health
+responses, and the provider checks it against the Sandbox the claim returned.
+The smoke test verifies this identity rule and fails closed if a future
+controller changes it.
 
 ## OpenTelemetry
 

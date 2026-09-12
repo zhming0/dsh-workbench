@@ -135,7 +135,11 @@ async function waitForWarmSandbox(api) {
       plural: "sandboxes",
       labelSelector: "agents.x-k8s.io/warm-pool-sandbox",
     });
-    const sandboxId = response.items?.[0]?.metadata?.name;
+    // The claim controller adopts a candidate only after it has observed the
+    // backing Pod's IP, and cold-starts the claim when no candidate reports one
+    // within a two-second grace period. Wait for the state adoption needs.
+    const warm = response.items?.find((item) => item.status?.podIPs?.length > 0);
+    const sandboxId = warm?.metadata?.name;
     if (typeof sandboxId === "string" && sandboxId !== "") return sandboxId;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }

@@ -36,6 +36,21 @@ kubectl cluster-info >/dev/null 2>&1 || { echo "error: current kube context is n
 kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || { echo "error: namespace '$NAMESPACE' does not exist" >&2; exit 1; }
 kubectl -n "$NAMESPACE" get sandboxwarmpool "$WARM_POOL" >/dev/null 2>&1 || { echo "error: warm pool '$WARM_POOL' not found in '$NAMESPACE'" >&2; exit 1; }
 
+# The claim controller adopts a warm Sandbox only after it has observed the
+# backing Pod's IP, and cold-starts the claim when no candidate reports one
+# within a two-second grace period. Wait for the state adoption needs.
+deadline=$((SECONDS + 120))
+while true; do
+  ips="$(kubectl -n "$NAMESPACE" get sandboxes -l agents.x-k8s.io/warm-pool-sandbox \
+    -o jsonpath='{range .items[*]}{.status.podIPs[0]}{"\n"}{end}' 2>/dev/null || true)"
+  ready_ip="$(printf '%s\n' "$ips" | grep -m1 -v '^$' || true)"
+  if [[ -n "$ready_ip" ]]; then
+    break
+  fi
+  (( SECONDS < deadline )) || { echo "error: no warm Sandbox reported a Pod IP within 120s" >&2; exit 1; }
+  sleep 0.5
+done
+
 suffix="$(date +%s)-$RANDOM"
 MAIN_CLAIM="kas-smoke-$suffix"
 start_ms="$(python3 -c 'import time; print(time.time_ns() // 1_000_000)')"
