@@ -40,16 +40,26 @@ preset.
 
 Subagent sessions share the root session's sandbox. Every sandbox lookup keys
 on the agent's top-level session — resolved from the durable `parentSession`
-lineage of the child session header — so delegation reads and writes one
-working copy, a child's first tool call boots the root's sandbox, and a child
-turn holds it against idle and release exactly as a root turn does (turns are
-counted per key, so a parent and a child turning at once keep the sandbox
-alive until both close). There is no locking or conflict detection between a
-parent and its subagents; the sandbox boundary is the containment. Resolution
-is memoized per session, so a child never switches sandboxes when an ancestor
-is disposed mid-run; a child whose parent cannot be resolved at all (absent
-or disposed ancestor) falls back to its own sandbox, and the fallback is
-logged as a warning.
+lineage of a child session header that carries `origin: subagent` — so
+delegation reads and writes one working copy, a child's first tool call boots
+the root's sandbox, and a child turn holds it against idle and release exactly
+as a root turn does (turns are counted per key, so a parent and a child turning
+at once keep the sandbox alive until both close). There is no locking or
+conflict detection between a parent and its subagents; the sandbox boundary is
+the containment. Resolution is memoized per session, so a child never switches
+sandboxes when an ancestor is disposed mid-run; a child whose parent cannot be
+resolved at all (absent or disposed ancestor) falls back to its own sandbox,
+and the fallback is logged as a warning.
+
+A Fork is not a subagent. dsh records a fork's source in the same
+`parentSession` field, but a fork is a top-level session that owns a fresh
+working copy, so it never shares the source's sandbox: starting a fork wakes
+nothing and hibernating or releasing it leaves the source's sandbox alone. The
+two are told apart by `origin`, which only a real subagent child sets. That
+field is doing load-bearing work here even though dsh describes it as
+presentation metadata, so a dsh change to how subagent children are marked
+would silently cost delegation its shared working copy; see the risk note in
+[`src/manager/root-session.ts`](src/manager/root-session.ts).
 
 Uploaded attachments are copied into the sandbox on demand. dsh stores an
 upload on the host and asks the filesystem row to map its host path into the

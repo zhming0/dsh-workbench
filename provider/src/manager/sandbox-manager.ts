@@ -459,6 +459,7 @@ export class SandboxManager extends TypertRemoteService {
       this.rootSessions.set(sessionId, root);
       if (
         root === sessionId &&
+        agent.session.header.origin === "subagent" &&
         agent.session.header.parentSession !== undefined
       ) {
         this.ctx
