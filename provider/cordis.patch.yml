@@ -111,3 +111,13 @@
     # of injecting them, so a headless profile still boots with this row.
     - id: sandbox-workspace-files
       name: '@zhming0/dsh-workbench/workspace-files'
+
+    # Skills authored in this package as TypeScript modules, for the reason the
+    # stock skill rows cannot serve a sandbox: `dsh-skill-filesystem` reads its
+    # user roots through the sandbox filesystem, so `$DSH_HOME/skills` on the
+    # host is a path that does not exist in the pod. This row registers the
+    # modules under `src/skills/` into the global layer of the skill registry,
+    # which every agent's merged catalog carries. An empty folder registers
+    # nothing, so the row is inert until a skill is authored.
+    - id: skills
+      name: '@zhming0/dsh-workbench/skills'

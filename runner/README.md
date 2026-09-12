@@ -51,6 +51,17 @@ separately. Architecture-specific archives have pinned checksums, and the Go
 stage cross-compiles from the builder's own architecture rather than running
 the toolchain under emulation.
 
+It also installs `agent-browser` and its Chrome for Testing browser, which
+back the `using-agent-browser` skill. Chrome lives in `/opt/agent-browser`
+rather than under `$HOME`, because a session mounts its workspace volume over
+`/workspace` and the home directory is `/workspace/home` on that volume: the
+CLI looks for its own download under `$HOME`, so a browser installed there
+would be invisible to every session. It is exposed as `google-chrome` on
+`PATH` instead, one of the names the CLI searches. Chrome's shared libraries
+are installed by hand rather than through `agent-browser install --with-deps`,
+which shells out to `sudo apt-get` and this image has no sudo; `sandbox` owns
+the browser directory so a session may repair or upgrade it.
+
 Releases are published to `ghcr.io/zhming0/dsh-runner`, tagged with the same
 version as the `@zhming0/dsh-workbench` package that expects them.
 
