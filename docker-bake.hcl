@@ -17,6 +17,11 @@ group "default" {
 # Everything a release pushes. The two images share one version by
 # construction: the control-plane image build stamps VERSION into the package and
 # asserts its default runner tag matches.
+#
+# Both targets publish a multi-arch index. GHCR reads package metadata for a
+# multi-arch image from the annotations on that index, while a Dockerfile label
+# only reaches the per-platform images, so each target names its source
+# repository as an index annotation too.
 group "release" {
   targets = ["production", "control-plane-production"]
 }
@@ -36,6 +41,9 @@ target "production" {
     "${IMAGE}:latest"
   ]
   platforms = ["linux/amd64", "linux/arm64"]
+  annotations = [
+    "index:org.opencontainers.image.source=https://github.com/zhming0/dsh-yawn"
+  ]
 }
 
 # Native single-platform control-plane image for local work and the CI composition
@@ -57,4 +65,7 @@ target "control-plane-production" {
     "${CONTROL_PLANE_IMAGE}:latest"
   ]
   platforms = ["linux/amd64", "linux/arm64"]
+  annotations = [
+    "index:org.opencontainers.image.source=https://github.com/zhming0/dsh-yawn"
+  ]
 }
