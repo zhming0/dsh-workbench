@@ -81,4 +81,8 @@ USER dsh
 ENV HOME=/data
 WORKDIR /data
 EXPOSE 3000
+
+# GHCR links the image to the GitHub repository this label names.
+LABEL org.opencontainers.image.source="https://github.com/zhming0/dsh-yawn"
+
 ENTRYPOINT ["dsh-yawn-entrypoint"]
