@@ -78,7 +78,7 @@ spec:
             # agent-sandbox names the backing pod after its Sandbox, so this
             # downward-API value is the assigned Sandbox name the control plane
             # expects in the tunnel handshake and in Health responses.
-            - name: SANDBOX_ID
+            - name: DSH_YAWN_SANDBOX_ID
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name

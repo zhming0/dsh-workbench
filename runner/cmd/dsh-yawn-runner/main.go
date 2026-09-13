@@ -74,9 +74,9 @@ func serve(socket string) error {
 	if err := ensureHome(); err != nil {
 		return fmt.Errorf("create home directory: %w", err)
 	}
-	sandboxID := os.Getenv("SANDBOX_ID")
+	sandboxID := os.Getenv("DSH_YAWN_SANDBOX_ID")
 	if sandboxID == "" {
-		return errors.New("SANDBOX_ID is required")
+		return errors.New("DSH_YAWN_SANDBOX_ID is required")
 	}
 	controlPlaneURL := os.Getenv("DSH_YAWN_CONTROL_PLANE_URL")
 	if controlPlaneURL == "" {

@@ -66,7 +66,7 @@ export class BuildkiteBackend implements SandboxBackend {
     // The control plane may have stopped after creating the build but before
     // saving its record. The session tag on the build makes that recoverable.
     let build = await this.findLiveBuild(spec.sessionId);
-    let sandboxId = build?.env?.SANDBOX_ID;
+    let sandboxId = build?.env?.DSH_YAWN_SANDBOX_ID;
     if (build === undefined || sandboxId === undefined) {
       sandboxId = sandboxName(spec.sessionId);
       // The pipeline's repository is unrelated to the sandbox, so the branch
@@ -78,7 +78,7 @@ export class BuildkiteBackend implements SandboxBackend {
         branch: sandboxId,
         message: `dsh sandbox ${sandboxId}`,
         env: {
-          SANDBOX_ID: sandboxId,
+          DSH_YAWN_SANDBOX_ID: sandboxId,
           DSH_YAWN_CONTROL_PLANE_URL: this.options.controlPlaneUrl,
           DSH_YAWN_RUNNER_IMAGE: this.options.image,
         },
