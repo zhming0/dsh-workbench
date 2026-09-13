@@ -41,10 +41,13 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
 # git backs the control plane's repository auto-detect fallback
 # (`git remote get-url origin`) for sessions not created from a repository
-# Workspace.
+# Workspace. The docker CLI lets the Docker backend manage sibling sandbox
+# containers when the control plane itself runs in a container; it is the
+# same static binary the sandbox pods' dind sidecar ships (docker:29.8.0).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+COPY --from=docker:29.8.0-cli /usr/local/bin/docker /usr/local/bin/docker
 
 COPY --from=build /out/meta /opt/dsh-yawn/meta
 COPY --from=build /out/dsh-yawn.tgz /opt/dsh-yawn/dsh-yawn.tgz

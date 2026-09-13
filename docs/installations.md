@@ -12,5 +12,6 @@ The phases are independent. After step 1 the Web UI, sessions, secrets,
 instructions, and repository workspaces all work; the first tool call fails
 with a message naming the missing runner until step 2 is done.
 
-Docker and checkout installs are development paths, not the product:
-[`development.md`](development.md).
+The supported dsh surface is `dsh web`: headless mode exits before the idle
+lifecycle can run, so it is out of scope. Docker and checkout installs are
+development paths, not the product: [`development.md`](development.md).

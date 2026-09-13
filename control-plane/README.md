@@ -11,9 +11,8 @@ published to npm. For development, install a checkout:
 dsh plugin --profile web add "$PWD/control-plane"
 ```
 
-The [repository README](https://github.com/zhming0/dsh-yawn#getting-started)
-covers the whole setup. This page is the reference: what the bundle patch does
-and every setting.
+The [repository README](../README.md) covers the whole setup. This page is the
+reference: what the bundle patch does and every setting.
 
 ## What installing it changes
 
@@ -182,6 +181,25 @@ configured, a chip in the composer's tool row lets the user pick one for a new
 session. The sandbox is provisioned on the first prompt, not when the session
 is created, so the choice can still change until then. Once a sandbox exists
 the chip shows the profile in use and is disabled.
+
+## What changes for the agent
+
+The tool rows keep their names, schemas, and prompt guidance; what changes is
+where they run.
+
+|                                    | Before                    | After                                     |
+| ---------------------------------- | ------------------------- | ----------------------------------------- |
+| `read`, `write`, `edit`, `present` | your disk                 | sandbox workspace                         |
+| `bash`                             | your machine              | sandbox                                   |
+| `glob`, `grep`                     | ripgrep on your machine   | sandbox workspace, ripgrep in the sandbox |
+| Working directory                  | wherever you launched dsh | `/workspace/repository` in the sandbox    |
+| `docker`                           | your Docker daemon        | a rootless daemon in the sandbox pod      |
+| Session logs, spill files          | your disk                 | unchanged, still your disk                |
+| Uploaded attachments               | your disk                 | copied into the sandbox workspace         |
+
+On Kubernetes the `docker` row is the rootless `dockerd` sidecar; see
+[Docker inside a sandbox](../docs/kubernetes.md#docker-inside-a-sandbox) for
+the security trade it makes and how to remove it.
 
 ## Settings
 
