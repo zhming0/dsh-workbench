@@ -24,40 +24,40 @@ From a blank machine, install Docker, then install
 [`kubectl`](https://kubernetes.io/docs/tasks/tools/). From the repository root:
 
 ```sh
-docker buildx bake dev host-dev --load
+docker buildx bake dev control-plane-dev --load
 
 scripts/kas/dev-cluster.sh \
-  --runner-image dsh-runner:dev \
-  --host-image dsh-host:dev \
+  --runner-image dsh-yawn-runner:dev \
+  --control-plane-image dsh-yawn-control-plane:dev \
   --load-runner-image
 
-scripts/kas/smoke-test.sh --namespace dsh-sandbox
+scripts/kas/smoke-test.sh --namespace dsh-yawn
 scripts/kas/teardown.sh
 ```
 
-For the self-contained provider-to-runner transport and lifecycle test used by
+For the self-contained control-plane-to-runner transport and lifecycle test used by
 CI, build both images and run `pnpm test:kas`; see
 [`e2e-testing.md`](e2e-testing.md#kubernetes-transport-and-lifecycle-test).
 
-With `--host-image`, the dsh host itself runs in the cluster and runners dial
-its `dsh-host-tunnel` Service. The script applies the kustomize base, so the
-dev host runs without the OIDC proxy and is reached over
+With `--control-plane-image`, the control plane itself runs in the cluster and runners dial
+its `dsh-yawn-control-plane-tunnel` Service. The script applies the kustomize base, so the
+dev control plane runs without the OIDC proxy and is reached over
 `kubectl port-forward` — no identity provider needed. To run dsh outside the
 cluster instead, omit it and tell the runners where to dial:
 
 ```sh
 scripts/kas/dev-cluster.sh \
-  --runner-image dsh-runner:dev \
-  --host-url ws://192.0.2.10:8081/tunnel \
+  --runner-image dsh-yawn-runner:dev \
+  --control-plane-url ws://192.0.2.10:8081/tunnel \
   --load-runner-image
 ```
 
 `--load-runner-image` is for images already present in the local Docker daemon.
 Omit it when the images are pullable by the cluster. The script generates a
 registration token (or reads `--registration-token-file`) and stores it in the
-`dsh-registration-token` Secret, which both the host Deployment and the warm
-runner pods read. With `--host-url`, hand the same token to the external dsh
-host through `DSH_WORKBENCH_REGISTRATION_TOKEN`, make the address reachable
+`dsh-yawn-registration-token` Secret, which both the control plane Deployment and the warm
+runner pods read. With `--control-plane-url`, hand the same token to the external control
+plane through `DSH_YAWN_REGISTRATION_TOKEN`, make the address reachable
 from pods, and widen the sandbox NetworkPolicy egress to it.
 The script creates `kind-dsh-kas`,
 installs exactly the v1.0.2 release asset `sandbox-with-extensions.yaml`, waits
@@ -79,28 +79,28 @@ kubectl wait --for=condition=Established \
   crd/sandboxwarmpools.extensions.agents.x-k8s.io --timeout=120s
 kubectl -n agent-sandbox-system wait --for=condition=Available deployment --all --timeout=180s
 
-kubectl create namespace dsh-sandbox
-kubectl -n dsh-sandbox create secret generic dsh-host-oidc \
+kubectl create namespace dsh-yawn
+kubectl -n dsh-yawn create secret generic dsh-yawn-oidc \
   --from-literal=OAUTH2_PROXY_OIDC_ISSUER_URL=https://your-idp/realm \
-  --from-literal=OAUTH2_PROXY_CLIENT_ID=dsh-host \
+  --from-literal=OAUTH2_PROXY_CLIENT_ID=dsh-yawn-control-plane \
   --from-literal=OAUTH2_PROXY_CLIENT_SECRET=… \
   --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')"
 
-helm install dsh-workbench oci://ghcr.io/zhming0/charts/dsh-workbench \
-  --namespace dsh-sandbox --create-namespace \
+helm install dsh-yawn-control-plane oci://ghcr.io/zhming0/charts/dsh-yawn \
+  --namespace dsh-yawn --create-namespace \
   --set oidc.enabled=true --set oidc.hostname=dsh.example.com
 
 # Sandbox pool, after the agent-sandbox controllers above are installed. The
 # base names no namespace, so name the release namespace in an overlay.
-mkdir -p dsh-runner
-cat >dsh-runner/kustomization.yaml <<'EOF'
-namespace: dsh-sandbox
+mkdir -p dsh-yawn-runner
+cat >dsh-yawn-runner/kustomization.yaml <<'EOF'
+namespace: dsh-yawn
 resources:
   - ../deploy/kubernetes/runner
 EOF
-kubectl apply -k dsh-runner
-kubectl -n dsh-sandbox wait --for=jsonpath='{.status.readyReplicas}'=1 \
-  sandboxwarmpool/dsh-universal --timeout=300s
+kubectl apply -k dsh-yawn-runner
+kubectl -n dsh-yawn wait --for=jsonpath='{.status.readyReplicas}'=1 \
+  sandboxwarmpool/dsh-yawn-universal --timeout=300s
 ```
 
 **Upgrading from v0.5.x.** First check `status.storedVersions` on all four
@@ -182,23 +182,23 @@ cluster, delete the `docker` container and its two `emptyDir` volumes from the
 template and the runner's `DOCKER_HOST` entry; the CLI then reports that no
 daemon is reachable.
 
-## The in-cluster dsh host
+## The in-cluster control plane
 
-The control plane chart runs the `ghcr.io/zhming0/dsh-host` distribution image
+The control plane chart runs the `ghcr.io/zhming0/dsh-yawn-control-plane` distribution image
 as a single-replica Deployment. Its home directory is the data volume, which
 carries everything durable: dsh sessions and storages, the seeded `web` profile
-with your `cordis.patch.yml`, and the provider's session records. Deleting the
+with your `cordis.patch.yml`, and the control plane's session records. Deleting the
 pod loses nothing; deleting the PVC loses all of it.
 
 The pod sets `fsGroup` so uid 1000 can write the volume, which on block-CSI
 StorageClasses makes the kubelet re-add group-read/write to every file on the
-volume at each pod start. The host's credentials document
+volume at each pod start. The control plane's credentials document
 (`/data/.dsh/.credentials.yaml`) must stay owner-only — dsh refuses to boot
 otherwise — so the Deployment runs a small init container that restores mode
 `0600` after the walk and before dsh starts. Nothing to configure; if you
 inspect the pod, the init container is expected.
 
-**Slow model API egress.** The host image is Node 24, where Happy Eyeballs
+**Slow model API egress.** The control-plane image is Node 24, where Happy Eyeballs
 (`net.autoSelectFamily`) is on by default and abandons each resolved address
 attempt after 250 ms. A model API endpoint further than that in TCP connect
 time fails every model call as an instant `ETIMEDOUT`, and a pod network
@@ -207,13 +207,13 @@ Deployment therefore sets
 `NODE_OPTIONS=--network-family-autoselection-attempt-timeout=3000` to give
 each attempt 3 s while keeping dual-stack failover.
 
-The host starts with no sandbox profile: it serves the Web UI, and sessions
+The control plane starts with no sandbox profile: it serves the Web UI, and sessions
 provision once the pool exists and the settings name it. On a chart install the
-sandbox-manager settings come from `provider.sandboxManager` values, which the
+sandbox-manager settings come from `controlPlane.sandboxManager` values, which the
 chart renders into a read-only patch layer at `/data/.dsh/cordis.patch.yml`,
 applied after the image's seeded profile file. A values change restarts the pod.
 
-The provider talks to the API server with the automounted `dsh-provider`
+The control plane talks to the API server with the automounted `dsh-yawn-control-plane`
 ServiceAccount token; the chart's Role and RoleBinding are what give it
 `sandboxclaims` and `sandboxes` access.
 
@@ -225,7 +225,7 @@ and [`30-warm-pool.yaml`](../deploy/kubernetes/runner/30-warm-pool.yaml) under a
 new name such as `dsh-large`, change the container `resources` and the volume
 request, and add them as resources in your kustomization. The
 [`installations-kas.md`](installations-kas.md#several-pools) walkthrough
-lists both pools in the provider settings; the composer shows a profile chip
+lists both pools in the control plane settings; the composer shows a profile chip
 when more than one exists:
 
 ```yaml
@@ -235,46 +235,46 @@ when more than one exists:
     profiles:
       standard:
         backend: kas
-        namespace: dsh-sandbox
-        warmPool: dsh-universal
+        namespace: dsh-yawn
+        warmPool: dsh-yawn-universal
       large:
         backend: kas
-        namespace: dsh-sandbox
+        namespace: dsh-yawn
         warmPool: dsh-large
 ```
 
 The same cluster still owns every template; a repository or a session picks
 among the pools the operator published and nothing else.
 
-**The registration token** authenticates every runner tunnel. The host reads
-it from `DSH_WORKBENCH_REGISTRATION_TOKEN` and each runner pod reads it from
-the same `dsh-registration-token` Secret, both at start. To rotate it, set the
-new value in the Secret, restart the host, and recycle the warm pods so they
+**The registration token** authenticates every runner tunnel. The control plane reads
+it from `DSH_YAWN_REGISTRATION_TOKEN` and each runner pod reads it from
+the same `dsh-yawn-registration-token` Secret, both at start. To rotate it, set the
+new value in the Secret, restart the control plane, and recycle the warm pods so they
 pick it up:
 
 ```sh
-kubectl -n dsh-sandbox create secret generic dsh-registration-token \
+kubectl -n dsh-yawn create secret generic dsh-yawn-registration-token \
   --from-literal=token="$(openssl rand -hex 32)" \
   --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n dsh-sandbox rollout restart deployment/dsh-host
-kubectl -n dsh-sandbox delete sandbox --all
+kubectl -n dsh-yawn rollout restart deployment/dsh-yawn-control-plane
+kubectl -n dsh-yawn delete sandbox --all
 ```
 
-For a gap-free rotation, first patch the host Deployment's
-`DSH_WORKBENCH_REGISTRATION_TOKEN` to a literal `new,old` value (comma
-separated, new first — the host accepts every listed token), then update the
+For a gap-free rotation, first patch the control plane Deployment's
+`DSH_YAWN_REGISTRATION_TOKEN` to a literal `new,old` value (comma
+separated, new first — the control plane accepts every listed token), then update the
 Secret to the new token alone, recycle the warm pods, and finally drop the old
-token from the host.
+token from the control plane.
 
 **Credentials and secrets** are in [`credentials.md`](credentials.md): which
 secrets sandbox commands receive, how to set them in the Web UI's
-**Settings → Secrets** page, and which two credentials belong to the host
+**Settings → Secrets** page, and which two credentials belong to the control plane
 instead. Never put secret values in YAML.
 
 **Reaching the UI.** dsh binds pod loopback by design and has no user
 authentication of its own, so the distribution fronts it with
 [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/): the
-`host-oidc.yaml` patch in the Helm chart runs the proxy
+chart's `oidc.enabled` runs an oauth2-proxy
 next to dsh, terminating OIDC and forwarding over pod-local loopback. The
 manifests deliberately stop at the proxy's pod port, 4180 — how to expose it
 is your cluster's business. A ClusterIP Service plus an ingress-nginx Ingress
@@ -284,11 +284,11 @@ looks like this:
 apiVersion: v1
 kind: Service
 metadata:
-  name: dsh-host
-  namespace: dsh-sandbox
+  name: dsh-yawn-control-plane
+  namespace: dsh-yawn
 spec:
   selector:
-    app.kubernetes.io/name: dsh-host
+    app.kubernetes.io/name: dsh-yawn-control-plane
   ports:
     - name: http
       port: 80
@@ -297,8 +297,8 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: dsh-host
-  namespace: dsh-sandbox
+  name: dsh-yawn-control-plane
+  namespace: dsh-yawn
   annotations:
     # dsh's browser transport holds WebSockets open at /api/events.* and can
     # carry large RPC bodies (attachments); nginx's defaults for read timeout
@@ -316,7 +316,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: dsh-host
+                name: dsh-yawn-control-plane
                 port:
                   name: http
           # Only for runners outside the cluster, such as Buildkite agents:
@@ -326,12 +326,12 @@ spec:
             pathType: Exact
             backend:
               service:
-                name: dsh-host-tunnel
+                name: dsh-yawn-control-plane-tunnel
                 port:
                   name: tunnel
   tls:
     - hosts: [dsh.example.com]
-      secretName: dsh-host-tls
+      secretName: dsh-yawn-tls
 ```
 
 One dsh-side detail is already handled by the patch: dsh's browser-trust
@@ -341,7 +341,7 @@ browser's Host through, so the external hostname is handed to dsh as
 `--trusted-host`. If you change the hostname, change it there too.
 
 Behind the proxy, dsh still asks each browser for its own launch token, the one
-it prints at startup. The patch sets `DSH_HOST_LAUNCH_TOKEN_ROUTE=1` on the dsh
+it prints at startup. The patch sets `DSH_YAWN_CONTROL_PLANE_LAUNCH_TOKEN_ROUTE=1` on the dsh
 container, which mounts a `/launch-token` route that redirects the browser to
 the tokenized URL, so once the proxy lets a user through they open
 
@@ -352,49 +352,49 @@ https://dsh.example.com/launch-token
 and land signed in. The redirect keeps the hostname the browser used, which is
 the one dsh binds the cookie to. The route is not a sign-in of its own: it
 hands the token to anyone who can reach port 3000, which in this pod is only
-the proxy and your own port-forward; do not enable it on a host whose port 3000
+the proxy and your own port-forward; do not enable it on a control plane whose port 3000
 is exposed some other way. Without the variable the route does not exist and
-the token has to come from the host log:
+the token has to come from the control plane log:
 
 ```sh
-kubectl -n dsh-sandbox logs deploy/dsh-workbench | grep 'dsh web:'
+kubectl -n dsh-yawn logs deploy/dsh-yawn-control-plane | grep 'dsh web:'
 # prints http://127.0.0.1:3000/?token=…; open https://dsh.example.com/?token=…
 ```
 
 The cookie lasts 30 days and its signing secret lives on the data volume, so a
-host restart does not sign browsers out. A new browser, or a cookie that has
+control-plane restart does not sign browsers out. A new browser, or a cookie that has
 expired, goes through `/launch-token` again.
 
 For yourself, a port-forward always works, with or without the proxy
 configured:
 
 ```sh
-kubectl -n dsh-sandbox port-forward deploy/dsh-workbench 3000:3000
+kubectl -n dsh-yawn port-forward deploy/dsh-yawn-control-plane 3000:3000
 ```
 
 then open `http://localhost:3000/launch-token`, or `http://localhost:3000/?token=…`
 with the token from the log. Loopback is trusted, so no extra flags are needed.
 
 The proxy authenticates users; it does not isolate them from each other. One
-dsh host is one trust domain — everyone the issuer lets through shares the
+control plane is one trust domain — everyone the issuer lets through shares the
 same sessions, credentials, and sandboxes. Restrict
 `OAUTH2_PROXY_EMAIL_DOMAINS` accordingly.
 
 ## Connectivity and isolation
 
 A Sandbox has no Service (`service: false`) and accepts no ingress at all. The
-runner opens a WebSocket to the host's `dsh-host-tunnel` Service on port 8081
-(`ws://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081/tunnel`),
-authenticates with the registration token, and all RPCs flow host→runner over
+runner opens a WebSocket to the control plane's `dsh-yawn-control-plane-tunnel` Service on port 8081
+(`ws://dsh-yawn-control-plane-tunnel.dsh-yawn.svc.cluster.local:8081/tunnel`),
+authenticates with the registration token, and all RPCs flow control-plane→runner over
 that runner-initiated tunnel. The claim's `status.sandbox.name` identifies the
-Sandbox; the runner presents the same name in its handshake and the provider
-verifies it. In-cluster the tunnel is plaintext: host authenticity rests on
+Sandbox; the runner presents the same name in its handshake and the control plane
+verifies it. In-cluster the tunnel is plaintext: control-plane authenticity rests on
 the cluster network being inside the trust domain.
 
 Runners outside the cluster, such as the [Buildkite backend's](buildkite.md)
 agents, get TLS from the Ingress that already fronts the Web UI: the
 `/tunnel` path rule in the Ingress above sends that one path to the
-`dsh-host-tunnel` Service, so those runners dial
+`dsh-yawn-control-plane-tunnel` Service, so those runners dial
 `wss://dsh.example.com/tunnel` under the UI's certificate while oauth2-proxy
 never sees the tunnel. The tunnel authenticates itself with the registration
 token, which is also why the rule is `Exact`: nothing else on the tunnel port
@@ -413,7 +413,7 @@ reversed, so an HTTPS proxy or Ingress can terminate TLS in front of it with
 the same certificate the Web UI uses. Two shapes work:
 
 - **An HTTP ingress with a WebSocket-capable path rule**, exactly as above:
-  `/tunnel` goes straight to the `dsh-host-tunnel` Service, under the UI's
+  `/tunnel` goes straight to the `dsh-yawn-control-plane-tunnel` Service, under the UI's
   certificate, with `proxy-read-timeout` and `proxy-send-timeout` above the
   UI's 3600 seconds. This is the simplest option when your ingress controller
   supports WebSocket upgrades, which ingress-nginx does by default.
@@ -435,7 +435,7 @@ stream {
     listen 8443 ssl;
     ssl_certificate     /etc/nginx/tls/tls.crt;
     ssl_certificate_key /etc/nginx/tls/tls.key;
-    proxy_pass dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081;
+    proxy_pass dsh-yawn-control-plane-tunnel.dsh-yawn.svc.cluster.local:8081;
   }
 }
 ```
@@ -450,8 +450,8 @@ listens on, 8443 here only as an example:
       hosted:
         backend: buildkite
         organization: acme
-        pipeline: dsh-sandbox
-        hostUrl: tls://dsh.example.com:8443
+        pipeline: dsh-yawn
+        controlPlaneUrl: tls://dsh.example.com:8443
 ```
 
 The registration token still authenticates every runner; exposure changes
@@ -459,7 +459,7 @@ reachability, not trust.
 
 The template asks the extension controller to manage a default-deny
 NetworkPolicy. Ingress is empty. The egress allow-list contains the tunnel to
-the dsh-host pod (TCP 8081), DNS to kube-dns (TCP/UDP 53), and HTTPS (TCP 443).
+the dsh-yawn-control-plane pod (TCP 8081), DNS to kube-dns (TCP/UDP 53), and HTTPS (TCP 443).
 Everything else is denied by a conforming NetworkPolicy CNI. The broad 443 rule
 also permits cluster and private addresses on 443, potentially including the
 API server; production deployments should replace it with approved CIDRs or an
@@ -469,7 +469,7 @@ is connectivity control, not a sandbox boundary.
 The pod does not mount a service-account token and runs non-root. The runner
 container has dropped capabilities and RuntimeDefault seccomp; the `docker`
 sidecar is privileged for the reasons in
-[Docker inside a sandbox](#docker-inside-a-sandbox). The `dsh-provider` Role is
+[Docker inside a sandbox](#docker-inside-a-sandbox). The `dsh-yawn-control-plane` Role is
 namespace scoped: it manages claims and reads/patches Sandboxes for lifecycle
 operations. It ships with the control plane chart, in the namespace the pool
 lives in, and grants nothing cluster-wide or outside sandbox operations.
@@ -488,9 +488,9 @@ before relying on it there.
 Typical output resembles:
 
 ```text
-Adopted Sandbox/dsh-universal-abc12 in 180ms
+Adopted Sandbox/dsh-yawn-universal-abc12 in 180ms
 Docker sidecar: container read the workspace sentinel
-Suspended: pod removed; PVC/workspace-dsh-universal-abc12 remains
+Suspended: pod removed; PVC/workspace-dsh-yawn-universal-abc12 remains
 Resumed in 2400ms; workspace and home sentinels verified
 Docker sidecar answered after resume
 shutdownTime foreground deletion and workspace cleanup verified
@@ -527,14 +527,14 @@ and then starts cold instead of adopting.
 Agent-sandbox names a warm Sandbox's backing pod after the Sandbox itself, so
 the pod name the runner reads through the downward API is the assigned Sandbox
 name. The runner presents it as its identity in the tunnel handshake and Health
-responses, and the provider checks it against the Sandbox the claim returned.
+responses, and the control plane checks it against the Sandbox the claim returned.
 The smoke test verifies this identity rule and fails closed if a future
 controller changes it.
 
 ## OpenTelemetry
 
-The provider records claim time, resume time, lifecycle changes, and command
-time through the dsh host's OpenTelemetry setup.
+The control plane records claim time, resume time, lifecycle changes, and command
+time through the control plane's OpenTelemetry setup.
 
 For the runner, add standard `OTEL_EXPORTER_OTLP_*`, `OTEL_TRACES_EXPORTER`,
 or `OTEL_METRICS_EXPORTER` variables to its container in the template to send

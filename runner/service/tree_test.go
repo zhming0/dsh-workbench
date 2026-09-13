@@ -10,20 +10,20 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
-	v1 "github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1"
-	"github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1/sandboxv1connect"
+	v1 "github.com/zhming0/dsh-yawn/runner/gen/dsh/yawn/v1"
+	"github.com/zhming0/dsh-yawn/runner/gen/dsh/yawn/v1/yawnv1connect"
 )
 
-func newTreeClient(t *testing.T) sandboxv1connect.RunnerServiceClient {
+func newTreeClient(t *testing.T) yawnv1connect.RunnerServiceClient {
 	t.Helper()
 	s := New("box")
 	mux := http.NewServeMux()
-	mux.Handle(sandboxv1connect.NewRunnerServiceHandler(s))
+	mux.Handle(yawnv1connect.NewRunnerServiceHandler(s))
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	t.Cleanup(server.Close)
-	return sandboxv1connect.NewRunnerServiceClient(server.Client(), server.URL)
+	return yawnv1connect.NewRunnerServiceClient(server.Client(), server.URL)
 }
 
 func relativePaths(entries []*v1.TreeEntry) []string {

@@ -1,0 +1,25 @@
+{{- include "dsh-yawn.validate" . }}
+{{- if .Values.oidc.enabled }}
+{{- /* The proxy port is the thing you expose. ClusterIP is the anchor: an
+Ingress, a Gateway API route, or a LoadBalancer Service of your own can point
+at it — or set service.type to expose this one directly. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dsh-yawn.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-yawn.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "dsh-yawn.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: 4180
+{{- end }}

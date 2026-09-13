@@ -1,0 +1,113 @@
+# The dsh-yawn bundle patch. `dsh plugin add` appends this package to the
+# profile's bundle list, so this layer applies after dsh-base and after the
+# surface bundle (dsh-web-app, dsh-headless).
+#
+# It swaps the three host capability rows and disables host-only helpers that
+# cannot operate through the remote boundary. Tool rows stay wherever the
+# surface bundle put them: in the host plane for headless, behind agent presets
+# for web. That lets the stock agent compositions work unchanged.
+
+# The host filesystem provider, so `read`, `write`, `edit`, and `present`
+# address the session's sandbox workspace.
+- id: fs-sandbox
+  disabled: true
+
+# The host shell executor, so `bash` runs in the sandbox.
+- id: bash-sandbox
+  disabled: true
+
+# The host process spawner. The shell executor above is built on it, so this
+# is the seam that actually moves execution off the dsh host.
+- id: subprocess
+  disabled: true
+
+# Permission presets switch dsh's local shell sandbox modes. The remote shell
+# runs in one fixed container boundary and does not claim to enforce those
+# per-command modes, so dsh correctly refuses to compose the preset service.
+- id: permission
+  disabled: true
+
+# dsh's sandbox policy describes the host's own file sandbox: a per-session
+# mode switch, a host directory the agent may write under, and a line in every
+# model request ("Current DSH file policy: workspace-write ... may modify files
+# under the session workspace: <path>") that renders the session cwd. That cwd
+# is the host anchor here and does not exist inside the sandbox, and the rows
+# above turn off the boundary the line describes, so the stock row would
+# mislead the model. The sandbox-workspace-policy row inserted below stands in
+# for it: it answers the Web rows that read `workspaceRoot` with the sandbox
+# workspace and adds nothing to the prompt.
+- id: sandbox-policy
+  disabled: true
+
+# The Web right sidebar's Files and Preview tabs, and the deliverables cards
+# under each turn, read through `workspace-files`, which serves the browser
+# from plain HTTP requests outside any agent turn. This package's filesystem
+# finds a session's sandbox through the calling agent, so on its own the stock
+# service fails on every request. The sandbox-workspace-files row inserted
+# below wraps its methods on the live service and runs each one as the agent
+# of the session named on the wire. The stock row stays mounted under its own
+# name: the Web app serves a package's browser half only for a mounted row of
+# that package, and the sidebar's file resource provider lives in that half.
+
+# Replace the Web app's host-directory chooser with this package's repository
+# URL flow. This patch is skipped with a warning in profiles, such as headless,
+# where the Web-only row does not exist.
+- id: directory-picker
+  disabled: true
+
+# The Web header's "Open in..." button launches a desktop application on the
+# dsh host against the session cwd. Neither holds here: the host runs headless
+# and the cwd is the bookkeeping anchor, while the application probe would run
+# through the sandbox subprocess seam and report programs installed in the
+# sandbox. Both halves go: the browser half calls the host routes directly, so
+# it cannot stand without them. Web-only, like directory-picker.
+- id: open-in-app
+  disabled: true
+
+- id: ui-open-in-app
+  disabled: true
+
+# The stock "@" file-discovery provider walks the session cwd on the host
+# filesystem. That cwd is this package's bookkeeping anchor directory, which
+# holds no repository content — the files live inside the sandbox — so the
+# stock row can never see them. The sandbox-file-reference row below lists the
+# sandbox workspace through the runner instead. Web-only, like directory-picker.
+- id: file-reference-local
+  disabled: true
+
+- insert:
+    # Owns one sandbox per dsh session: provision, idle hibernate, wake, expiry,
+    # and the credential broker. Every default works as-is against local Docker.
+    - id: sandbox-manager
+      name: '@zhming0/dsh-yawn'
+
+    - id: sandbox-fs
+      name: '@zhming0/dsh-yawn/fs'
+
+    - id: sandbox-shell
+      name: '@zhming0/dsh-yawn/shell'
+
+    - id: sandbox-subprocess
+      name: '@zhming0/dsh-yawn/subprocess'
+
+    - id: sandbox-file-reference
+      name: '@zhming0/dsh-yawn/file-reference'
+
+    # States the sandbox environment in the model's system prompt: shadows the
+    # cwd prompt variable with the sandbox workspace, contributes a short
+    # environment section, and drops dsh's host-only prompt sections (the
+    # implementation checkout and Web GUI paragraphs), which do not hold
+    # inside a sandbox.
+    - id: sandbox-context
+      name: '@zhming0/dsh-yawn/sandbox-context'
+
+    # `ctx.sandboxPolicy` for the Web rows that read it: reports the sandbox
+    # workspace as the root and adds no prompt line (see the stock row above).
+    - id: sandbox-workspace-policy
+      name: '@zhming0/dsh-yawn/sandbox-policy'
+
+    # Runs the Web Files and Preview sidebar (the stock workspace-files row
+    # above) as the session it serves. Waits for the Web-only services instead
+    # of injecting them, so a headless profile still boots with this row.
+    - id: sandbox-workspace-files
+      name: '@zhming0/dsh-yawn/workspace-files'

@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"connectrpc.com/connect"
-	v1 "github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1"
+	v1 "github.com/zhming0/dsh-yawn/runner/gen/dsh/yawn/v1"
 )
 
 func (s *Service) run(ctx context.Context, dir string, argv ...string) error {
@@ -69,7 +69,7 @@ func (s *Service) Setup(ctx context.Context, request *connect.Request[v1.SetupRe
 	marker := setupMarkerPath(workspace)
 	unlock := s.lock(marker)
 	defer unlock()
-	if err := s.run(ctx, workspace, "git", "config", "--global", "credential.helper", "!dsh-runner git-credential"); err != nil {
+	if err := s.run(ctx, workspace, "git", "config", "--global", "credential.helper", "!dsh-yawn-runner git-credential"); err != nil {
 		return nil, cerr(connect.CodeInternal, err)
 	}
 

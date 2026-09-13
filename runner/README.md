@@ -1,12 +1,12 @@
-# dsh-runner
+# dsh-yawn-runner
 
-`dsh-runner` is the in-sandbox ConnectRPC server. It dials the host rather
-than accepting inbound connections: `HOST_URL` names the host's tunnel
+`dsh-yawn-runner` is the in-sandbox ConnectRPC server. It dials the control plane rather
+than accepting inbound connections: `DSH_YAWN_CONTROL_PLANE_URL` names its tunnel
 endpoint as a WebSocket URL (`ws://host:port/tunnel`, or `wss://host/tunnel`
-through an HTTPS proxy that terminates TLS in front of the host), and the
+through an HTTPS proxy that terminates TLS in front of the control plane), and the
 runner registers with `SANDBOX_ID` plus the shared secret in
 `REGISTRATION_TOKEN` (or a file named by `REGISTRATION_TOKEN_FILE`), sent as
-a bearer token and the `X-Dsh-Sandbox-Id` header on the upgrade request.
+a bearer token and the `X-Dsh-Yawn-Sandbox-Id` header on the upgrade request.
 After a registration is accepted, the runner serves its RPCs over that same
 WebSocket with HTTP/2 roles reversed, and redials with backoff whenever the
 tunnel drops. RPCs are reachable only over tunnels the runner itself opened.
@@ -17,7 +17,7 @@ Secrets and Git credentials exist only in process memory. Child processes get a
 small allowlisted base environment, the current secrets, and RPC-supplied
 overrides; they do not inherit the runner environment. Git obtains credentials
 from a mode-0600 Unix socket at `CREDENTIAL_SOCKET` (default
-`/run/dsh/credentials.sock`) through `dsh-runner git-credential`.
+`/run/dsh/credentials.sock`) through `dsh-yawn-runner git-credential`.
 
 Setup defaults to `/workspace/repository`, preserves an already initialized
 workspace, runs the repository's one-time `.agents/setup` hook and the
@@ -59,8 +59,8 @@ separately. Architecture-specific archives have pinned checksums, and the Go
 stage cross-compiles from the builder's own architecture rather than running
 the toolchain under emulation.
 
-Releases are published to `ghcr.io/zhming0/dsh-runner`, tagged with the same
-version as the `@zhming0/dsh-workbench` package that expects them.
+Releases are published to `ghcr.io/zhming0/dsh-yawn-runner`, tagged with the same
+version as the `@zhming0/dsh-yawn` package that expects them.
 
 When standard `OTEL_EXPORTER_OTLP_*`, `OTEL_TRACES_EXPORTER`, or
 `OTEL_METRICS_EXPORTER` settings are present, the runner exports HTTP traces and

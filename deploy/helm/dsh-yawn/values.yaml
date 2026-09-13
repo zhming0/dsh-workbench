@@ -1,0 +1,117 @@
+# The control plane only: one dsh host, its data volume, the tunnel Service
+# runners dial, and the shared registration token. The sandbox infrastructure
+# — SandboxTemplate and SandboxWarmPool — is the sandbox pool, a separate
+# kustomize base in `deploy/kubernetes/runner`. See
+# docs/installations-control-plane.md.
+
+controlPlane:
+  image:
+    repository: ghcr.io/zhming0/dsh-yawn-control-plane
+    pullPolicy: IfNotPresent
+    # Defaults to .Chart.appVersion, the matching released version.
+    tag: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+  # Extra arguments passed to the dsh web app, e.g. --trusted-host for
+  # exposures without the bundled oauth2-proxy.
+  extraArgs: []
+  # Extra environment variables for the control-plane container, appended after
+  # the fixed ones. This is how the control plane gets a credential it needs in
+  # order to create sandboxes — the Buildkite API token, for example — from a
+  # Secret you own. Such a credential must not go in the control plane's secret
+  # store: that store is pushed into every sandbox before a command runs.
+  extraEnv: []
+  podAnnotations: {}
+  podLabels: {}
+  persistence:
+    # The control plane keeps everything durable — sessions, credentials, the
+    # seeded profile — on this volume. Disabling it swaps in an emptyDir: every
+    # pod restart (including a `helm upgrade`) then loses all of that,
+    # credentials store included, with nothing warning you at install time.
+    # Left on by default for that reason; turn it off only for throwaway
+    # installs.
+    enabled: true
+    size: 5Gi
+    # Clusters without a default StorageClass must name one here, or the PVC
+    # stays Pending.
+    # storageClass: ""
+  # The sandbox-manager settings, stated as the chart's own values. They render
+  # into a read-only patch layer at /data/.dsh/cordis.patch.yml, which dsh
+  # applies after the seeded profile file, so they are the interface for this
+  # row on a chart install. Unset leaves the seeded file in charge, which seeds
+  # no profile: the control plane boots but cannot provision a sandbox until
+  # values name one. A Kubernetes profile that omits `namespace` is rendered
+  # with the release namespace; every profile must target it, because the
+  # control plane's Role and the tunnel Service live there. Settings reference:
+  # https://github.com/zhming0/dsh-yawn/blob/main/control-plane/README.md#settings
+  sandboxManager: {}
+  #  profiles:
+  #    standard:
+  #      backend: kas
+  #      warmPool: dsh-yawn-universal
+
+runner:
+  # The in-cluster tunnel address handed to sandbox runners.
+  # Defaults to the dsh-yawn-control-plane-tunnel Service this chart creates in
+  # the release namespace; set it only for an unusual namespace or Service
+  # layout.
+  controlPlaneUrl: ""
+
+# The shared registration token every runner presents when it dials the
+# control plane. By default the chart creates the dsh-yawn-registration-token
+# Secret with a generated token that stays stable across upgrades. To supply
+# your own, either set a value or point at an existing Secret holding it under
+# the key `token`.
+#
+# GitOps: Argo CD and Flux render without a live cluster, so the lookup that
+# keeps the generated token stable cannot see the existing Secret and every
+# sync invents a new one — the release sits OutOfSync forever and each sync
+# rotates the token out from under the warm pods. Set `value` (from your
+# secret store) or `existingSecret` on those installs.
+registrationToken:
+  # When set, the chart creates no Secret; the pool's SandboxTemplate defaults
+  # to `dsh-yawn-registration-token`, so patch that reference when you point
+  # this at another name.
+  existingSecret: ""
+  value: ""
+
+# The distribution fronts dsh with oauth2-proxy: dsh binds pod loopback and
+# its only browser authentication is the startup `?token=` URL. The
+# /launch-token shortcut is mounted either way — it is safe without the proxy
+# because port 3000 never leaves the pod — so the default install works over
+# `kubectl port-forward` with no identity provider. With the proxy enabled,
+# the dsh container additionally gains --trusted-host, and the Service below
+# exposes the proxy's port. Create the Secret it reads first (see NOTES.txt);
+# until it exists the pod never becomes Ready.
+oidc:
+  enabled: false
+  # Required when enabled: a bare host, no scheme. Handed to dsh as
+  # --trusted-host and used in the proxy's redirect URL.
+  hostname: ""
+  image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.4
+  existingSecret: dsh-yawn-oidc
+  # Accept any email the issuer authenticates. Restrict this to your domain,
+  # or use authenticated-emails-file, before trusting the issuer's whole user
+  # base with your control plane.
+  emailDomains: "*"
+  # Extra environment variables for the proxy, appended after the fixed ones.
+  # For an identity provider that needs a non-default flag, for example:
+  #   - name: OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL
+  #     value: "true"
+  extraEnv: []
+
+# The Service in front of the oauth2-proxy (requires oidc.enabled). ClusterIP
+# is the anchor other controllers point at: an Ingress, a Gateway API route,
+# or a Service of your own selecting on the pod labels. Set type LoadBalancer
+# to expose it directly. Whatever fronts dsh must serve https (the proxy's
+# cookie is secure) and pass WebSockets and large RPC bodies — see
+# docs/kubernetes.md for the nginx-ingress values as a reference.
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+  #  service.beta.kubernetes.io/aws-load-balancer-scheme: internal

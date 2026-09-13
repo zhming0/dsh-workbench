@@ -1,6 +1,6 @@
 # Runner on a Buildkite agent
 
-Each sandbox is one build on a Buildkite pipeline you own: the host triggers
+Each sandbox is one build on a Buildkite pipeline you own: the control plane triggers
 the build, the agent runs the runner container, and the runner dials back over
 the tunnel. Pick this when sessions should run outside the cluster. The
 backend's internals are in [`buildkite.md`](buildkite.md).
@@ -20,7 +20,7 @@ Install the [control plane](installations-control-plane.md) first.
 
 ## Create the pipeline
 
-Create a pipeline with this one command step. The provider never uploads
+Create a pipeline with this one command step. The control plane never uploads
 steps: the pipeline's own definition is the whole contract.
 
 ```yaml
@@ -28,8 +28,8 @@ steps:
   - label: dsh sandbox
     command: >-
       docker run --rm
-      -e SANDBOX_ID -e HOST_URL -e REGISTRATION_TOKEN
-      "$DSH_RUNNER_IMAGE"
+      -e SANDBOX_ID -e DSH_YAWN_CONTROL_PLANE_URL -e REGISTRATION_TOKEN
+      "$DSH_YAWN_RUNNER_IMAGE"
     checkout:
       skip: true
     secrets:
@@ -39,38 +39,37 @@ steps:
       queue: hosted
 ```
 
-- `DSH_RUNNER_IMAGE`, `SANDBOX_ID`, and `HOST_URL` come from the build
-  environment the provider sets, so the pipeline never pins a runner image and
-  cannot drift from the host.
+- `DSH_YAWN_RUNNER_IMAGE`, `SANDBOX_ID`, and `DSH_YAWN_CONTROL_PLANE_URL` come from the build
+  environment the control plane sets, so the pipeline never pins a runner image and
+  cannot drift from the control plane.
 - `secrets` maps a [Buildkite secret](https://buildkite.com/docs/pipelines/security/secrets/buildkite-secrets)
   into the job environment. Create `dsh_registration_token` with the same value
-  the host holds — the `dsh-registration-token` Secret in the cluster — so the
+  the control plane holds — the `dsh-yawn-registration-token` Secret in the cluster — so the
   runner can register on the tunnel. This needs agent 3.106.0 or later.
 - `agents.queue` has to be set here rather than from the build environment:
   pipeline steps interpolate only a fixed list of `BUILDKITE_*` variables,
   before the build exists. To offer two fleets, create two pipelines and point
   two profiles at them.
-- `timeout_in_minutes` bounds a sandbox's life even if the host never cancels
-  it; the provider cancels on idle. Buildkite applies its own ceilings on top.
+- `timeout_in_minutes` bounds a sandbox's life even if the control plane never cancels
+  it; the control plane cancels on idle. Buildkite applies its own ceilings on top.
 - The pipeline should not trigger builds on its own. Turn off its repository
   webhook, or leave it without a repository integration, so the only builds are
-  the ones the provider creates.
+  the ones the control plane creates.
 
 [`buildkite.md`](buildkite.md#the-pipeline) explains each of these in full.
 
-## Point the host at the pipeline
+## Point the control plane at the pipeline
 
 ```yaml
-# dsh-workbench.values.yaml
-provider:
+# dsh-yawn.values.yaml
+controlPlane:
   sandboxManager:
     profiles:
       hosted:
         backend: buildkite
         organization: acme
-        pipeline: dsh-sandbox
-        hostUrl: wss://dsh.example.com/tunnel
-host:
+        pipeline: dsh-yawn
+        controlPlaneUrl: wss://dsh.example.com/tunnel
   extraEnv:
     - name: BUILDKITE_API_TOKEN
       valueFrom:
@@ -84,13 +83,13 @@ Put the token in that Secret first, as
 describes, then upgrade:
 
 ```sh
-helm upgrade dsh-workbench oci://ghcr.io/zhming0/charts/dsh-workbench \
-  --namespace dsh-sandbox \
-  --values dsh-workbench.values.yaml
+helm upgrade dsh-yawn-control-plane oci://ghcr.io/zhming0/charts/dsh-yawn \
+  --namespace dsh-yawn \
+  --values dsh-yawn.values.yaml
 ```
 
 The token is read at boot and never sent to a build, and it does not go in the
-provider's secret store. Then run a session: the provider creates a build, an
+control plane's secret store. Then run a session: the control plane creates a build, an
 agent picks it up, and the sandbox is live once its runner registers.
 
 ## Reaching the tunnel
@@ -118,13 +117,13 @@ places; the composer shows a profile chip when more than one exists:
       hosted:
         backend: buildkite
         organization: acme
-        pipeline: dsh-sandbox
-        hostUrl: wss://dsh.example.com/tunnel
+        pipeline: dsh-yawn
+        controlPlaneUrl: wss://dsh.example.com/tunnel
       self-hosted:
         backend: buildkite
         organization: acme
-        pipeline: dsh-sandbox-self-hosted
-        hostUrl: wss://dsh.example.com/tunnel
+        pipeline: dsh-yawn-self-hosted
+        controlPlaneUrl: wss://dsh.example.com/tunnel
 ```
 
 ## Next

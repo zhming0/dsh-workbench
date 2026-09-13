@@ -1,9 +1,9 @@
 # Runner on Kubernetes agent-sandbox
 
 This phase ends at a **sandbox warm pool**: pre-started pods a session claims
-instead of waiting for a cold start. The host creates a SandboxClaim per
+instead of waiting for a cold start. The control plane creates a SandboxClaim per
 session and watches the Sandbox behind it; the runner in that pod dials back to
-the host's tunnel, and nothing dials in.
+the control plane's tunnel, and nothing dials in.
 
 This is the supported backend, pinned to
 [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) **v1.0.2**
@@ -15,7 +15,7 @@ pieces do and the isolation model, see [`kubernetes.md`](kubernetes.md).
 
 ## Prerequisites
 
-- **the pool in the release namespace.** The host's `dsh-provider` Role, the
+- **the pool in the release namespace.** The control plane's `dsh-yawn-control-plane` Role, the
   tunnel Service, and the names the pool reads all live there, and the chart
   requires every Kubernetes profile to target that namespace.
 - **the agent-sandbox controllers**, pinned at v1.0.2, installed below. A
@@ -42,23 +42,23 @@ kubectl -n agent-sandbox-system wait --for=condition=Available deployment --all 
 ## Apply the sandbox pool
 
 The pool has to land in the release namespace: its template reads the
-`dsh-runner-config` ConfigMap and the `dsh-registration-token` Secret the chart
-wrote there, and the host's Role and tunnel Service are there too. The base
+`dsh-yawn-runner-config` ConfigMap and the `dsh-yawn-registration-token` Secret the chart
+wrote there, and the control plane's Role and tunnel Service are there too. The base
 therefore names no namespace — the placeholder in it is not a namespace any
 cluster has, and applying the base as-is fails. Write an overlay:
 
 ```yaml
-# dsh-runner/kustomization.yaml
-namespace: dsh-sandbox
+# dsh-yawn-runner/kustomization.yaml
+namespace: dsh-yawn
 resources:
-  - https://github.com/zhming0/dsh-workbench//deploy/kubernetes/runner?ref=<release-tag>
+  - https://github.com/zhming0/dsh-yawn//deploy/kubernetes/runner?ref=<release-tag>
 ```
 
 ```sh
-kubectl apply -k dsh-runner
+kubectl apply -k dsh-yawn-runner
 
-kubectl -n dsh-sandbox wait --for=jsonpath='{.status.readyReplicas}'=1 \
-  sandboxwarmpool/dsh-universal --timeout=300s
+kubectl -n dsh-yawn wait --for=jsonpath='{.status.readyReplicas}'=1 \
+  sandboxwarmpool/dsh-yawn-universal --timeout=300s
 ```
 
 In a checkout, point `resources` at `../deploy/kubernetes/runner` instead of
@@ -66,41 +66,41 @@ the remote base.
 
 The base is a `SandboxTemplate` describing the pod a sandbox runs, a
 `SandboxWarmPool` keeping some warm, and nothing else. It is static: the
-template reads `HOST_URL` and `REGISTRATION_TOKEN` from what the control plane
+template reads `DSH_YAWN_CONTROL_PLANE_URL` and `REGISTRATION_TOKEN` from what the control plane
 wrote, so there is no version to keep in sync. Vary it with the usual overlay
 fields:
 
 ```yaml
 patches:
-  - target: { kind: SandboxWarmPool, name: dsh-universal }
+  - target: { kind: SandboxWarmPool, name: dsh-yawn-universal }
     patch: |-
       - op: replace
         path: /spec/replicas
         value: 4
 ```
 
-## Point the host at the pool
+## Point the control plane at the pool
 
 ```yaml
-# dsh-workbench.values.yaml
+# dsh-yawn.values.yaml
 provider:
   sandboxManager:
     profiles:
       standard:
         backend: kas
-        warmPool: dsh-universal
+        warmPool: dsh-yawn-universal
 ```
 
 ```sh
-helm upgrade dsh-workbench oci://ghcr.io/zhming0/charts/dsh-workbench \
-  --namespace dsh-sandbox \
-  --values dsh-workbench.values.yaml
+helm upgrade dsh-yawn-control-plane oci://ghcr.io/zhming0/charts/dsh-yawn \
+  --namespace dsh-yawn \
+  --values dsh-yawn.values.yaml
 ```
 
 Values are the interface for this row: the chart mounts a read-only patch layer
 over the seeded settings and restarts the pod when they change. A `kas` profile
 that omits `namespace` is rendered with the release namespace, which is where
-the pool and the host's Role live.
+the pool and the control plane's Role live.
 
 Then run a session and send a prompt: a warm pod is claimed, the repository is
 cloned into it, and the tools run there.
@@ -120,7 +120,7 @@ kustomization, and list both profiles:
     profiles:
       standard:
         backend: kas
-        warmPool: dsh-universal
+        warmPool: dsh-yawn-universal
       large:
         backend: kas
         warmPool: dsh-large

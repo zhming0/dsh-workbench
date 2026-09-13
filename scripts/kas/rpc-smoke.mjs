@@ -4,19 +4,19 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const namespace = process.env.KAS_NAMESPACE ?? "dsh-sandbox";
-const warmPool = process.env.KAS_WARM_POOL ?? "dsh-universal";
+const namespace = process.env.KAS_NAMESPACE ?? "dsh-yawn";
+const warmPool = process.env.KAS_WARM_POOL ?? "dsh-yawn-universal";
 const registrationToken = requiredEnvironment("REGISTRATION_TOKEN");
-const profile = process.env.DSH_PROFILE_DIR ?? "/opt/dsh-host/profile";
+const profile = process.env.DSH_YAWN_PROFILE_DIR ?? "/opt/dsh-yawn/profile";
 const require = createRequire(join(profile, "package.json"));
-const workbenchRoot = dirname(
-  require.resolve("@zhming0/dsh-workbench/package.json"),
+const yawnRoot = dirname(
+  require.resolve("@zhming0/dsh-yawn/package.json"),
 );
 const { KasBackend } = await import(
-  pathToFileURL(join(workbenchRoot, "dist/backends/kas.js")).href
+  pathToFileURL(join(yawnRoot, "dist/backends/kas.js")).href
 );
 const { TunnelServer } = await import(
-  pathToFileURL(join(workbenchRoot, "dist/tunnel.js")).href
+  pathToFileURL(join(yawnRoot, "dist/tunnel.js")).href
 );
 const { CustomObjectsApi, KubeConfig } = await import(
   pathToFileURL(require.resolve("@kubernetes/client-node")).href

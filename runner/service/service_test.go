@@ -10,19 +10,19 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
-	v1 "github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1"
-	"github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1/sandboxv1connect"
+	v1 "github.com/zhming0/dsh-yawn/runner/gen/dsh/yawn/v1"
+	"github.com/zhming0/dsh-yawn/runner/gen/dsh/yawn/v1/yawnv1connect"
 )
 
 func TestExecEmptyStdinMeansIgnore(t *testing.T) {
 	s := New("box")
 	mux := http.NewServeMux()
-	mux.Handle(sandboxv1connect.NewRunnerServiceHandler(s))
+	mux.Handle(yawnv1connect.NewRunnerServiceHandler(s))
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	defer server.Close()
-	client := sandboxv1connect.NewRunnerServiceClient(server.Client(), server.URL)
+	client := yawnv1connect.NewRunnerServiceClient(server.Client(), server.URL)
 
 	exitCode := func(stdin []byte) int {
 		stream, err := client.Exec(context.Background(), connect.NewRequest(&v1.ExecRequest{
@@ -195,7 +195,7 @@ func TestSetupRestoresGitCredentialHelperAfterWake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(config), "dsh-runner git-credential") {
+	if !strings.Contains(string(config), "dsh-yawn-runner git-credential") {
 		t.Fatalf("credential helper was not restored: %s", config)
 	}
 }

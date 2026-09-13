@@ -10,8 +10,8 @@ TAG="$VERSION"
 # step checks out the commit the build started from, which is older, so the tag
 # has to name the stamped one.
 RELEASE_COMMIT="$(buildkite-agent meta-data get release-commit)"
-HOST_IMAGE="ghcr.io/zhming0/dsh-host"
-RUNNER_IMAGE="ghcr.io/zhming0/dsh-runner"
+CONTROL_PLANE_IMAGE="ghcr.io/zhming0/dsh-yawn-control-plane"
+RUNNER_IMAGE="ghcr.io/zhming0/dsh-yawn-runner"
 
 echo "+++ :github: Creating GitHub release"
 # --target creates the tag at the stamped commit, where Chart.yaml and the
@@ -19,12 +19,12 @@ echo "+++ :github: Creating GitHub release"
 gh release create "$TAG" --target "$RELEASE_COMMIT" --title "$TAG" --generate-notes --notes "## Images
 
 \`\`\`
-docker pull ${HOST_IMAGE}:${VERSION}
+docker pull ${CONTROL_PLANE_IMAGE}:${VERSION}
 docker pull ${RUNNER_IMAGE}:${VERSION}
 \`\`\`
 
-Both built for \`linux/amd64\` and \`linux/arm64\`. The host image is the dsh
-distribution: dsh with the web profile and this provider assembled at the same
-version. The provider inside it defaults to the runner image tag above, so the
+Both built for \`linux/amd64\` and \`linux/arm64\`. The control-plane image is the dsh
+distribution: dsh with the web profile and this control plane assembled at the same
+version. The control plane inside it defaults to the runner image tag above, so the
 pair always ships together.
 "

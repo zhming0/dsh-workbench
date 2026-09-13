@@ -2,10 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CLUSTER_NAME="${DSH_KAS_CLUSTER_NAME:-dsh-kas-e2e}"
-RUNNER_IMAGE="${DSH_RUNNER_IMAGE:-dsh-runner:dev}"
-HOST_IMAGE="${DSH_HOST_IMAGE:-dsh-host:dev}"
-NAMESPACE="dsh-sandbox"
+CLUSTER_NAME="${DSH_YAWN_KAS_CLUSTER_NAME:-dsh-kas-e2e}"
+RUNNER_IMAGE="${DSH_YAWN_RUNNER_IMAGE:-dsh-yawn-runner:dev}"
+CONTROL_PLANE_IMAGE="${DSH_YAWN_CONTROL_PLANE_IMAGE:-dsh-yawn-control-plane:dev}"
+NAMESPACE="dsh-yawn"
 JOB="dsh-kas-rpc-smoke"
 TOKEN_FILE="$(mktemp)"
 OVERLAY="$(mktemp -d "$ROOT_DIR/.dsh-e2e-overlay.XXXXXX")"
@@ -39,7 +39,7 @@ for command in docker kind kubectl od; do
   command -v "$command" >/dev/null || { echo "error: required command not found: $command" >&2; exit 1; }
 done
 docker image inspect "$RUNNER_IMAGE" >/dev/null 2>&1 || { echo "error: local image not found: $RUNNER_IMAGE" >&2; exit 1; }
-docker image inspect "$HOST_IMAGE" >/dev/null 2>&1 || { echo "error: local image not found: $HOST_IMAGE" >&2; exit 1; }
+docker image inspect "$CONTROL_PLANE_IMAGE" >/dev/null 2>&1 || { echo "error: local image not found: $CONTROL_PLANE_IMAGE" >&2; exit 1; }
 
 od -vN 32 -An -tx1 /dev/urandom | tr -d ' \n' >"$TOKEN_FILE"
 chmod 600 "$TOKEN_FILE"
@@ -50,7 +50,7 @@ if ! kind get clusters | grep -Fxq "$CLUSTER_NAME"; then
   kind create cluster --name "$CLUSTER_NAME" --wait 120s
 fi
 kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
-# dev-cluster.sh creates the namespace, the provider ServiceAccount, and the
+# dev-cluster.sh creates the namespace, the control plane ServiceAccount, and the
 # runner-config ConfigMap from the chart; this test only needs its own tunnel
 # Service, created now so its ClusterIP is stable before the runner starts.
 kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
@@ -58,27 +58,27 @@ kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Service
 metadata:
-  name: dsh-host-tunnel
+  name: dsh-yawn-control-plane-tunnel
   namespace: $NAMESPACE
 spec:
   selector:
-    app.kubernetes.io/name: dsh-host
+    app.kubernetes.io/name: dsh-yawn-control-plane
   ports:
     - name: tunnel
       port: 8081
       targetPort: tunnel
 EOF
-HOST_SERVICE_IP="$(kubectl -n "$NAMESPACE" get service dsh-host-tunnel -o jsonpath='{.spec.clusterIP}')"
+HOST_SERVICE_IP="$(kubectl -n "$NAMESPACE" get service dsh-yawn-control-plane-tunnel -o jsonpath='{.spec.clusterIP}')"
 
 "$ROOT_DIR/scripts/kas/dev-cluster.sh" \
   --name "$CLUSTER_NAME" \
   --runner-image "$RUNNER_IMAGE" \
-  --host-url "ws://${HOST_SERVICE_IP}:8081/tunnel" \
+  --control-plane-url "ws://${HOST_SERVICE_IP}:8081/tunnel" \
   --registration-token-file "$TOKEN_FILE" \
   --load-runner-image \
   --skip-warm-pool
 
-kind load docker-image --name "$CLUSTER_NAME" "$HOST_IMAGE"
+kind load docker-image --name "$CLUSTER_NAME" "$CONTROL_PLANE_IMAGE"
 
 kubectl -n "$NAMESPACE" create configmap dsh-kas-rpc-smoke \
   --from-file="rpc-smoke.mjs=$ROOT_DIR/scripts/kas/rpc-smoke.mjs" \
@@ -95,20 +95,20 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: dsh-host
+        app.kubernetes.io/name: dsh-yawn-control-plane
     spec:
       restartPolicy: Never
-      serviceAccountName: dsh-provider
+      serviceAccountName: dsh-yawn-control-plane
       containers:
         - name: smoke
-          image: $HOST_IMAGE
+          image: $CONTROL_PLANE_IMAGE
           imagePullPolicy: IfNotPresent
           command: [node, /test/rpc-smoke.mjs]
           env:
             - name: REGISTRATION_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: dsh-registration-token
+                  name: dsh-yawn-registration-token
                   key: token
           ports:
             - name: tunnel
@@ -128,21 +128,22 @@ spec:
   ttlSecondsAfterFinished: 300
 EOF
 
-# Do not start a runner until the host Job is accepting tunnel connections.
+# Do not start a runner until the control-plane Job is accepting tunnel
+# connections.
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod \
   -l job-name="$JOB" --timeout=120s
-# The runner template reads HOST_URL and the token from the names the control
-# plane writes. This test runs its own host Job, so it supplies the ConfigMap
+# The runner template reads DSH_YAWN_CONTROL_PLANE_URL and the token from the names the control
+# plane writes. This test runs its own control-plane Job, so it supplies the ConfigMap
 # itself and applies the sandbox pool through an overlay that pins the locally
 # built image instead of the released tag in the base.
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: dsh-runner-config
+  name: dsh-yawn-runner-config
   namespace: $NAMESPACE
 data:
-  HOST_URL: ws://${HOST_SERVICE_IP}:8081/tunnel
+  DSH_YAWN_CONTROL_PLANE_URL: ws://${HOST_SERVICE_IP}:8081/tunnel
 EOF
 cat >"$OVERLAY/kustomization.yaml" <<EOF
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -151,7 +152,7 @@ namespace: $NAMESPACE
 resources:
   - ../deploy/kubernetes/runner
 images:
-  - name: ghcr.io/zhming0/dsh-runner
+  - name: ghcr.io/zhming0/dsh-yawn-runner
     newName: ${RUNNER_IMAGE%%:*}
     newTag: ${RUNNER_IMAGE##*:}
 EOF
@@ -171,9 +172,9 @@ done
 kubectl -n "$NAMESPACE" logs "job/$JOB"
 
 # The existing controller smoke covers warm-adoption latency and terminal
-# expiry in addition to the transport probe's provider-owned lifecycle path.
+# expiry in addition to the transport probe's control-plane-owned lifecycle path.
 kubectl -n "$NAMESPACE" wait --for=jsonpath='{.status.readyReplicas}'=1 \
-  sandboxwarmpool/dsh-universal --timeout=300s
+  sandboxwarmpool/dsh-yawn-universal --timeout=300s
 "$ROOT_DIR/scripts/kas/smoke-test.sh" --namespace "$NAMESPACE"
 
 SUCCESS=true

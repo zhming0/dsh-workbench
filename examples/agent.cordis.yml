@@ -1,7 +1,7 @@
 # An agent preset that keeps one session's file and command work in a sandbox.
 #
 # This is the alternative to the shipped bundle patch, not an addition to it.
-# Installing @zhming0/dsh-workbench already swaps the host capability rows for
+# Installing @zhming0/dsh-yawn already swaps the host capability rows for
 # every session in the profile, which is what most people want. Use this preset
 # only when you want sandbox tools in some sessions and host tools in others,
 # and first neutralize the bundle layer in the profile's cordis.patch.yml:
@@ -43,22 +43,22 @@
     subprocess: true
   config:
     - id: sandbox-manager
-      name: '@zhming0/dsh-workbench'
+      name: '@zhming0/dsh-yawn'
       # Defaults to the runner image released with this package. Set the
-      # profile's image to dsh-runner:dev to test a locally built image.
+      # profile's image to dsh-yawn-runner:dev to test a locally built image.
       config:
         profiles:
           standard:
             backend: docker
 
     - id: sandbox-subprocess
-      name: '@zhming0/dsh-workbench/subprocess'
+      name: '@zhming0/dsh-yawn/subprocess'
 
     - id: sandbox-shell
-      name: '@zhming0/dsh-workbench/shell'
+      name: '@zhming0/dsh-yawn/shell'
 
     - id: sandbox-filesystem
-      name: '@zhming0/dsh-workbench/fs'
+      name: '@zhming0/dsh-yawn/fs'
 
     - id: filesystem-observation
       name: '@deepseek-ai/dsh-fs-observation-policy'

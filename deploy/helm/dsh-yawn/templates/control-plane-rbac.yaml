@@ -1,0 +1,43 @@
+# The identity the control plane uses for the Kubernetes backend's API calls,
+# and the permissions it needs to operate sandboxes. The control plane is the
+# client, so these ship with it rather than with the sandbox pool manifests. Non-Kubernetes
+# backends leave the identity and its permissions unused.
+{{- include "dsh-yawn.validate" . }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dsh-yawn-control-plane
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-yawn.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dsh-yawn-control-plane
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-yawn.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [extensions.agents.x-k8s.io]
+    resources: [sandboxclaims]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [agents.x-k8s.io]
+    resources: [sandboxes]
+    verbs: [get, list, patch, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dsh-yawn-control-plane
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-yawn.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: dsh-yawn-control-plane
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dsh-yawn-control-plane

@@ -8,9 +8,9 @@ steps:
   # supply git, curl, and a C compiler, the last of which `go test -race` needs.
   # Pinning a language image here would put a second version of Go or Node next
   # to the one mise.toml already pins.
-  - label: ":typescript: Provider"
+  - label: ":typescript: Control plane"
     image: &toolchain buildpack-deps:trixie@sha256:fc37e60062783dc2c137f05d7b22cca1b20a642ecf1881f778b2ce7211038347
-    command: .buildkite/steps/test-provider
+    command: .buildkite/steps/test-control-plane
 
   - label: ":golang: Runner"
     image: *toolchain
@@ -23,8 +23,8 @@ steps:
   - label: ":docker: Runner image & smoke test"
     command: .buildkite/steps/smoke-test
 
-  - label: ":docker: Host image"
-    command: .buildkite/steps/check-host-image
+  - label: ":docker: Control plane image"
+    command: .buildkite/steps/check-control-plane-image
 
   - label: ":kubernetes: Agent Sandbox end-to-end"
     agents:
@@ -37,7 +37,7 @@ steps:
 
   - block: ":rocket: Release"
     if: build.branch == "main"
-    prompt: "Publish the host and runner images?"
+    prompt: "Publish the control-plane and runner images?"
 
   - label: ":pipeline: Upload release pipeline"
     if: build.branch == "main"

@@ -36,7 +36,7 @@ type Config struct {
 
 // SandboxIDHeader carries the runner's sandbox ID on the upgrade request; the
 // registration token travels as a bearer token.
-const SandboxIDHeader = "X-Dsh-Sandbox-Id"
+const SandboxIDHeader = "X-Dsh-Yawn-Sandbox-Id"
 
 const (
 	dialTimeout    = 10 * time.Second
@@ -125,16 +125,16 @@ func rejection(response *http.Response) string {
 	return reason
 }
 
-func validateHostURL(hostURL string) error {
-	parsed, err := url.Parse(hostURL)
+func validateHostURL(controlPlaneURL string) error {
+	parsed, err := url.Parse(controlPlaneURL)
 	if err != nil {
-		return fmt.Errorf("invalid HOST_URL: %w", err)
+		return fmt.Errorf("invalid DSH_YAWN_CONTROL_PLANE_URL: %w", err)
 	}
 	if parsed.Scheme != "ws" && parsed.Scheme != "wss" {
-		return fmt.Errorf("HOST_URL scheme %q is not ws or wss", parsed.Scheme)
+		return fmt.Errorf("DSH_YAWN_CONTROL_PLANE_URL scheme %q is not ws or wss", parsed.Scheme)
 	}
 	if parsed.Hostname() == "" {
-		return fmt.Errorf("HOST_URL %q must name a host", hostURL)
+		return fmt.Errorf("DSH_YAWN_CONTROL_PLANE_URL %q must name a host", controlPlaneURL)
 	}
 	return nil
 }

@@ -1,0 +1,12 @@
+# The control-plane image build needs the workspace manifests and control-plane/.
+**/node_modules
+**/dist
+.amp
+.buildkite
+.git
+deploy
+docs
+examples
+proto
+runner
+scripts

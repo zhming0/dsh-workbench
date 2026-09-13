@@ -10,7 +10,7 @@ plugins:
     opt:
       - paths=source_relative
   - local: protoc-gen-es
-    out: provider/src/gen
+    out: control-plane/src/gen
     opt:
       - target=ts
       - import_extension=js
