@@ -10,9 +10,14 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          // The build config sits outside every tsconfig; lint it against a
-          // minimal default project instead of skipping it.
-          allowDefaultProject: ["tsdown.config.ts"],
+          // The build config, this config, and the build helper that `prepack`
+          // runs sit outside every tsconfig; lint them against a minimal
+          // default project instead of skipping them.
+          allowDefaultProject: [
+            "tsdown.config.ts",
+            "eslint.config.mjs",
+            "scripts/*.mjs",
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -45,6 +50,15 @@ export default tseslint.config(
       "@typescript-eslint/require-await": "off",
     },
   },
-  // Config files carry no types, so switch off the type-aware rules for them.
-  { files: ["**/*.js", "**/*.mjs", "**/*.cjs"], ...tseslint.configs.disableTypeChecked },
+  // Config files and the packaged build helper carry no types, so switch off
+  // the type-aware rules for them. They run under Node, which the TypeScript
+  // files get from tsconfig `types` and these do not.
+  {
+    files: ["**/*.js", "**/*.mjs", "**/*.cjs"],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      ...tseslint.configs.disableTypeChecked.languageOptions,
+      globals: { process: "readonly" },
+    },
+  },
 );

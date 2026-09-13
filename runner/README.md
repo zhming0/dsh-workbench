@@ -60,6 +60,18 @@ separately. Architecture-specific archives have pinned checksums, and the Go
 stage cross-compiles from the builder's own architecture rather than running
 the toolchain under emulation.
 
+It also installs the `agent-browser` CLI and `install-browser`, the bootstrap
+the `using-agent-browser` skill runs. The browser itself is deliberately
+absent, and so are the libraries and the font it needs to draw: together they
+are far larger than everything else here, and a task drives a page rarely
+enough that paying for them on every pull is the wrong trade. `install-browser`
+adds them to a session on first use, into the workspace volume so a
+hibernation keeps them.
+
+The CLI sits in `/opt/agent-browser` and is linked onto `PATH`, outside both
+`$HOME` and `/workspace`, because a session mounts its workspace volume over
+`/workspace` and would otherwise hide it.
+
 Releases are published to `ghcr.io/zhming0/dsh-yawn-runner`, tagged with the same
 version as the `@zhming0/dsh-yawn` package that expects them.
 

@@ -164,6 +164,38 @@ pinned composer packages (`@deepseek-ai/dsh-app-boot`, `@deepseek-ai/dsh-web-app
 and fails CI when either paragraph changes, so a dsh bump cannot silently
 reword them. The markers themselves are pinned to the observed wording.
 
+The bundle also serves skills authored in this package. dsh's stock local
+provider discovers skills from disk, and this package's filesystem seam reads
+that disk inside the sandbox, so a `SKILL.md` under `$DSH_HOME/skills` on the
+host is never seen by a sandboxed session: the path does not exist in the pod.
+The `skills` row instead registers a provider over the TypeScript modules in
+[`src/skills/`](src/skills/) into the global layer of dsh's skill registry,
+which every agent's merged catalog carries.
+
+A skill is a folder: an `index.ts` exporting an `AuthoredSkill` and a
+`SKILL.md` beside it, listed in `src/skills/index.ts`. The list is explicit
+rather than a directory scan, because a scan of TypeScript sources can only
+find compiled files and would leave the catalog silently empty when the layout
+changes. An unlisted folder is not served, and a listed one fails as it loads
+if its import does not resolve or its `SKILL.md` is missing, so a mistake names
+its path instead of appearing as a skill that lists but cannot be read. The
+build copies the bodies into `dist`, and the served bodies are held in host
+memory, so no machine's disk is read at session time. Authored skills take the
+bundled rank, so a repository's own `.agents/skills` still wins a name
+collision. dsh's `minimal` agent preset mounts no skill tool, so a session on
+it sees no catalog regardless.
+
+The one shipped skill, `using-agent-browser`, covers driving a browser from a
+session: `install-browser` once per sandbox, then the CLI. The runner image
+carries both commands; Chrome, the libraries it links against, and the font it
+draws with are larger than the rest of the image, so `install-browser` adds
+them on demand, into the workspace volume so a wake keeps them. The script
+ships in the image rather than in the skill body, which keeps the body short
+and pins the script to the image the session is running. The skill writes media
+to `/workspace/.agents/artifacts/`, on the workspace volume but outside the
+checkout, so reads reach it, a wake keeps it, and a capture never lands as an
+untracked file in a repository.
+
 One module is not part of the bundle patch:
 `@zhming0/dsh-yawn/launch-token`. Mounted as a row, it serves
 `GET /launch-token`, which redirects the browser to dsh's tokenized login URL so

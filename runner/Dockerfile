@@ -31,6 +31,13 @@ ARG UV_SHA256_arm64=7eb9bf48516448c9db6a9e436d8e747ac9c8a9cac74717160a29918249b0
 ARG YQ_VERSION=4.53.6
 ARG YQ_SHA256_amd64=c5f056448f973ae7d39b5401949648a78f2dc1947d6a8eb65be60d5c504b9385
 ARG YQ_SHA256_arm64=88a1016bc1d657375a35864e4f44b6f333df8ff97b559f51bba0adcb2169df09
+# agent-browser backs the `using-agent-browser` skill. Only the CLI is in this
+# image: Chrome, the libraries it links against, and a font are larger than
+# everything else here, and `install-browser` adds them on demand. The CLI is
+# installed outside $HOME and /workspace (a session mounts its workspace volume
+# over /workspace) and linked onto PATH.
+ARG AGENT_BROWSER_VERSION=0.37.1
+ARG AGENT_BROWSER_INSTALL_DIR=/opt/agent-browser
 RUN set -eux; \
     case "${TARGETARCH}" in \
       amd64) jj_arch=x86_64-unknown-linux-musl;  mise_arch=linux-x64-musl;   jj_sha="${JJ_SHA256_amd64}"; mise_sha="${MISE_SHA256_amd64}"; rg_arch=x86_64-unknown-linux-musl;  rg_sha="${RIPGREP_SHA256_amd64}"; uv_arch=x86_64-unknown-linux-musl;  uv_sha="${UV_SHA256_amd64}"; yq_sha="${YQ_SHA256_amd64}" ;; \
@@ -87,7 +94,16 @@ RUN set -eux; \
     chmod 0755 /etc/profile.d/dsh-path.sh; \
     mkdir -p /workspace /run/dsh; \
     useradd --create-home --uid 1000 --home-dir /workspace/home sandbox; \
-    chown -R sandbox:sandbox /workspace /run/dsh
+    chown -R sandbox:sandbox /workspace /run/dsh; \
+    install -d "${AGENT_BROWSER_INSTALL_DIR}"; \
+    npm install -g --prefix "${AGENT_BROWSER_INSTALL_DIR}" "agent-browser@${AGENT_BROWSER_VERSION}"; \
+    ln -s "${AGENT_BROWSER_INSTALL_DIR}/bin/agent-browser" /usr/local/bin/agent-browser; \
+    chown -R sandbox:sandbox "${AGENT_BROWSER_INSTALL_DIR}"
+# The on-demand browser bootstrap ships in the image the session runs, so that
+# a session runs the copy pinned to its own image instead of the control plane
+# having to send one through the skill body.
+COPY install-browser.sh /usr/local/bin/install-browser
+RUN chmod 0755 /usr/local/bin/install-browser && sh -n /usr/local/bin/install-browser
 COPY --from=build /dsh-yawn-runner /usr/local/bin/dsh-yawn-runner
 # $HOME lives on the workspace volume so home files and caches survive a
 # Kubernetes wake. A sandbox mounts its workspace volume over /workspace, which
@@ -96,6 +112,8 @@ COPY --from=build /dsh-yawn-runner /usr/local/bin/dsh-yawn-runner
 # `npm install -g` fails with EACCES; $HOME/.local is writable, is on PATH,
 # and is on the workspace volume, so global installs work and survive a wake.
 # mise keeps its default data directory under $HOME too, so no override is set.
+# The agent-browser CLI sits outside both $HOME and /workspace for the same
+# volume reason, and is linked onto PATH under a name that outlives the mount.
 ENV HOME=/workspace/home \
     NPM_CONFIG_PREFIX=/workspace/home/.local \
     PATH=/workspace/home/.local/share/mise/shims:/opt/mise/installs/node/${NODE_VERSION}/bin:$PATH
