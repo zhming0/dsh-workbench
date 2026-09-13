@@ -61,8 +61,13 @@ execute in). You need:
 - a repository for sandboxes to clone. Public repositories need nothing more;
   private ones need the GitHub step below.
 
-[`docs/kubernetes.md`](docs/kubernetes.md) is the complete walkthrough,
-including what each manifest does and the isolation model. The short form:
+[`docs/installations.md`](docs/installations.md) is the installation index:
+install the [control plane](docs/installations-control-plane.md) (the
+`dsh-workbench` Helm chart), then a runner —
+[Kubernetes agent-sandbox](docs/installations-kas.md) or
+[Buildkite agents](docs/installations-buildkite.md) — then give sessions their
+[credentials](docs/credentials.md). [`docs/kubernetes.md`](docs/kubernetes.md)
+covers what each manifest does and the isolation model. The Helm short form:
 
 ```sh
 kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.2/sandbox-with-extensions.yaml
@@ -74,20 +79,36 @@ kubectl -n dsh-sandbox create secret generic dsh-host-oidc \
   --from-literal=OAUTH2_PROXY_CLIENT_SECRET=… \
   --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')"
 
-# The shared registration token every runner presents when it dials the host.
-kubectl -n dsh-sandbox create secret generic dsh-registration-token \
-  --from-literal=token="$(openssl rand -hex 32)"
+helm install dsh-workbench oci://ghcr.io/zhming0/charts/dsh-workbench \
+  --namespace dsh-sandbox \
+  --set oidc.enabled=true --set oidc.hostname=dsh.example.com
 
-# Replace DSH_HOST_IMAGE_PLACEHOLDER and DSH_RUNNER_IMAGE_PLACEHOLDER with
-# released tags, and dsh.example.com in host-oidc.yaml with your hostname.
-kubectl apply -k deploy/kubernetes
+# Set up a runner: the sandbox pool base names no namespace, so name the
+# release namespace in an overlay, then name its warm pool in
+# provider.sandboxManager.
+mkdir -p dsh-runner
+cat >dsh-runner/kustomization.yaml <<'EOF'
+namespace: dsh-sandbox
+resources:
+  - ../deploy/kubernetes/runner
+EOF
+kubectl apply -k dsh-runner
+helm upgrade dsh-workbench oci://ghcr.io/zhming0/charts/dsh-workbench \
+  --namespace dsh-sandbox --reuse-values \
+  --set provider.sandboxManager.profiles.standard.backend=kas \
+  --set provider.sandboxManager.profiles.standard.warmPool=dsh-universal
 ```
 
-The manifests stop at the proxy's pod port, 4180: put a Service and an
-Ingress, LoadBalancer, or Gateway of your choosing in front of it. The proxy
-authenticates users; it does not isolate them. One dsh host is one trust
-domain: everyone the issuer admits shares the same sessions, credentials, and
-sandboxes.
+The chart owns the control plane only: the host, its data volume, the tunnel
+Service, the registration token, and the host's Kubernetes API access. Sandbox
+infrastructure is the sandbox pool, a kustomize base you reference and patch
+rather than copy. The host boots and serves the Web UI without it; sessions
+provision once a pool exists.
+
+The Service stops at the proxy's pod port, 4180: put your own Ingress,
+LoadBalancer, or Gateway in front of it. The proxy authenticates users; it
+does not isolate them. One dsh host is one trust domain: everyone the issuer
+admits shares the same sessions, credentials, and sandboxes.
 
 Runners dial out to the host's tunnel Service over a WebSocket and
 authenticate with that registration token, so no route into a sandbox is ever
@@ -105,9 +126,9 @@ reach the host (`https://dsh.example.com/launch-token`, or
 to the tokenized URL. The token itself is also in the host log:
 
 ```sh
-kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'
+kubectl -n dsh-sandbox logs deploy/dsh-workbench | grep 'dsh web:'
 # before exposure is wired up:
-kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
+kubectl -n dsh-sandbox port-forward deploy/dsh-workbench 3000:3000
 ```
 
 Then start a session:
@@ -152,17 +173,21 @@ to the repositories you work on fits best; `gh auth token` works too.
 Manage secrets in the Web UI — **Settings → Secrets**. Changes reach every
 session before its next command, running sessions included. Never put secret
 values in the configuration file (plain YAML) or in chat (transcripts are
-durable); the UI exists so values never touch either. The store is described
-in [`provider/README.md`](provider/README.md#secrets).
+durable); the UI exists so values never touch either.
+[`docs/credentials.md`](docs/credentials.md) is the full page: token scopes and
+the two credentials that belong to the host instead and must never reach a
+sandbox. The store itself is described in
+[`provider/README.md`](provider/README.md#secrets).
 
 ## Configuration
 
 dsh composes a plugin tree at boot; a **profile** is one installed copy of
 such a tree, and the host image seeds the `web` profile with this provider on
-first boot. Your settings live in one file, the profile's override layer:
-`/data/.dsh/profiles/web/cordis.patch.yml` in the host pod. There is no
-UI for these deployment settings; the file is the interface. The Instructions
-page described above manages only model guidance.
+first boot. Settings are a YAML patch layer applied over the bundle defaults.
+On the Kubernetes distribution the chart owns the sandbox-manager row through
+[`provider.sandboxManager`](deploy/helm/dsh-workbench/README.md#provider-settings-as-values);
+a checkout install edits the profile's file under `$DSH_HOME`. (The
+Instructions page described above manages only model guidance.)
 
 An entry replaces the **whole** `config` of the row it names rather than
 merging into it, so restate every field you want to keep:
@@ -176,9 +201,8 @@ merging into it, so restate every field you want to keep:
     idleMs: 300000 # hibernate after 5 minutes instead of 10
 ```
 
-The file is watched, so a saved edit reaches the next session without
-restarting dsh; `dsh --profile web --dump-config` prints the composed tree.
-Every setting, with its default, is in
+`dsh --profile web --dump-config` prints the composed tree, and every setting,
+with its default, is in
 [`provider/README.md`](provider/README.md#settings).
 
 ## What changes for the agent
@@ -239,9 +263,12 @@ routes are alternatives, and running both gives a session two sandboxes.
 
 ## Documentation
 
-| Page                                         | Covers                                                           |
-| -------------------------------------------- | ---------------------------------------------------------------- |
-| [`docs/kubernetes.md`](docs/kubernetes.md)   | full install walkthrough, host operations, isolation, smoke test |
-| [`docs/buildkite.md`](docs/buildkite.md)     | running sandboxes as Buildkite builds: pipeline shape and limits |
-| [`provider/README.md`](provider/README.md)   | what the bundle patch changes, every setting, secret handling    |
-| [`docs/development.md`](docs/development.md) | repository layout, build and test, checkout installs, releasing  |
+| Page                                                                         | Covers                                                           |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [`docs/installations.md`](docs/installations.md)                             | installation index: control plane, runner, credentials           |
+| [`docs/installations-control-plane.md`](docs/installations-control-plane.md) | the Helm chart: install, verify, credentials, upgrade            |
+| [`docs/credentials.md`](docs/credentials.md)                                 | the secret store: `GITHUB_TOKEN`, the Web UI, host credentials   |
+| [`docs/kubernetes.md`](docs/kubernetes.md)                                   | the Kubernetes backend: host operations, isolation, smoke test   |
+| [`docs/buildkite.md`](docs/buildkite.md)                                     | running sandboxes as Buildkite builds: pipeline shape and limits |
+| [`provider/README.md`](provider/README.md)                                   | what the bundle patch changes, every setting, secret handling    |
+| [`docs/development.md`](docs/development.md)                                 | repository layout, build and test, checkout installs, releasing  |

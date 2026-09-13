@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
+
+CHART="deploy/helm/dsh-workbench"
+
+echo "--- :helm: Linting the chart"
+helm lint "$CHART" --namespace dsh-sandbox --set registrationToken.value=ci-token
+
+# Deterministic renders: `lookup` finds no cluster here, so pin the token
+# instead of letting each render generate a different one.
+render() {
+  helm template dsh-workbench "$CHART" --namespace dsh-sandbox \
+    --set registrationToken.value=ci-token "$@"
+}
+
+echo "--- :helm: Rendering the default and proxy value sets"
+render >/tmp/chart-default.yaml
+grep -q "DSH_HOST_LAUNCH_TOKEN_ROUTE" /tmp/chart-default.yaml \
+  || { echo "default render lost the /launch-token route" >&2; exit 1; }
+grep -q "ws://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081/tunnel" /tmp/chart-default.yaml \
+  || { echo "dsh-runner-config lost the in-cluster tunnel address" >&2; exit 1; }
+render --set oidc.enabled=true --set oidc.hostname=dsh.example.com \
+  --set service.type=LoadBalancer --set service.annotations.foo=bar \
+  --set oidc.extraEnv[0].name=OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL \
+  --set oidc.extraEnv[0].value=true >/tmp/chart-proxy.yaml
+for expected in "type: LoadBalancer" "foo: bar" "OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL"; do
+  grep -q "$expected" /tmp/chart-proxy.yaml \
+    || { echo "proxy render lost: $expected" >&2; exit 1; }
+done
+# host.extraEnv is how a boot-time host credential (the Buildkite API token)
+# reaches the process from a Secret, so the block has to render where the
+# provider reads it.
+render --set host.extraEnv[0].name=BUILDKITE_API_TOKEN \
+  --set host.extraEnv[0].valueFrom.secretKeyRef.name=dsh-buildkite \
+  --set host.extraEnv[0].valueFrom.secretKeyRef.key=token >/tmp/chart-host-env.yaml
+for expected in "name: BUILDKITE_API_TOKEN" "name: dsh-buildkite"; do
+  grep -q "$expected" /tmp/chart-host-env.yaml \
+    || { echo "host extraEnv render lost: $expected" >&2; exit 1; }
+done
+# Every install names a sandbox pool through provider.sandboxManager, and the
+# in-cluster dev host (dev-cluster.sh --host-image) is no exception. The render
+# has to carry the settings layer and the mount, or the host boots with the
+# seeded `profiles: {}` and cannot provision.
+render --set provider.sandboxManager.profiles.standard.backend=kas \
+  --set provider.sandboxManager.profiles.standard.warmPool=dsh-universal \
+  >/tmp/chart-profile.yaml
+for expected in "dsh-workbench-provider-settings" "/data/.dsh/cordis.patch.yml" \
+  "warmPool: dsh-universal"; do
+  grep -q "$expected" /tmp/chart-profile.yaml \
+    || { echo "chart profile render lost: $expected" >&2; exit 1; }
+done
+# A kas profile with no namespace has to render the release namespace: the
+# provider's own default is the fixed name dsh-sandbox, so a host installed
+# elsewhere would claim in a namespace its pool is not in. `render` pins the
+# dsh-sandbox namespace, so this one calls helm directly.
+helm template dsh-workbench "$CHART" --namespace platform \
+  --set registrationToken.value=ci-token \
+  --set provider.sandboxManager.profiles.standard.backend=kas \
+  --set provider.sandboxManager.profiles.standard.warmPool=dsh-universal \
+  --show-only templates/provider-settings-configmap.yaml >/tmp/chart-profile-ns.yaml
+awk '/^  cordis.patch.yml:/{found=1} found' /tmp/chart-profile-ns.yaml \
+  | grep -q "namespace: platform" \
+  || { echo "chart profile does not default the namespace to the release namespace" >&2; exit 1; }
+
+echo "--- :helm: Checking the chart guards"
+expect_fail() {
+  local what="$1"; shift
+  if helm template dsh-workbench "$CHART" --namespace dsh-sandbox "$@" >/dev/null 2>&1; then
+    echo "guard failed: $what rendered successfully" >&2
+    exit 1
+  fi
+}
+# The sandbox pool reads fixed names, so the release name is part of the
+# contract. `helm template` takes the name as an argument, not a flag.
+if helm template other "$CHART" --namespace dsh-sandbox --set registrationToken.value=x >/dev/null 2>&1; then
+  echo "guard failed: a foreign release name rendered successfully" >&2; exit 1
+fi
+expect_fail "a kas profile in a foreign namespace" --set registrationToken.value=x \
+  --set provider.sandboxManager.profiles.standard.backend=kas \
+  --set provider.sandboxManager.profiles.standard.namespace=elsewhere
+expect_fail "managed settings without profiles" --set registrationToken.value=x \
+  --set provider.sandboxManager.defaultProfile=standard
+expect_fail "oidc without hostname" --set registrationToken.value=x --set oidc.enabled=true
+expect_fail "LoadBalancer without the proxy" --set registrationToken.value=x \
+  --set service.type=LoadBalancer
+
+echo "--- :kubernetes: Rendering the sandbox pool"
+kubectl kustomize deploy/kubernetes/runner >/tmp/kustomize-runner.yaml
+
+# The sandbox pool is the only kustomize artifact; the control plane is the
+# chart. The pool must stay usable as a remote base, so it owns nothing that
+# belongs to the host — including the identity and permissions the host uses,
+# which ship with the chart — and its template must read the two names the
+# chart writes.
+for expected in "kind: SandboxTemplate" "kind: SandboxWarmPool"; do
+  grep -q "$expected" /tmp/kustomize-runner.yaml \
+    || { echo "sandbox pool lost: $expected" >&2; exit 1; }
+done
+if grep -qE "kind: (Deployment|Service|PersistentVolumeClaim|Role|RoleBinding|ServiceAccount)$" \
+  /tmp/kustomize-runner.yaml; then
+  echo "sandbox pool owns resources that belong to the control plane" >&2; exit 1
+fi
+for expected in "dsh-runner-config" "dsh-registration-token" "dsh-universal"; do
+  grep -q "$expected" /tmp/kustomize-runner.yaml \
+    || { echo "sandbox pool lost its link to the control plane: $expected" >&2; exit 1; }
+done
+
+# The pool reads specific keys and the chart writes them. A key renamed on one
+# side is invisible to the name checks above and fails only at runtime: a
+# runner started without REGISTRATION_TOKEN exits with "REGISTRATION_TOKEN or
+# REGISTRATION_TOKEN_FILE is required", and the sandbox never registers.
+for expected in "name: HOST_URL" "key: HOST_URL" \
+  "name: REGISTRATION_TOKEN" "key: token"; do
+  grep -q "$expected" /tmp/kustomize-runner.yaml \
+    || { echo "sandbox pool no longer reads: $expected" >&2; exit 1; }
+done
+
+# The pool has to land in the control plane's namespace, so the base refuses to
+# pick one: it carries a placeholder no cluster has, and an overlay's namespace
+# has to replace it. Without both halves, a host installed outside dsh-sandbox
+# would claim sandboxes the pool never created.
+grep -q "namespace: dsh-set-your-namespace" /tmp/kustomize-runner.yaml \
+  || { echo "sandbox pool no longer requires an explicit namespace" >&2; exit 1; }
+ns_overlay="$(mktemp -d "$PWD/.dsh-lint-namespace.XXXXXX")"
+trap 'rm -rf "$ns_overlay"' EXIT
+cat >"$ns_overlay/kustomization.yaml" <<'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: operator-ns
+resources:
+  - ../deploy/kubernetes/runner
+EOF
+kubectl kustomize "$ns_overlay" >/tmp/kustomize-runner-ns.yaml
+grep -q "namespace: operator-ns" /tmp/kustomize-runner-ns.yaml \
+  || { echo "sandbox pool namespace cannot be set by an overlay" >&2; exit 1; }
+if grep -q "dsh-set-your-namespace" /tmp/kustomize-runner-ns.yaml; then
+  echo "sandbox pool kept the namespace placeholder under an overlay" >&2; exit 1
+fi
+
+# The chart must render everything the pool reads, and the host's API access
+# must cover the claims and sandboxes it operates.
+for expected in "name: dsh-runner-config" "name: dsh-registration-token" \
+  "name: dsh-provider" "kind: RoleBinding"; do
+  grep -q "$expected" /tmp/chart-default.yaml \
+    || { echo "chart does not render: $expected" >&2; exit 1; }
+done
+grep -q "^  HOST_URL:" /tmp/chart-default.yaml \
+  || { echo "chart's runner config lost its HOST_URL key" >&2; exit 1; }
+grep -q "^  token:" /tmp/chart-default.yaml \
+  || { echo "chart's registration token Secret lost its token key" >&2; exit 1; }
+for expected in "extensions.agents.x-k8s.io" "sandboxclaims" "agents.x-k8s.io" "sandboxes"; do
+  grep -q "$expected" /tmp/chart-default.yaml \
+    || { echo "chart's provider Role lost: $expected" >&2; exit 1; }
+done
+
+test -s /tmp/kustomize-runner.yaml || { echo "empty runner render" >&2; exit 1; }
+
+echo "chart lint and render OK"

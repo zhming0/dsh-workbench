@@ -1,11 +1,12 @@
 # Your dsh-workbench settings. The image seeds this file once and never
 # overwrites it.
 #
+# No sandbox profile is seeded on purpose: the host boots and serves the Web UI
+# without one, and the profiles you add name the pool your runner setup
+# publishes.
 # An id-targeted patch replaces the named row's whole config, so restate every
 # field you keep. All settings and their defaults:
 # https://github.com/zhming0/dsh-workbench/blob/main/provider/README.md#settings
 - id: sandbox-manager
   config:
-    profiles:
-      standard:
-        backend: kas
+    profiles: {}

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "$(dirname "$0")/lib/mise.bash"
+ensure_tools
+
+VERSION="$(buildkite-agent meta-data get release-version)"
+CHART="deploy/helm/dsh-workbench"
+
+# The version goes into places that must agree: the chart's version and
+# appVersion (appVersion is the default host image tag), and the sandbox pool's
+# image tag. Stamping them together is what keeps a release from pairing a host
+# and runner of different versions.
+#
+# The stamps are committed before the GitHub release tags the branch, so
+# `?ref=$VERSION` renders that version. An operator on an older ref gets that
+# ref's version; one who wants a specific version passes an `images:` override
+# in their own kustomization, which docs/installations.md shows.
+echo "--- :pencil: Stamping ${VERSION}"
+sed -i "s/^version: .*/version: ${VERSION}/" "$CHART/Chart.yaml"
+sed -i "s/^appVersion: .*/appVersion: \"${VERSION}\"/" "$CHART/Chart.yaml"
+sed -i "s/^    newTag: .*/    newTag: \"${VERSION}\"/" deploy/kubernetes/runner/kustomization.yaml
+# Each sed matches a whole line, so a reformatted file would stamp nothing and
+# release the previous version under the new tag.
+grep -qxF "version: ${VERSION}" "$CHART/Chart.yaml"
+grep -qxF "appVersion: \"${VERSION}\"" "$CHART/Chart.yaml"
+grep -qxF "    newTag: \"${VERSION}\"" deploy/kubernetes/runner/kustomization.yaml
+
+if ! git diff --quiet -- "$CHART/Chart.yaml" deploy/kubernetes; then
+  echo "--- :git: Committing the release stamps for ${VERSION}"
+  git config url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+  git add "$CHART/Chart.yaml" deploy/kubernetes
+  git \
+    -c user.name="dsh-workbench release" \
+    -c user.email="dsh-workbench@users.noreply.github.com" \
+    commit -m "release: ${VERSION}"
+  git push origin "HEAD:${BUILDKITE_BRANCH}"
+fi
+
+# The release step gets its own checkout of the commit this build started from,
+# not the stamp commit above, so hand it the SHA the tag belongs on.
+buildkite-agent meta-data set release-commit "$(git rev-parse HEAD)"
+
+echo "--- :helm: Packaging the chart"
+helm package "$CHART"
+
+echo "+++ :helm: Pushing the chart to ghcr.io/zhming0/charts"
+echo "$GITHUB_TOKEN" | helm registry login ghcr.io -u zhming0 --password-stdin
+helm push "dsh-workbench-${VERSION}.tgz" oci://ghcr.io/zhming0/charts

@@ -11,7 +11,8 @@ release. For what the project is and how to deploy it, start with the
 | `provider/`          | TypeScript dsh plugin, bundle patch, lifecycle policy, backends, credential broker |
 | `runner/`            | Go server that runs inside each sandbox                                            |
 | `proto/`             | Single ConnectRPC contract used by provider and runner                             |
-| `deploy/kubernetes/` | Warm pool, template, network policy, RBAC, host Deployment, oauth2-proxy patch    |
+| `deploy/helm/`       | Helm chart for the control plane (host, tunnel, token, provider identity)          |
+| `deploy/kubernetes/` | Kustomize base for the Kubernetes sandbox pool (template, warm pool)             |
 | `scripts/kas/`       | Disposable kind cluster and lifecycle smoke test                                   |
 | `examples/`          | Agent preset for the per-session route                                             |
 
@@ -125,5 +126,7 @@ Kubernetes transport and lifecycle test.
 
 On `main`, a manual block step unlocks
 [`.buildkite/pipeline.release.yml`](../.buildkite/pipeline.release.yml), which
-picks a calendar version, pushes both multi-architecture images, and tags a
-GitHub release.
+picks a calendar version, pushes both multi-architecture images, and stamps the
+chart's `appVersion` and the sandbox pool's image tag in a commit on `main`.
+The GitHub release tags that stamped commit, so `?ref=<version>` in the pool
+base renders the version the tag names.

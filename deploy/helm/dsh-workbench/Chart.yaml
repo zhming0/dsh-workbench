@@ -1,0 +1,19 @@
+apiVersion: v2
+name: dsh-workbench
+description: >-
+  The dsh-workbench control plane: one dsh host, its data volume, the tunnel
+  Service runners dial, and the shared registration token. The sandbox
+  infrastructure is a separate kustomize base (deploy/kubernetes/runner).
+type: application
+# Stamped with the release version by .buildkite/steps/package-and-release.
+# appVersion is the default host image tag and the ref the NOTES point the
+# sandbox pool at, so the two move together.
+version: 0.1.0
+appVersion: "2026.9.5-1151143"
+home: https://github.com/zhming0/dsh-workbench
+sources:
+  - https://github.com/zhming0/dsh-workbench
+keywords:
+  - dsh
+  - kubernetes
+  - ai

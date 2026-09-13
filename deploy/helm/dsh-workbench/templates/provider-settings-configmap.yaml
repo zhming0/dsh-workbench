@@ -1,0 +1,18 @@
+{{- include "dsh-workbench.validate" . }}
+{{- if .Values.provider.sandboxManager }}
+{{- /* The chart-owned settings layer. dsh applies this home-level file after
+the seeded profile file, and the id-targeted row replaces that row's whole
+config, so these values win for sandbox-manager while everything else in the
+seeded file stays the user's. Read-only in the container on purpose: values
+are its only writer. */}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dsh-workbench.fullname" . }}-provider-settings
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-workbench.labels" . | nindent 4 }}
+data:
+  cordis.patch.yml: |
+{{ include "dsh-workbench.providerSettingsPatch" . | indent 4 }}
+{{- end }}

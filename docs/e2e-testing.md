@@ -161,7 +161,7 @@ its cluster when it finishes.
 2. Forward the dsh server from the host pod:
 
    ```sh
-   kubectl -n dsh-sandbox port-forward deploy/dsh-host 3000:3000
+   kubectl -n dsh-sandbox port-forward deploy/dsh-workbench 3000:3000
    ```
 
 3. Open `http://localhost:3000/launch-token`, which redirects to the tokenized
@@ -171,7 +171,7 @@ its cluster when it finishes.
    session**, and add a disposable public repository as a Workspace:
 
    ```sh
-   kubectl -n dsh-sandbox logs deploy/dsh-host | grep 'dsh web:'
+   kubectl -n dsh-sandbox logs deploy/dsh-workbench | grep 'dsh web:'
    # prints http://127.0.0.1:3000/?token=…; open http://localhost:3000/?token=…
    ```
 
@@ -250,8 +250,8 @@ alone does not prove persistence or model-context injection.
   refreshes the profile on the host volume only when the image version
   changes, and every development build is `0.0.0-dev`. Remove the marker and
   restart:
-  `kubectl -n dsh-sandbox exec deploy/dsh-host -c dsh-host -- rm /data/.dsh/profiles/web/.dsh-host-image-version`,
-  then `kubectl -n dsh-sandbox rollout restart deploy/dsh-host`.
+  `kubectl -n dsh-sandbox exec deploy/dsh-workbench -c dsh-host -- rm /data/.dsh/profiles/web/.dsh-host-image-version`,
+  then `kubectl -n dsh-sandbox rollout restart deploy/dsh-workbench`.
 - **The warm pool never becomes ready:** inspect agent-sandbox controller
   deployments, the `dsh-universal` `SandboxWarmPool`, and runner pod events.
 - **The browser stops loading after a rollout:** restart the port-forward.

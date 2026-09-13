@@ -85,12 +85,60 @@ for crd in sandboxes.agents.x-k8s.io sandboxclaims.extensions.agents.x-k8s.io sa
 done
 kubectl -n agent-sandbox-system wait --for=condition=Available deployment --all --timeout=180s
 
-kubectl apply -f "$ROOT_DIR/deploy/kubernetes/00-namespace.yaml"
-kubectl -n dsh-sandbox delete sandboxwarmpool dsh-universal --ignore-not-found --wait=true
-kubectl apply -f "$ROOT_DIR/deploy/kubernetes/40-provider-rbac.yaml"
+# The control plane is the Helm chart, rendered rather than installed so the
+# script controls the images, the token, and whether a host Deployment exists.
+# The sandbox pool is the kustomize base. Both go through the same artifacts an
+# operator uses.
+overlay="$(mktemp -d "$ROOT_DIR/.dsh-dev-cluster.XXXXXX")"
+trap 'rm -rf "$overlay"' EXIT
 
-# The registration Secret must exist before host and warm pods start; both
-# read it. Never echo the token.
+cat >"$overlay/kustomization.yaml" <<'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# The pool base names no namespace: the overlay supplies the one the host
+# lives in.
+namespace: dsh-sandbox
+resources:
+  - ../deploy/kubernetes/runner
+EOF
+
+cat >>"$overlay/kustomization.yaml" <<EOF
+images:
+  - name: ghcr.io/zhming0/dsh-runner
+    newName: ${RUNNER_IMAGE%%:*}
+    newTag: ${RUNNER_IMAGE##*:}
+EOF
+
+# Patches accumulate in one list; kustomize rejects a repeated `patches` key.
+patches=()
+
+if $SKIP_WARM_POOL; then
+  cat >"$overlay/delete-warm-pool.yaml" <<'EOF'
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxWarmPool
+metadata:
+  name: dsh-universal
+$patch: delete
+EOF
+  patches+=("delete-warm-pool.yaml")
+fi
+
+if ((${#patches[@]})); then
+  printf 'patches:\n' >>"$overlay/kustomization.yaml"
+  for patch in "${patches[@]}"; do
+    printf '  - path: %s\n' "$patch" >>"$overlay/kustomization.yaml"
+  done
+fi
+
+# The namespace and the registration Secret both have to exist before the
+# host and warm pods start. The Secret never goes through the chart here, so
+# that its value stays under the script's control.
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dsh-sandbox
+EOF
 if [[ -n "$TOKEN_FILE" ]]; then
   TOKEN="$(tr -d '[:space:]' <"$TOKEN_FILE")"
   [[ -n "$TOKEN" ]] || { echo "error: token file is empty" >&2; exit 2; }
@@ -101,24 +149,39 @@ kubectl -n dsh-sandbox create secret generic dsh-registration-token \
   --from-literal="token=$TOKEN" \
   --dry-run=client -o yaml \
   | kubectl apply -f -
-unset TOKEN
 
 if [[ -n "$HOST_IMAGE" ]]; then
-  sed "s|DSH_HOST_IMAGE_PLACEHOLDER|${HOST_IMAGE//&/\\&}|g" \
-    "$ROOT_DIR/deploy/kubernetes/50-host.yaml" \
+  # In-cluster host: the whole chart, with the locally built images and the
+  # profile naming the warm pool this script applies. The seed alone is
+  # `profiles: {}`, so without it the host boots but cannot provision.
+  helm template dsh-workbench "$ROOT_DIR/deploy/helm/dsh-workbench" \
+    --namespace dsh-sandbox \
+    --set registrationToken.existingSecret=dsh-registration-token \
+    --set "host.image.repository=${HOST_IMAGE%%:*}" \
+    --set "host.image.tag=${HOST_IMAGE##*:}" \
+    --set provider.sandboxManager.profiles.standard.backend=kas \
+    --set provider.sandboxManager.profiles.standard.warmPool=dsh-universal \
     | kubectl apply -f -
-  kubectl -n dsh-sandbox rollout status deployment/dsh-host --timeout=300s
+else
+  # External host: the provider's identity and permissions, plus the
+  # runner-config ConfigMap HOST_URL comes from. The host itself is elsewhere.
+  helm template dsh-workbench "$ROOT_DIR/deploy/helm/dsh-workbench" \
+    --namespace dsh-sandbox \
+    --set registrationToken.existingSecret=dsh-registration-token \
+    --set "runner.hostUrl=$HOST_URL" \
+    --show-only templates/provider-rbac.yaml \
+    --show-only templates/runner-config-configmap.yaml \
+    | kubectl apply -f -
 fi
+unset TOKEN
 
-TEMPLATE="$(sed "s|DSH_RUNNER_IMAGE_PLACEHOLDER|${RUNNER_IMAGE//&/\\&}|g" \
-  "$ROOT_DIR/deploy/kubernetes/20-sandbox-template.yaml")"
-if [[ -n "$HOST_URL" ]]; then
-  TEMPLATE="$(sed "s|ws://dsh-host-tunnel.dsh-sandbox.svc.cluster.local:8081/tunnel|${HOST_URL//&/\\&}|g" <<<"$TEMPLATE")"
+kubectl kustomize "$overlay" | kubectl apply -f -
+
+if [[ -n "$HOST_IMAGE" ]]; then
+  kubectl -n dsh-sandbox rollout status deployment/dsh-workbench --timeout=300s
 fi
-kubectl apply -f - <<<"$TEMPLATE"
 
 if ! $SKIP_WARM_POOL; then
-  kubectl apply -f "$ROOT_DIR/deploy/kubernetes/30-warm-pool.yaml"
   echo "Waiting for warm capacity..."
   kubectl -n dsh-sandbox wait --for=jsonpath='{.status.readyReplicas}'=1 sandboxwarmpool/dsh-universal --timeout=300s
   echo "Ready. Run: scripts/kas/smoke-test.sh --namespace dsh-sandbox"

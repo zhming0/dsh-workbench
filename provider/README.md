@@ -202,8 +202,8 @@ Configuration is YAML in the profile's own layer,
 but the first prompt fails with `no sandbox profile is configured` until a
 profile is added; nothing is provisioned and no backend is contacted. That is
 the intended state while installing the control plane before its sandbox
-backend exists, and it keeps a mistyped profile map from stopping the host
-from starting so the settings file can still be fixed in place.
+backend exists, and it keeps a mistyped profile map from stopping the host from
+starting, so the settings can still be corrected.
 
 | Setting             | Default                 | Meaning                                                          |
 | ------------------- | ----------------------- | ---------------------------------------------------------------- |
@@ -419,6 +419,10 @@ required.
 Sandbox code can read injected secrets, which is their purpose. The broker
 improves storage and cleanup, not confidentiality from the repository being run.
 Skip `GITHUB_TOKEN` entirely if you only work on public repositories.
+
+On the Kubernetes distribution the same store lives on the host pod's data
+volume; [`docs/credentials.md`](../docs/credentials.md) is the install-facing
+page, including the credentials that deliberately never enter this store.
 
 ## Credentials at rest
 

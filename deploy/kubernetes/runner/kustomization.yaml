@@ -1,0 +1,37 @@
+# The sandbox pool for one dsh host: the SandboxTemplate and SandboxWarmPool
+# that the Kubernetes backend claims sessions from. Apply it after the control
+# plane (the Helm chart), which owns the namespace, the provider's identity and
+# permissions, and the `dsh-runner-config` ConfigMap and
+# `dsh-registration-token` Secret the template reads.
+#
+# The pool has to land in the control plane's namespace, and this base refuses
+# to guess it. The name below is a placeholder no cluster has, so applying the
+# base without an overlay fails instead of putting warm pods where the host
+# cannot claim them. Name the release namespace in an overlay, which is also
+# where an operator repository references the base and varies it:
+#
+#   namespace: dsh-sandbox
+#   resources:
+#     - https://github.com/zhming0/dsh-workbench//deploy/kubernetes/runner?ref=<release-tag>
+#
+#   patches:
+#     - target: { kind: SandboxWarmPool, name: dsh-universal }
+#       patch: |-
+#         - op: replace
+#           path: /spec/replicas
+#           value: 4
+#
+# Because it is static — no release name, no image tag to fill in — the
+# resource names are fixed. One host per namespace is what makes that work.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: dsh-set-your-namespace
+
+resources:
+  - 20-sandbox-template.yaml
+  - 30-warm-pool.yaml
+
+images:
+  - name: ghcr.io/zhming0/dsh-runner
+    newTag: "2026.9.5-1151143"

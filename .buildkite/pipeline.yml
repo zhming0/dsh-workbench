@@ -32,6 +32,9 @@ steps:
     command: .buildkite/steps/kas-smoke-test
     timeout_in_minutes: 30
 
+  - label: ":helm: Chart and sandbox pool"
+    command: .buildkite/steps/lint-chart
+
   - block: ":rocket: Release"
     if: build.branch == "main"
     prompt: "Publish the host and runner images?"
