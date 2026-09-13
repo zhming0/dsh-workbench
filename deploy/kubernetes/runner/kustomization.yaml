@@ -14,6 +14,10 @@
 #   resources:
 #     - https://github.com/zhming0/dsh-yawn//deploy/kubernetes/runner?ref=<release-tag>
 #
+#   images:
+#     - name: ghcr.io/zhming0/dsh-yawn-runner
+#       newTag: <release-tag>
+#
 #   patches:
 #     - target: { kind: SandboxWarmPool, name: dsh-yawn-universal }
 #       patch: |-
@@ -21,8 +25,15 @@
 #           path: /spec/replicas
 #           value: 4
 #
-# Because it is static — no release name, no image tag to fill in — the
-# resource names are fixed. One control plane per namespace is what makes that work.
+# The base names the runner image without a tag: the image is the same artifact
+# for every release, and which version a cluster runs belongs to whoever
+# installed the control plane. The overlay pins it, and the chart's appVersion
+# is the version to match — the control plane's default runner tag is built from
+# it, and a warm pod of another version cannot register with it.
+#
+# Because it is static — no release name, no image tag — the resource names are
+# fixed, and only the overlay's `images:` entry varies between releases. One
+# control plane per namespace is what makes that work.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -31,7 +42,3 @@ namespace: dsh-set-your-namespace
 resources:
   - 20-sandbox-template.yaml
   - 30-warm-pool.yaml
-
-images:
-  - name: ghcr.io/zhming0/dsh-yawn-runner
-    newTag: "2026.9.5-1151143"

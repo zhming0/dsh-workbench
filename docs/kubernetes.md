@@ -91,12 +91,16 @@ helm install dsh-yawn-control-plane oci://ghcr.io/zhming0/charts/dsh-yawn \
   --set oidc.enabled=true --set oidc.hostname=dsh.example.com
 
 # Sandbox pool, after the agent-sandbox controllers above are installed. The
-# base names no namespace, so name the release namespace in an overlay.
+# base names no namespace, so name the release namespace in an overlay and pin
+# the runner image to the release you installed.
 mkdir -p dsh-yawn-runner
 cat >dsh-yawn-runner/kustomization.yaml <<'EOF'
 namespace: dsh-yawn
 resources:
   - ../deploy/kubernetes/runner
+images:
+  - name: ghcr.io/zhming0/dsh-yawn-runner
+    newTag: <release-tag>
 EOF
 kubectl apply -k dsh-yawn-runner
 kubectl -n dsh-yawn wait --for=jsonpath='{.status.readyReplicas}'=1 \

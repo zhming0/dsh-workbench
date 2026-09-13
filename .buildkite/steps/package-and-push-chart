@@ -7,38 +7,20 @@ ensure_tools
 VERSION="$(buildkite-agent meta-data get release-version)"
 CHART="deploy/helm/dsh-yawn"
 
-# The version goes into places that must agree: the chart's version and
-# appVersion (appVersion is the default control-plane image tag), and the sandbox pool's
-# image tag. Stamping them together is what keeps a release from pairing a control-plane image
-# and runner of different versions.
-#
-# The stamps are committed before the GitHub release tags the branch, so
-# `?ref=$VERSION` renders that version. An operator on an older ref gets that
-# ref's version; one who wants a specific version passes an `images:` override
-# in their own kustomization, which docs/installations.md shows.
+# The chart's appVersion is the default control-plane image tag, so stamping it
+# here is what makes the published chart render this release. The stamp stays in
+# the build checkout: `main` is protected, so a release cannot commit to it, and
+# the published chart and the images carry the version anyway.
 echo "--- :pencil: Stamping ${VERSION}"
 sed -i "s/^version: .*/version: ${VERSION}/" "$CHART/Chart.yaml"
 sed -i "s/^appVersion: .*/appVersion: \"${VERSION}\"/" "$CHART/Chart.yaml"
-sed -i "s/^    newTag: .*/    newTag: \"${VERSION}\"/" deploy/kubernetes/runner/kustomization.yaml
 # Each sed matches a whole line, so a reformatted file would stamp nothing and
-# release the previous version under the new tag.
+# publish the previous version under the new tag.
 grep -qxF "version: ${VERSION}" "$CHART/Chart.yaml"
 grep -qxF "appVersion: \"${VERSION}\"" "$CHART/Chart.yaml"
-grep -qxF "    newTag: \"${VERSION}\"" deploy/kubernetes/runner/kustomization.yaml
 
-if ! git diff --quiet -- "$CHART/Chart.yaml" deploy/kubernetes; then
-  echo "--- :git: Committing the release stamps for ${VERSION}"
-  git config url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-  git add "$CHART/Chart.yaml" deploy/kubernetes
-  git \
-    -c user.name="dsh-yawn release" \
-    -c user.email="dsh-yawn@users.noreply.github.com" \
-    commit -m "release: ${VERSION}"
-  git push origin "HEAD:${BUILDKITE_BRANCH}"
-fi
-
-# The release step gets its own checkout of the commit this build started from,
-# not the stamp commit above, so hand it the SHA the tag belongs on.
+# The release step gets its own checkout of the commit this build started from.
+# This step commits nothing, so that commit is where the release tag belongs.
 buildkite-agent meta-data set release-commit "$(git rev-parse HEAD)"
 
 echo "--- :helm: Packaging the chart"

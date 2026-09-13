@@ -6,16 +6,15 @@ ensure_tools
 
 VERSION="$(buildkite-agent meta-data get release-version)"
 TAG="$VERSION"
-# package-and-push-chart pushed the stamped commit and recorded its SHA. This
-# step checks out the commit the build started from, which is older, so the tag
-# has to name the stamped one.
+# package-and-push-chart recorded the commit the build started from. No release
+# step writes a commit to `main`, so the tag names the commit that was built.
 RELEASE_COMMIT="$(buildkite-agent meta-data get release-commit)"
 CONTROL_PLANE_IMAGE="ghcr.io/zhming0/dsh-yawn-control-plane"
 RUNNER_IMAGE="ghcr.io/zhming0/dsh-yawn-runner"
 
 echo "+++ :github: Creating GitHub release"
-# --target creates the tag at the stamped commit, where Chart.yaml and the
-# sandbox pool's image tag read $VERSION.
+# --target creates the tag at the commit the build started from, which is what
+# the images and the chart were built and published from.
 gh release create "$TAG" --target "$RELEASE_COMMIT" --title "$TAG" --generate-notes --notes "## Images
 
 \`\`\`
@@ -27,4 +26,18 @@ Both built for \`linux/amd64\` and \`linux/arm64\`. The control-plane image is t
 distribution: dsh with the web profile and this control plane assembled at the same
 version. The control plane inside it defaults to the runner image tag above, so the
 pair always ships together.
+
+## Sandbox pool
+
+The pool base names the runner image without a tag. An overlay pins it to this
+release:
+
+\`\`\`yaml
+images:
+  - name: ${RUNNER_IMAGE}
+    newTag: ${VERSION}
+\`\`\`
+
+Use this version for the \`ref\` of the base too, so the manifests and the image
+are the same release: https://github.com/zhming0/dsh-yawn/blob/${TAG}/docs/installations-kas.md
 "
