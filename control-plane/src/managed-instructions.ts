@@ -23,8 +23,14 @@ interface WorkspaceRegistryLike {
 interface ManagedInstructionDependencies {
   store: InstructionStore;
   stateDir: string;
-  ensureRunning(agent: Agent): Promise<unknown>;
-  repositoryForAgent(agent: Agent): string | undefined;
+  /**
+   * The repository this session's instructions describe. Resolved host-side,
+   * without creating a sandbox: instructions must land on the first prompt,
+   * while the sandbox itself waits for the first action that needs it. A
+   * session that could never be provisioned rejects here, so the first prompt
+   * reports the problem instead of a later tool call.
+   */
+  repositoryForStep(agent: Agent): Promise<string>;
   workspaceRegistry(): WorkspaceRegistryLike | undefined;
 }
 
@@ -41,7 +47,9 @@ export class ManagedInstructions {
 
   install(): void {
     this.ctx.on("agent/pre-step", async ({ agent, messages, step }, next) => {
-      await this.dependencies.ensureRunning(agent);
+      // Resolve before the step runs, so a session that could never start a
+      // sandbox fails the turn before the model sees it.
+      const repositoryUrl = await this.dependencies.repositoryForStep(agent);
       const decision = await next();
       if (
         decision.kind === "reject" ||
@@ -49,7 +57,7 @@ export class ManagedInstructions {
       ) {
         return decision;
       }
-      const rendered = this.renderFor(agent);
+      const rendered = this.renderFor(repositoryUrl);
       const previous = latestManagedInstructions(agent);
       if (rendered === "" && previous === undefined) {
         return decision;
@@ -105,13 +113,10 @@ export class ManagedInstructions {
     );
   }
 
-  private renderFor(agent: Agent): string {
-    const repositoryUrl = this.dependencies.repositoryForAgent(agent);
+  private renderFor(repositoryUrl: string): string {
     return renderManagedInstructions(
       this.dependencies.store.global(),
-      repositoryUrl === undefined
-        ? ""
-        : this.dependencies.store.workspace(repositoryUrl),
+      this.dependencies.store.workspace(repositoryUrl),
       repositoryUrl,
     );
   }

@@ -99,20 +99,22 @@ Details: [`docs/kubernetes.md`](docs/kubernetes.md#the-in-cluster-control-plane)
 ### What is a sandbox's lifecycle like?
 
 ```text
-new session -> start sandbox -> clone and set up repository -> run tools
-                                                            |
-                                                            v
+new session -> prompt -> first tool call -> start sandbox -> clone and set up repository -> run tools
+                                                                                             |
+                                                                                             v
 follow-up <- wake with the same files <- hibernate after idle
                                                |
                                                v
                                       delete after expiry
 ```
 
-The first prompt claims a sandbox, clones the repository into
+The first action that needs a sandbox — a tool call, an `@` file reference, or
+an attachment upload — claims one, clones the repository into
 `/workspace/repository`, and runs the repository's one-time `.agents/setup`
-hook. After ten idle minutes the sandbox hibernates: compute stops and the
-workspace survives, so the next prompt wakes it with the same files, re-running
-the idempotent `.agents/resume` hook. After seven days idle it is deleted.
+hook. A prompt that never touches a file runs no sandbox. After ten idle
+minutes the sandbox hibernates: compute stops and the workspace survives, so
+the next action that needs it wakes it with the same files, re-running the
+idempotent `.agents/resume` hook. After seven days idle it is deleted.
 Archiving a session in the Web UI skips the clock: its sandbox and storage are
 deleted at once, and the session can never run again.
 Details: [`control-plane/README.md`](control-plane/README.md#idle-and-hibernation).

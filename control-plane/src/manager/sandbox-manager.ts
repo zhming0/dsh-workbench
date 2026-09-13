@@ -185,7 +185,7 @@ export class SandboxManager extends TypertRemoteService {
     // while the sandbox still answers here.
     this.engine.addHooks(this.fileIndexHooks);
     // A completed restore or wake queues the turn's notice; the pre-step
-    // listener installed below rides it onto exactly that turn's prompt.
+    // listener installed below rides it onto the next step of that turn.
     this.notices = new SandboxNotices(ctx, {
       rootSessionId: (agent) => this.rootSessionId(agent),
     });
@@ -195,9 +195,7 @@ export class SandboxManager extends TypertRemoteService {
         dependencies.instructions ??
         new InstructionStore(join(this.config.stateDir, "instructions.json")),
       stateDir: this.config.stateDir,
-      ensureRunning: (agent) => this.ensureRunning(agent),
-      repositoryForAgent: (agent) =>
-        this.engine.record(this.rootSessionId(agent))?.repositoryUrl,
+      repositoryForStep: (agent) => this.repositoryForStep(agent),
       workspaceRegistry: () =>
         this.workspaceRegistry ??
         (this.ctx.get("workspaceRegistry") as
@@ -240,12 +238,16 @@ export class SandboxManager extends TypertRemoteService {
       typertCtx.typert.register(yawnHost);
     });
 
-    // Provisioning waits for the first prompt: `agent/session-start` fires as
-    // soon as a blank session exists, before the user has picked a profile.
-    // ManagedInstructions.install() calls ensureRunning at `agent/pre-step`.
+    // Provisioning waits for the first action that needs the sandbox: dsh
+    // fires `agent/session-start` as soon as a blank session exists, before
+    // the user has picked a profile, and a prompt that never touches a file
+    // should not claim one. Tool calls, `@` references, and attachment copies
+    // reach ensureRunning through their own seams; the instruction listener
+    // only resolves what the first prompt needs and fails fast on a session
+    // that could never be provisioned.
     this.instructions.install();
-    // After it, so the notice listener reads only when next() has already run
-    // the ensureRunning hooks for this step.
+    // A wake or restore queues its notice from inside the tool call that
+    // triggered it, so the notice listener reads it on the next step.
     this.notices.install();
     ctx.on("agent/status", ({ agent, status }) => {
       if (status === "running") {
@@ -383,10 +385,34 @@ export class SandboxManager extends TypertRemoteService {
   }
 
   /**
-   * A session is about to run: provision, wake, or recover its sandbox and
-   * answer with the live runner. Subagent sessions resolve to their root
-   * session's sandbox, so a child's first tool call boots the root's sandbox
-   * and every agent in one session tree shares one working copy.
+   * A session is about to assemble a step: answer the repository its managed
+   * instructions describe. Resolution is host-side — the sandbox itself is
+   * created by the first action that needs it — but a session with no sandbox
+   * yet still fails here when it could never be provisioned, so a missing
+   * profile or an unresolvable repository is reported on the first prompt
+   * rather than inside a tool call. A session that already has a sandbox
+   * answers the repository it was provisioned with.
+   */
+  async repositoryForStep(agent: Agent): Promise<string> {
+    await this.ready;
+    const sessionId = this.rootSessionId(agent);
+    const record = this.engine.record(sessionId);
+    if (record !== undefined) {
+      return record.repositoryUrl;
+    }
+    // Resolve in the order provisioning does, so a missing profile is named
+    // first when both are wrong.
+    this.profileChoice.pending(sessionId);
+    const rootAgent = this.agentLookup(sessionId) ?? agent;
+    return this.repositoryFor(rootAgent);
+  }
+
+  /**
+   * An action needs the session's live runner: provision, wake, or recover
+   * its sandbox and answer with the live runner. Subagent sessions resolve to
+   * their root session's sandbox, so a child's first tool call boots the
+   * root's sandbox and every agent in one session tree shares one working
+   * copy.
    */
   async ensureRunning(agent: Agent): Promise<RunnerClient> {
     await this.ready;

@@ -456,7 +456,7 @@ describe("sandbox lifecycle", () => {
     expect(store.get("session-fork")?.state).toBe("running");
   });
 
-  it("leaves provisioning and waking to the first prompt, not session-start", async () => {
+  it("leaves provisioning and waking to the first action that needs it, not session-start", async () => {
     const backend = new FakeBackend();
     const ctx = new Context();
     const manager = new SandboxManager(
@@ -472,18 +472,36 @@ describe("sandbox lifecycle", () => {
     );
     const agent = {
       id: "session-one",
-      session: { header: {} },
+      session: { header: {}, surface: { nodes: [] } },
     } as unknown as Agent;
 
     // A blank session exists before the user has picked a profile, and every
     // UI action that resolves a cold session resumes it. Neither may schedule
-    // a sandbox; the first pre-step does, through ensureRunning.
+    // a sandbox.
     ctx.emit("agent/session-start", { agent, source: "startup" });
     ctx.emit("agent/session-start", { agent, source: "resume" });
     await sleep(50);
     expect(backend.provisions).toBe(0);
     expect(backend.wakes).toBe(0);
 
+    // The first prompt resolves its instructions without claiming a sandbox.
+    const prompt = createUserMessage({
+      content: [{ type: "text", text: "Hello" }],
+      source: { kind: "user" },
+    });
+    await agentEvents(ctx, agent).waterfall(
+      "agent/pre-step",
+      {
+        messages: [prompt],
+        turn: 1,
+        step: 1,
+        signal: new AbortController().signal,
+      },
+      () => Promise.resolve({ kind: "enter" as const, messages: [prompt] }),
+    );
+    expect(backend.provisions).toBe(0);
+
+    // An action that needs the sandbox is what boots it.
     await manager.ensureRunning(agent);
     expect(backend.provisions).toBe(1);
 
@@ -495,6 +513,43 @@ describe("sandbox lifecycle", () => {
     const store = new SessionStore(join(directory, "sessions.json"));
     await store.initialize();
     expect(store.get("session-one")?.state).toBe("hibernated");
+  });
+
+  it("fails the first prompt when no sandbox profile is configured", async () => {
+    const backend = new FakeBackend();
+    const ctx = new Context();
+    const manager = new SandboxManager(
+      ctx,
+      {
+        profiles: {},
+        stateDir: directory,
+        repository: "https://github.com/example/public.git",
+      },
+      { backends: { standard: backend }, gateway: gatewayFor(backend) },
+    );
+    const agent = {
+      id: "session-one",
+      session: { header: {} },
+    } as unknown as Agent;
+    const prompt = createUserMessage({
+      content: [{ type: "text", text: "Hello" }],
+      source: { kind: "user" },
+    });
+
+    expect(manager.workspace).toBe("/workspace/repository");
+    await expect(
+      agentEvents(ctx, agent).waterfall(
+        "agent/pre-step",
+        {
+          messages: [prompt],
+          turn: 1,
+          step: 1,
+          signal: new AbortController().signal,
+        },
+        () => Promise.resolve({ kind: "enter" as const, messages: [prompt] }),
+      ),
+    ).rejects.toThrow("no sandbox profile is configured");
+    expect(backend.provisions).toBe(0);
   });
 
   it("tells the model its workspace was restored from a checkpoint, once", async () => {
@@ -533,7 +588,7 @@ describe("sandbox lifecycle", () => {
       );
 
     // The backend cannot hibernate, so idling saves the tree and destroys
-    // the sandbox; the next turn's pre-step restores it into a fresh one.
+    // the sandbox; the next action that needs it restores it into a fresh one.
     await manager.ensureRunning(agent);
     const commit = "0123456789abcdef0123456789abcdef01234567";
     const bundle = new TextEncoder().encode("# v2 git bundle\nobjects");
@@ -546,7 +601,12 @@ describe("sandbox lifecycle", () => {
     await manager.hibernate("session-one");
     expect(backend.destroys).toBe(1);
 
-    // The restore turn's prompt carries the notice ahead of the user's text.
+    // A prompt alone does not pay for the restore; an action that needs the
+    // sandbox is what restores it, and the next pre-step carries the notice
+    // ahead of the user's text.
+    const beforeRestore = await preStep();
+    expect(beforeRestore).toEqual({ kind: "enter", messages: [prompt] });
+    await manager.ensureRunning(agent);
     const restored = await preStep();
     expect(restored).toMatchObject({
       kind: "enter",
@@ -608,12 +668,15 @@ describe("sandbox lifecycle", () => {
         () => Promise.resolve({ kind: "enter" as const, messages: [prompt] }),
       );
 
-    // The sandbox hibernates, then the next turn's pre-step wakes it.
+    // The sandbox hibernates; a prompt alone does not wake it. The action
+    // that needs it does, and the next pre-step carries the notice ahead of
+    // the user's text.
     await manager.ensureRunning(agent);
     await manager.hibernate("session-one");
     expect(backend.hibernations).toBe(1);
-
-    // The waking turn's prompt carries the notice ahead of the user's text.
+    const beforeWake = await preStep();
+    expect(beforeWake).toEqual({ kind: "enter", messages: [prompt] });
+    await manager.ensureRunning(agent);
     const woken = await preStep();
     expect(woken).toMatchObject({
       kind: "enter",
@@ -677,6 +740,7 @@ describe("sandbox lifecycle", () => {
 
     await manager.ensureRunning(agent);
     await manager.hibernate("session-one");
+    await manager.ensureRunning(agent);
     const woken = await preStep();
 
     expect(woken).toMatchObject({
@@ -897,8 +961,8 @@ describe("repository workspaces and instructions", () => {
       },
     } as unknown as Agent;
 
-    await manager.ensureRunning(agent);
-
+    // The prompt resolves the repository from the session's anchor and
+    // renders its workspace instructions without claiming a sandbox.
     const emptyDecision = await agentEvents(ctx, agent).waterfall(
       "agent/pre-step",
       {
@@ -927,9 +991,7 @@ describe("repository workspaces and instructions", () => {
     expect(workspaceRegistry.creates).toEqual([
       { path: anchor, title: "example/public" },
     ]);
-    expect(backend.repositoryUrls).toEqual([
-      "https://github.com/example/public",
-    ]);
+    expect(backend.provisions).toBe(0);
     expect(emptyDecision).toEqual({ kind: "enter", messages: [] });
     expect(await manager.getInstructions()).toEqual({
       global: "Use concise answers.",

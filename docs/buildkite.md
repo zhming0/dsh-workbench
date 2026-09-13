@@ -173,8 +173,8 @@ One control plane is one trust domain, and a Buildkite profile widens it:
 ## Limits
 
 - No hibernation. Idle saves the Git working tree as a bundle on the control plane and
-  cancels the build; everything else in the sandbox is lost. The first prompt
-  after the restore tells the model what did not come back.
+  cancels the build; everything else in the sandbox is lost. The step after
+  the restore tells the model what did not come back.
 - A build is polled every two seconds while waiting for an agent. With a busy
   self-hosted queue, raise `readyTimeoutMs`.
 - `health` is a Build API read on every resume of a session whose tunnel has

@@ -178,9 +178,11 @@ description of one kind of sandbox: which backend provisions it and that
 backend's settings, such as a runner image for Docker or a warm pool for
 Kubernetes. When more than one profile is
 configured, a chip in the composer's tool row lets the user pick one for a new
-session. The sandbox is provisioned on the first prompt, not when the session
-is created, so the choice can still change until then. Once a sandbox exists
-the chip shows the profile in use and is disabled.
+session. The sandbox is provisioned by the first action that needs it — a tool
+call, an `@` file reference, or an attachment upload — not when the session is
+created, so the choice can still change until then. Once a sandbox exists the
+chip shows the profile in use and is disabled. A prompt that never touches a
+file runs no sandbox at all.
 
 ## What changes for the agent
 
@@ -350,20 +352,20 @@ branches, stashes, or which changes were staged: everything comes back
 unstaged. A merge or rebase that was stopped on conflicts comes back as the
 conflicted files with their markers, no longer mid-merge. `.agents/setup` runs
 before the restore, on the configured revision, as it does for a new session.
-The first prompt after a restore carries a notice that says the sandbox was
-recreated from a checkpoint: Git changes and commits are back, while installed
-tools, ignored files, and anything outside the repository are gone, and
-previously staged changes are now unstaged, so the model can re-run the setup
-steps it needs.
+A restore happens inside the tool call that needed the sandbox, so its notice
+rides the next step of that turn. It says the sandbox was recreated from a
+checkpoint: Git changes and commits are back, while installed tools, ignored
+files, and anything outside the repository are gone, and previously staged
+changes are now unstaged, so the model can re-run the setup steps it needs.
 
-A wake carries its own one-shot notice on the first prompt, worded for what the
-machine kept. On Kubernetes the new pod kept only the workspace volume, so the
-notice names running processes, `/tmp`, and anything installed outside
-`/workspace` as gone; the home directory lives on that volume and comes back
-with it. On Docker the files survived and the notice says only that the
+A wake carries its own one-shot notice, worded for what the machine kept, on
+the step after the wake. On Kubernetes the new pod kept only the workspace
+volume, so the notice names running processes, `/tmp`, and anything installed
+outside `/workspace` as gone; the home directory lives on that volume and comes
+back with it. On Docker the files survived and the notice says only that the
 processes did not. Only a backend that hibernates sends this notice: a backend
-that checkpoints never wakes, so its first prompt after a restore is the only
-one that carries a note.
+that checkpoints never wakes, so the step after a restore is the only one that
+carries a note.
 
 The bundle lives in the host's state directory next to the credential store,
 with the same file permissions, so a checkpoint has the same exposure as a

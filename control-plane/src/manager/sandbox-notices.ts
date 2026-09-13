@@ -50,9 +50,9 @@ export class SandboxNotices implements LifecycleHooks {
   ) {}
 
   /**
-   * Register the pre-step listener. Install it after the listeners that call
-   * ensureRunning, so next() has performed the restore or wake before the
-   * notice is read and prepended.
+   * Register the pre-step listener. A lifecycle hook queues the notice during
+   * the tool call that woke or restored the sandbox — nothing provisions at
+   * pre-step any more — so the next step of that turn picks it up.
    */
   install(): void {
     this.ctx.on("agent/pre-step", async ({ agent }, next) => {
