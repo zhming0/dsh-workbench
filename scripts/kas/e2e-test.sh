@@ -105,7 +105,7 @@ spec:
           imagePullPolicy: IfNotPresent
           command: [node, /test/rpc-smoke.mjs]
           env:
-            - name: REGISTRATION_TOKEN
+            - name: DSH_YAWN_REGISTRATION_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: dsh-yawn-registration-token

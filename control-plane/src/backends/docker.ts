@@ -54,11 +54,11 @@ export class DockerBackend implements SandboxBackend {
         "--add-host",
         "host.docker.internal:host-gateway",
         "--env",
-        `SANDBOX_ID=${sandboxId}`,
+        `DSH_YAWN_SANDBOX_ID=${sandboxId}`,
         "--env",
         `DSH_YAWN_CONTROL_PLANE_URL=${this.options.controlPlaneUrl}`,
         "--env",
-        `REGISTRATION_TOKEN=${this.options.registrationToken}`,
+        `DSH_YAWN_REGISTRATION_TOKEN=${this.options.registrationToken}`,
         this.options.image,
       ]);
       return {

@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 
 const namespace = process.env.KAS_NAMESPACE ?? "dsh-yawn";
 const warmPool = process.env.KAS_WARM_POOL ?? "dsh-yawn-universal";
-const registrationToken = requiredEnvironment("REGISTRATION_TOKEN");
+const registrationToken = requiredEnvironment("DSH_YAWN_REGISTRATION_TOKEN");
 const profile = process.env.DSH_YAWN_PROFILE_DIR ?? "/opt/dsh-yawn/profile";
 const require = createRequire(join(profile, "package.json"));
 const yawnRoot = dirname(

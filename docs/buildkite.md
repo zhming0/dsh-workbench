@@ -20,11 +20,10 @@ first build in your own organization.
 ## What the control plane does
 
 ```text
-control plane ── POST /builds {SANDBOX_ID, DSH_YAWN_CONTROL_PLANE_URL, DSH_YAWN_RUNNER_IMAGE} ──▶ Buildkite API
-      ▲                                                                                   │
-      │◀───────────── GET /builds/{n} until state == running ─────────────────────────────┤
-      │                                                                                   │ job
-      └◀── dsh-yawn-runner dials DSH_YAWN_CONTROL_PLANE_URL with REGISTRATION_TOKEN ──────────── agent
+control plane ──▶ Buildkite API
+  POST /builds {DSH_YAWN_SANDBOX_ID, DSH_YAWN_CONTROL_PLANE_URL, DSH_YAWN_RUNNER_IMAGE}
+  ◀── GET /builds/{n} until state == running
+  ◀── dsh-yawn-runner dials DSH_YAWN_CONTROL_PLANE_URL with DSH_YAWN_REGISTRATION_TOKEN ── agent
 ```
 
 For each new session the control plane:
@@ -32,13 +31,13 @@ For each new session the control plane:
 1. looks for a live build tagged with the session (`meta_data[dsh-session]`),
    in case the control plane stopped after creating one and before saving its record;
 2. otherwise creates a build with `commit: HEAD` on a branch named after the
-   sandbox, build env `SANDBOX_ID`, `DSH_YAWN_CONTROL_PLANE_URL`, and `DSH_YAWN_RUNNER_IMAGE`, and
+   sandbox, build env `DSH_YAWN_SANDBOX_ID`, `DSH_YAWN_CONTROL_PLANE_URL`, and `DSH_YAWN_RUNNER_IMAGE`, and
    that session tag;
 3. polls the build until its state is `running`, giving up and cancelling the
    build after `readyTimeoutMs` (default 10 minutes); this covers queue wait and
    image pull, after which the runner has 60 seconds to register on the tunnel.
 
-`SANDBOX_ID` is `dsh-<16 hex chars of the session hash>-<6 random hex chars>`.
+`DSH_YAWN_SANDBOX_ID` is `dsh-<16 hex chars of the session hash>-<6 random hex chars>`.
 The random suffix changes on every build, so a runner from a cancelled job
 that is still redialing cannot be mistaken for the new one. The build's branch
 is the same string. Buildkite does not check that a branch exists, and the
@@ -130,7 +129,8 @@ The pipeline is one command step that runs the runner image the control plane na
 has the YAML and the setup steps. What matters to the backend:
 
 - `-e VAR` with no value copies that variable from the job environment, which
-  is how `SANDBOX_ID`, `DSH_YAWN_CONTROL_PLANE_URL`, and `REGISTRATION_TOKEN` reach the runner.
+  is how `DSH_YAWN_SANDBOX_ID`, `DSH_YAWN_CONTROL_PLANE_URL`, and
+  `DSH_YAWN_REGISTRATION_TOKEN` reach the runner.
   The image's entrypoint is `dsh-yawn-runner`.
 - The control plane sets `DSH_YAWN_RUNNER_IMAGE` to the tag matching its own version, so
   the pipeline never pins an image and cannot drift from the control plane.
@@ -151,7 +151,7 @@ has the YAML and the setup steps. What matters to the backend:
 The pipeline should not trigger builds on its own. Turn off the repository
 webhook, or leave the pipeline without a repository integration, so the only
 builds are the ones the control plane creates. A build that Buildkite starts by
-itself has no `SANDBOX_ID` or `DSH_YAWN_CONTROL_PLANE_URL` in its env, so `dsh-yawn-runner` exits at
+itself has no `DSH_YAWN_SANDBOX_ID` or `DSH_YAWN_CONTROL_PLANE_URL` in its env, so `dsh-yawn-runner` exits at
 once and the job fails; it wastes an agent slot but never reaches the control plane.
 
 ## Trust boundary
@@ -161,9 +161,9 @@ One control plane is one trust domain, and a Buildkite profile widens it:
 - The API token can create and cancel builds on the pipeline. Anyone who can
   read the control plane's environment can trigger jobs on your agents.
 - Every agent that can take the job, and every person who can edit the
-  pipeline's steps, can read `REGISTRATION_TOKEN` and the secrets the control plane
-  pushes to the runner after it registers. Give the pipeline its own cluster
-  and queue rather than sharing them with unrelated CI.
+  pipeline's steps, can read `DSH_YAWN_REGISTRATION_TOKEN` and the secrets the
+  control plane pushes to the runner after it registers. Give the pipeline its
+  own cluster and queue rather than sharing them with unrelated CI.
 - The job runs with whatever the agent grants it. On hosted agents that is a
   Buildkite-managed VM; on self-hosted agents it is your infrastructure.
 - The idle checkpoint bundle lives in the control plane's state directory, next to the

@@ -108,7 +108,7 @@ describe("Buildkite backend", () => {
       branch: handle.sandboxId,
       message: `dsh sandbox ${handle.sandboxId}`,
       env: {
-        SANDBOX_ID: handle.sandboxId,
+        DSH_YAWN_SANDBOX_ID: handle.sandboxId,
         DSH_YAWN_CONTROL_PLANE_URL: "wss://dsh.example.com/tunnel",
         DSH_YAWN_RUNNER_IMAGE: "ghcr.io/zhming0/dsh-yawn-runner:test",
       },
@@ -129,7 +129,7 @@ describe("Buildkite backend", () => {
             state: "running",
             web_url: "https://bk/3",
             env: {
-              SANDBOX_ID: "dsh-existing",
+              DSH_YAWN_SANDBOX_ID: "dsh-existing",
               DSH_YAWN_CONTROL_PLANE_URL: "wss://x/tunnel",
             },
           },
