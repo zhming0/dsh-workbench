@@ -126,7 +126,8 @@ done
 grep -q "namespace: dsh-set-your-namespace" /tmp/kustomize-runner.yaml \
   || { echo "sandbox pool no longer requires an explicit namespace" >&2; exit 1; }
 ns_overlay="$(mktemp -d "$PWD/.dsh-lint-namespace.XXXXXX")"
-trap 'rm -rf "$ns_overlay"' EXIT
+pin_overlay="$(mktemp -d "$PWD/.dsh-lint-pin.XXXXXX")"
+trap 'rm -rf "$ns_overlay" "$pin_overlay"' EXIT
 cat >"$ns_overlay/kustomization.yaml" <<'EOF'
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -140,6 +141,29 @@ grep -q "namespace: operator-ns" /tmp/kustomize-runner-ns.yaml \
 if grep -q "dsh-set-your-namespace" /tmp/kustomize-runner-ns.yaml; then
   echo "sandbox pool kept the namespace placeholder under an overlay" >&2; exit 1
 fi
+
+# The base names the runner image without a tag, because the version belongs to
+# the operator's overlay. A release used to stamp a tag here and push the stamp
+# commit to `main`, which the branch ruleset rejects, so no release can do that
+# again. A tag reappearing in the base is that mistake returning.
+if grep -qE "^[[:space:]]*newTag:" deploy/kubernetes/runner/kustomization.yaml; then
+  echo "sandbox pool pins a runner tag: the overlay owns it" >&2; exit 1
+fi
+grep -q "image: ghcr.io/zhming0/dsh-yawn-runner\$" /tmp/kustomize-runner.yaml \
+  || { echo "sandbox pool no longer names the runner image untagged" >&2; exit 1; }
+cat >"$pin_overlay/kustomization.yaml" <<'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: operator-ns
+resources:
+  - ../deploy/kubernetes/runner
+images:
+  - name: ghcr.io/zhming0/dsh-yawn-runner
+    newTag: v9.9.9-test
+EOF
+kubectl kustomize "$pin_overlay" >/tmp/kustomize-runner-pin.yaml
+grep -q "image: ghcr.io/zhming0/dsh-yawn-runner:v9.9.9-test" /tmp/kustomize-runner-pin.yaml \
+  || { echo "an overlay cannot pin the runner image" >&2; exit 1; }
 
 # The chart must render everything the pool reads, and the control plane's API
 # access must cover the claims and sandboxes it operates.

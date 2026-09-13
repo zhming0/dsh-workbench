@@ -17,10 +17,8 @@ steps:
 
   - wait
 
-  # Stamps the chart's appVersion and the sandbox pool's image tag with the
-  # release version, commits that change, and pushes the stamp commit and the
-  # chart. It records the stamped SHA in build meta-data for the release step,
-  # whose own checkout is the commit this build started from.
+  # Stamps the chart's appVersion in the build checkout and pushes the chart.
+  # It records the built commit in build meta-data for the release step.
   - label: ":helm: Package & push chart"
     secrets:
       - GITHUB_TOKEN
@@ -28,8 +26,8 @@ steps:
 
   - wait
 
-  # Creates the tag at the stamped commit, not at this step's checkout, so
-  # `?ref=$VERSION` renders the version the tag names.
+  # Creates the tag at the commit the build started from. The tag is what
+  # `?ref=$VERSION` in the pool base names.
   - label: ":github: Create GitHub release"
     secrets:
       - GITHUB_TOKEN

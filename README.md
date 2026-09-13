@@ -84,13 +84,16 @@ helm install dsh-yawn-control-plane oci://ghcr.io/zhming0/charts/dsh-yawn \
   --set oidc.enabled=true --set oidc.hostname=dsh.example.com
 
 # Set up a runner: the sandbox pool base names no namespace, so name the
-# release namespace in an overlay, then name its warm pool in
-# controlPlane.sandboxManager.
+# release namespace in an overlay and pin the runner image to the release you
+# installed, then name its warm pool in controlPlane.sandboxManager.
 mkdir -p dsh-yawn-runner
 cat >dsh-yawn-runner/kustomization.yaml <<'EOF'
 namespace: dsh-yawn
 resources:
   - ../deploy/kubernetes/runner
+images:
+  - name: ghcr.io/zhming0/dsh-yawn-runner
+    newTag: <release-tag>
 EOF
 kubectl apply -k dsh-yawn-runner
 helm upgrade dsh-yawn-control-plane oci://ghcr.io/zhming0/charts/dsh-yawn \

@@ -126,7 +126,14 @@ Kubernetes transport and lifecycle test.
 
 On `main`, a manual block step unlocks
 [`.buildkite/pipeline.release.yml`](../.buildkite/pipeline.release.yml), which
-picks a calendar version, pushes both multi-architecture images, and stamps the
-chart's `appVersion` and the sandbox pool's image tag in a commit on `main`.
-The GitHub release tags that stamped commit, so `?ref=<version>` in the pool
-base renders the version the tag names.
+picks a calendar version, pushes both multi-architecture images, stamps that
+version into the chart's `appVersion`, and publishes the chart to
+`ghcr.io/zhming0/charts`. A release commits nothing: `main` is protected by a
+ruleset that requires a pull request and the `buildkite/dsh-yawn` check, so the
+stamp stays in the build checkout and the published chart carries it. The
+checked-in `version` and `appVersion` can therefore lag the published chart.
+
+The GitHub release tags the commit the build started from, so `?ref=<version>`
+in the pool base names a ref whose manifests are that release's. The base names
+the runner image without a tag; an operator's overlay pins it to the version
+they installed, and the chart's `appVersion` is the one to match.

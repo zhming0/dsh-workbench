@@ -52,6 +52,9 @@ cluster has, and applying the base as-is fails. Write an overlay:
 namespace: dsh-yawn
 resources:
   - https://github.com/zhming0/dsh-yawn//deploy/kubernetes/runner?ref=<release-tag>
+images:
+  - name: ghcr.io/zhming0/dsh-yawn-runner
+    newTag: <release-tag>
 ```
 
 ```sh
@@ -64,11 +67,19 @@ kubectl -n dsh-yawn wait --for=jsonpath='{.status.readyReplicas}'=1 \
 In a checkout, point `resources` at `../deploy/kubernetes/runner` instead of
 the remote base.
 
+Substitute one concrete version for both `<release-tag>` placeholders: the ref
+and the image tag have to name the same release. The base names the runner
+image without a tag, because the image is one artifact for every release and
+which version a cluster runs is the version of the control plane it registers
+with — `kubectl get deploy dsh-yawn-control-plane -o jsonpath='{.spec.template.spec.containers[0].image}'`
+prints the one the chart installed. Nothing checks it at install time: a warm
+pod from another version fails when it dials the tunnel.
+
 The base is a `SandboxTemplate` describing the pod a sandbox runs, a
-`SandboxWarmPool` keeping some warm, and nothing else. It is static: the
-template reads `DSH_YAWN_CONTROL_PLANE_URL` and `DSH_YAWN_REGISTRATION_TOKEN`
-from what the control plane wrote, so there is no version to keep in sync.
-Vary it with the usual overlay fields:
+`SandboxWarmPool` keeping some warm, and nothing else. Apart from the runner
+tag, it is static: the template reads `DSH_YAWN_CONTROL_PLANE_URL` and
+`DSH_YAWN_REGISTRATION_TOKEN` from what the control plane wrote, so there is
+nothing else to keep in sync. Vary it with the usual overlay fields:
 
 ```yaml
 patches:
