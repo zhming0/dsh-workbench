@@ -1,26 +1,102 @@
-# dsh-yawn
+# DeepSeek Harness Yawn
 
-A Kubernetes distribution of [DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh)
-(dsh). You run one control plane in your cluster. Each session claims its own
-sandbox from a warm pool, and dsh's stock file and command tools work inside
-that sandbox — never on the control plane. The control plane also holds the
-secrets and Git credentials sandboxes need, so tokens live in one owner-only place instead of
-in repositories or chat.
+<br />
 
-Running it takes three pieces of infrastructure, all yours to operate: a
-Kubernetes cluster you administer,
-[agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) (pinned to
-**v1.0.2**; the install steps apply it), and an OIDC identity provider — dsh
-ships no user authentication, so the distribution fronts it with oauth2-proxy
-and you supply the OIDC client. If that is not your situation, this project is
-not a turnkey tool.
+<p align="center">
+  <strong>A DSH distribution for advanced users who love to lay back and yawn</strong><br>
 
-The supported dsh surface is `dsh web`; headless mode never reaches the idle
-lifecycle and is out of scope. A Docker-backend mode runs sessions in
-containers on one machine, but it is the development path, not the product —
-see [docs/development.md](docs/development.md).
+</p>
 
-Each session's sandbox goes through this lifecycle:
+<p align="center">
+  <img src="docs/logo.png" alt="Project logo" style="max-width: 100%; width: 320px;" />
+</p>
+
+## Features
+
+* Deployed as an always-on service on your LAN or the internet.
+* Every session runs in its own sandbox: Kubernetes agent-sandbox, Buildkite, or Docker.
+* Sandboxes hibernate when idle and wake with the same files; backends that cannot pause checkpoint instead.
+* OIDC authentication through oauth2-proxy and your identity provider.
+* Repository-centric workspaces: paste a URL, the session clones it.
+* Credentials management in the Web UI: Secrets only reach a sandbox only when its commands run, .
+* AGENTS.md editing in the Web UI.
+
+## Rationale
+
+[DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh) is a great
+harness, but it assumes it runs on your laptop: every session shares your
+operating system, so you have to watch what the agents do, keep the machine
+running, and live with the scale of one machine. All of that kept me tense.
+
+DSH Yawn splits dsh into a control plane you deploy once and runners that host
+each session's sandbox. Runners have multiple backends — Kubernetes, Buildkite,
+or Docker — and can run anywhere that can reach the control plane. dsh's stock
+file and command tools run inside that sandbox, never on the control plane or
+your laptop, so whatever the agents do stays there. Hence the name: you can
+lay back and yawn :)
+
+## Quick start (demo)
+
+This runs the control plane in one Docker container and starts sandboxes as
+sibling containers through your Docker daemon. It is the fastest way to see a
+session run, not a supported deployment — for that, read
+[`docs/installations.md`](docs/installations.md).
+
+```sh
+docker run -d --name dsh-yawn \
+  -p 127.0.0.1:3000:3000 -p 8081:8081 \
+  -e DSH_YAWN_WEB_PORT=13000 \
+  -e DSH_YAWN_CONTROL_PLANE_LAUNCH_TOKEN_ROUTE=1 \
+  --group-add "$(stat -c %g /var/run/docker.sock 2>/dev/null || echo 0)" \
+  -v dsh-yawn-data:/data \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/zhming0/dsh-yawn-control-plane
+
+# dsh serves its UI on loopback only, so a sidecar publishes it. This is the
+# same shape as the oauth2-proxy sidecar in the Kubernetes install.
+docker run -d --name dsh-yawn-ui --network container:dsh-yawn --restart unless-stopped \
+  alpine/socat TCP-LISTEN:3000,fork,reuseaddr TCP4:127.0.0.1:13000
+
+# Tell the control plane to use the Docker backend, then restart to apply.
+docker exec -i dsh-yawn sh -c 'cat > /data/.dsh/profiles/web/cordis.patch.yml' <<'EOF'
+- id: sandbox-manager
+  config:
+    profiles:
+      standard:
+        backend: docker
+EOF
+docker restart dsh-yawn
+```
+
+What the pieces do:
+
+- The Docker socket mount lets the control plane start sibling sandbox
+  containers; `--group-add` grants the socket's group (0 on Docker Desktop,
+  the `docker` group on Linux).
+- The sandbox profile needs only `backend: docker`: the runner image defaults
+  to the tag matching the control plane, and runners dial back through
+  `host.docker.internal` on the published tunnel port 8081.
+
+Then open <http://localhost:3000/launch-token>, choose **New session**, use
+**Add workspace…** with a repository URL, and send a message. The first message
+needs a model credential; add one in the Web UI settings.
+
+To clean up: `docker rm -f dsh-yawn dsh-yawn-ui`.
+
+## FAQ
+
+### What is `/launch-token`?
+
+DeepSeek Harness signs each browser in with a per-process token and exchanges it for a
+cookie that lasts 30 days. `/launch-token` redirects you to the tokenized URL,
+so you never copy a token out of the logs. Open it through the address you use
+to reach the control plane, such as
+`http://localhost:3000/launch-token` or `https://dsh.example.com/launch-token`.
+The route hands the token to anyone who can reach dsh's port; behind the
+distribution's oauth2-proxy, that means authenticated users only.
+Details: [`docs/kubernetes.md`](docs/kubernetes.md#the-in-cluster-control-plane).
+
+### What is a sandbox's lifecycle like?
 
 ```text
 new session -> start sandbox -> clone and set up repository -> run tools
@@ -32,237 +108,51 @@ follow-up <- wake with the same files <- hibernate after idle
                                       delete after expiry
 ```
 
-While a session idles, the sandbox's pod is removed; its workspace volume
-survives until expiry. In this repository, "sandbox" always means one such
-provisioned environment.
+The first prompt claims a sandbox, clones the repository into
+`/workspace/repository`, and runs the repository's one-time `.agents/setup`
+hook. After ten idle minutes the sandbox hibernates: compute stops and the
+workspace survives, so the next prompt wakes it with the same files, re-running
+the idempotent `.agents/resume` hook. After seven days idle it is deleted.
+Archiving a session in the Web UI skips the clock: its sandbox and storage are
+deleted at once, and the session can never run again.
+Details: [`control-plane/README.md`](control-plane/README.md#idle-and-hibernation).
 
-A session's subagents work in the same sandbox: each subagent session resolves
-to its root session's sandbox, so delegation shares one working copy — the
-same contract as dsh without this control plane. A rogue subagent can therefore
-damage the session's workspace exactly as the session itself could, but it
-cannot reach anything outside the sandbox.
+### What happens if a sandbox cannot hibernate?
 
-Archiving a session in the Web UI is one-way — dsh keeps the log but the
-session can never run again — so archiving exits this cycle immediately: the
-provider deletes that sandbox and its storage, subagents included, instead of
-waiting for expiry.
+A Buildkite build cannot be paused, so that backend checkpoints instead: the
+working tree is committed, the commits `origin` does not have are written to a
+Git bundle in the control plane's state directory, and the sandbox is
+destroyed. The next prompt provisions a fresh sandbox, clones, runs
+`.agents/setup`, and unpacks the bundle. Kept: the branch, its commits, and
+every tracked or untracked file. Lost: ignored files, installed tools, and
+which changes were staged. Docker and Kubernetes hibernate properly.
+Details:
+[`control-plane/README.md`](control-plane/README.md#idle-and-hibernation).
 
-## Getting started
+### How does the runner talk to the control plane?
 
-The distribution is two images released together under one version:
-`ghcr.io/zhming0/dsh-yawn-control-plane` (dsh with the `web` profile and this control plane
-assembled) and `ghcr.io/zhming0/dsh-yawn-runner` (the per-sandbox server sessions
-execute in). You need:
+It dials out. Every runner opens one WebSocket to the control plane's tunnel
+listener and authenticates with the shared registration token; all RPCs then
+flow control-plane → runner over that runner-initiated connection. Nothing
+ever connects into a sandbox, and sandboxes accept no ingress at all. Runners
+outside the cluster reach the same listener through a `/tunnel` path on the
+Ingress that fronts the Web UI.
+Details: [`docs/kubernetes.md`](docs/kubernetes.md#connectivity-and-isolation),
+[`control-plane/README.md`](control-plane/README.md#tunnel).
 
-- a default StorageClass in the cluster;
-- an OIDC client registered at your identity provider for
-  [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/): issuer URL,
-  client ID, and client secret;
-- a repository for sandboxes to clone. Public repositories need nothing more;
-  private ones need the GitHub step below.
+### Can I still install plugins?
 
-[`docs/installations.md`](docs/installations.md) is the installation index:
-install the [control plane](docs/installations-control-plane.md) (the
-`dsh-yawn` Helm chart), then a runner —
-[Kubernetes agent-sandbox](docs/installations-kas.md) or
-[Buildkite agents](docs/installations-buildkite.md) — then give sessions their
-[credentials](docs/credentials.md). [`docs/kubernetes.md`](docs/kubernetes.md)
-covers what each manifest does and the isolation model. The Helm short form:
+Yes. The control plane runs a stock dsh `web` profile on its data volume, so
+`dsh plugin --profile web add <package>` works as anywhere else (on Kubernetes,
+`kubectl exec` into the control-plane pod, then restart it). Three caveats:
 
-```sh
-kubectl apply -f https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.2/sandbox-with-extensions.yaml
-
-kubectl create namespace dsh-yawn
-kubectl -n dsh-yawn create secret generic dsh-yawn-oidc \
-  --from-literal=OAUTH2_PROXY_OIDC_ISSUER_URL=https://your-idp/realm \
-  --from-literal=OAUTH2_PROXY_CLIENT_ID=dsh-yawn-control-plane \
-  --from-literal=OAUTH2_PROXY_CLIENT_SECRET=… \
-  --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')"
-
-helm install dsh-yawn-control-plane oci://ghcr.io/zhming0/charts/dsh-yawn \
-  --namespace dsh-yawn \
-  --set oidc.enabled=true --set oidc.hostname=dsh.example.com
-
-# Set up a runner: the sandbox pool base names no namespace, so name the
-# release namespace in an overlay and pin the runner image to the release you
-# installed, then name its warm pool in controlPlane.sandboxManager.
-mkdir -p dsh-yawn-runner
-cat >dsh-yawn-runner/kustomization.yaml <<'EOF'
-namespace: dsh-yawn
-resources:
-  - ../deploy/kubernetes/runner
-images:
-  - name: ghcr.io/zhming0/dsh-yawn-runner
-    newTag: <release-tag>
-EOF
-kubectl apply -k dsh-yawn-runner
-helm upgrade dsh-yawn-control-plane oci://ghcr.io/zhming0/charts/dsh-yawn \
-  --namespace dsh-yawn --reuse-values \
-  --set controlPlane.sandboxManager.profiles.standard.backend=kas \
-  --set controlPlane.sandboxManager.profiles.standard.warmPool=dsh-yawn-universal
-```
-
-The chart owns the control plane only: the dsh process, its data volume,
-the tunnel Service, the registration token, and its Kubernetes API access.
-Sandbox infrastructure is the sandbox pool, a kustomize base you reference
-and patch rather than copy. The control plane boots and serves the Web UI
-without it; sessions provision once a pool exists.
-
-The Service stops at the proxy's pod port, 4180: put your own Ingress,
-LoadBalancer, or Gateway in front of it. The proxy authenticates users; it
-does not isolate them. One control plane is one trust domain: everyone the issuer
-admits shares the same sessions, credentials, and sandboxes.
-
-Runners dial out to the control plane's tunnel Service over a WebSocket and
-authenticate with that registration token, so no route into a sandbox is ever
-needed. Runners outside the cluster reach the tunnel through a `/tunnel` path
-on the same Ingress, under the UI's certificate. Rotation and details are in
-[docs/kubernetes.md](docs/kubernetes.md#the-in-cluster-control-plane).
-
-### Start a session
-
-dsh signs a browser in with a per-process token; the browser exchanges it for
-a cookie that lasts 30 days. The proxy has already authenticated you, so the
-control plane hands the token over: open `/launch-token` through the address you use to
-reach the control plane (`https://dsh.example.com/launch-token`, or
-`http://localhost:3000/launch-token` over a port-forward) and it redirects you
-to the tokenized URL. The token itself is also in the control plane log:
-
-```sh
-kubectl -n dsh-yawn logs deploy/dsh-yawn-control-plane | grep 'dsh web:'
-# before exposure is wired up:
-kubectl -n dsh-yawn port-forward deploy/dsh-yawn-control-plane 3000:3000
-```
-
-Then start a session:
-
-1. Open **New session**, then **Add workspace…**.
-2. Enter a repository URL such as `https://github.com/owner/repository`.
-3. Choose the resulting Workspace and start the session.
-
-The session claims a warm sandbox, clones the repository into
-`/workspace/repository`, runs the repository's one-time `.agents/setup` hook,
-and re-runs its idempotent `.agents/resume` hook on every wake.
-The parent `/workspace` is the persistent volume root, so storage metadata such
-as `lost+found` remains outside the checkout. The home directory is
-`/workspace/home` on that volume, so caches and tool configuration written
-under `$HOME` survive a wake; `/tmp` and installs elsewhere in the container do
-not. Every session gets its own sandbox; two sessions never share files.
-
-### AGENTS.md instructions
-
-Open **Settings → Instructions** to add AGENTS.md-style guidance without
-changing a repository. Choose **Global** for every session or select a
-repository Workspace for guidance that applies only to that repository.
-Workspace instructions take precedence over the global layer. Checked-in
-`AGENTS.md` files remain active, including more-specific files in nested
-directories.
-
-Saved changes apply to the next model request, usually after the next user
-message or tool call, including in an existing session. They do not alter a
-request already in flight. The control plane stores these UI-managed layers in
-`stateDir/instructions.json`; it does not write into a checkout. Empty a scope
-and save to clear it. The global and effective workspace layers may total at
-most 65,536 UTF-8 bytes.
-
-## Credentials and secrets
-
-The control plane keeps a store of named secrets. Each one is injected into the
-environment of every sandbox command, and one name is special: `GITHUB_TOKEN`
-also serves as the Git credential for github.com, so cloning private
-repositories needs nothing else. A fine-grained personal access token scoped
-to the repositories you work on fits best; `gh auth token` works too.
-
-Manage secrets in the Web UI — **Settings → Secrets**. Changes reach every
-session before its next command, running sessions included. Never put secret
-values in the configuration file (plain YAML) or in chat (transcripts are
-durable); the UI exists so values never touch either.
-[`docs/credentials.md`](docs/credentials.md) is the full page: token scopes and
-the two credentials that belong to the control plane instead and must never reach a
-sandbox. The store itself is described in
-[`control-plane/README.md`](control-plane/README.md#secrets).
-
-## Configuration
-
-dsh composes a plugin tree at boot; a **profile** is one installed copy of
-such a tree, and the control-plane image seeds the `web` profile with this control plane on
-first boot. Settings are a YAML patch layer applied over the bundle defaults.
-On the Kubernetes distribution the chart owns the sandbox-manager row through
-[`controlPlane.sandboxManager`](deploy/helm/dsh-yawn/README.md#settings-as-values);
-a checkout install edits the profile's file under `$DSH_HOME`. (The
-Instructions page described above manages only model guidance.)
-
-An entry replaces the **whole** `config` of the row it names rather than
-merging into it, so restate every field you want to keep:
-
-```yaml
-- id: sandbox-manager
-  config:
-    profiles:
-      standard:
-        backend: kas
-    idleMs: 300000 # hibernate after 5 minutes instead of 10
-```
-
-`dsh --profile web --dump-config` prints the composed tree, and every setting,
-with its default, is in
-[`control-plane/README.md`](control-plane/README.md#settings).
-
-## What changes for the agent
-
-|                                               | Before                    | After                                  |
-| --------------------------------------------- | ------------------------- | -------------------------------------- |
-| `read`, `write`, `edit`, `present`            | your disk                 | sandbox workspace                      |
-| `bash`                                        | your machine              | sandbox                                |
-| `glob`, `grep`                                | ripgrep on your machine   | sandbox workspace, ripgrep in the sandbox |
-| Working directory                             | wherever you launched dsh | `/workspace/repository` in the sandbox |
-| `docker`                                      | your Docker daemon        | a rootless daemon in the sandbox pod   |
-| Session logs, spill files                     | your disk                 | unchanged, still your disk             |
-| Uploaded attachments                          | your disk                 | copied into the sandbox workspace      |
-
-An uploaded file is copied into the sandbox before the model request that
-references it, under `/workspace/.dsh-attachments`, so the model's file tools
-can read it; the control plane keeps the stored original. One copy is capped at 64 MiB,
-the size of the single write RPC that carries it, so a larger upload keeps
-dsh's "cannot access a readable path" placeholder.
-
-Each Kubernetes sandbox pod runs a rootless `dockerd` sidecar, and the runner's
-`DOCKER_HOST` points at its socket, so `docker build` and `docker run` work
-inside a session. The daemon's images and containers are discarded when the
-sandbox hibernates; see
-[Docker inside a sandbox](docs/kubernetes.md#docker-inside-a-sandbox) for the
-security trade this makes and how to remove it.
-
-Replacing the filesystem row also turns off dsh's host-side permission model:
-`workspace-write` and the approval prompts came from that row, and the bundle
-drops the "Current DSH file policy" line from the agent's context with it. The
-container is the boundary instead, and the agent acts inside it without asking
-— treat the sandbox, not the prompt, as what stands between a repository and
-your machine.
-
-How the bundle patch does this — which rows it replaces, how `glob` and `grep`
-come to run ripgrep inside the sandbox, and how a repository URL becomes a dsh
-Workspace — is in
-[`control-plane/README.md`](control-plane/README.md#what-installing-it-changes). To
-sandbox only some sessions, use the agent preset in
-[`examples/`](examples/agent.cordis.yml) instead of the bundle patch; the two
-routes are alternatives, and running both gives a session two sandboxes.
-
-## Trust boundaries
-
-- The GitHub token and configured secrets stay in an owner-only directory on
-  the control plane.
-- A runner keeps pushed credentials in memory. Its Git helper reads them from a
-  private Unix socket, not from the workspace.
-- Secret values are added only to child-process environments. Repository code
-  can read them by design, so only run repositories trusted with those values.
-- A GitHub token has whatever reach you grant it, so prefer a fine-grained
-  PAT scoped to the repositories you work on. One provider instance suits one
-  dsh user, not shared hosting.
-- The runner dials out to the control plane and authenticates with a shared
-  registration token; nothing ever connects into a sandbox. All RPCs flow
-  control-plane→runner over that runner-initiated tunnel, and the control plane verifies the
-  runner's sandbox identity before using it.
+- a package without `dsh.bundle.patch` installs as a plain dependency and
+  wires up nothing;
+- an image upgrade reseeds the profile's `package.json` and `node_modules`,
+  dropping what you added, so re-add plugins after upgrading;
+- Web sessions mount their tools through agent presets, so a bundle patch that
+  renames a stock tool row changes nothing for sessions. The stock rows
+  already run inside the sandbox.
 
 ## Documentation
 
@@ -273,5 +163,5 @@ routes are alternatives, and running both gives a session two sandboxes.
 | [`docs/credentials.md`](docs/credentials.md)                                 | the secret store: `GITHUB_TOKEN`, the Web UI, control-plane credentials   |
 | [`docs/kubernetes.md`](docs/kubernetes.md)                                   | the Kubernetes backend: control-plane operations, isolation, smoke test   |
 | [`docs/buildkite.md`](docs/buildkite.md)                                     | running sandboxes as Buildkite builds: pipeline shape and limits |
-| [`control-plane/README.md`](control-plane/README.md)                                   | what the bundle patch changes, every setting, secret handling    |
+| [`control-plane/README.md`](control-plane/README.md)                         | what the bundle patch changes, every setting, secret handling    |
 | [`docs/development.md`](docs/development.md)                                 | repository layout, build and test, checkout installs, releasing  |
