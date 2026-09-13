@@ -90,7 +90,7 @@ if (args[0] === "inspect") process.stdout.write(JSON.stringify([{
     expect(commands[0]).toContain(
       "DSH_YAWN_CONTROL_PLANE_URL=ws://host.docker.internal:8081/tunnel",
     );
-    expect(commands[0]).toContain("REGISTRATION_TOKEN=token-value");
+    expect(commands[0]).toContain("DSH_YAWN_REGISTRATION_TOKEN=token-value");
     expect(commands[0]?.at(-1)).toBe("runner:large");
     expect(commands[2]).toEqual(["start", "existing-container"]);
   });

@@ -162,7 +162,7 @@ likely to mislead you.
 ## Inspect Buildkite CI
 
 Use `bk`, pinned in `mise.toml`, to inspect this repository's CI in the
-`zhming0` organization and `dsh-workbench` pipeline. Prefer the pre-provisioned
+`zhming0` organization and `dsh-yawn` pipeline. Prefer the pre-provisioned
 `BUILDKITE_API_TOKEN`; it takes precedence over the credential store and legacy
 config, and `BUILDKITE_ORGANIZATION_SLUG` selects the organization, so no login
 is needed when they are set. Do not run `bk auth login --device` or any

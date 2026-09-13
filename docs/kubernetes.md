@@ -247,8 +247,8 @@ The same cluster still owns every template; a repository or a session picks
 among the pools the operator published and nothing else.
 
 **The registration token** authenticates every runner tunnel. The control plane reads
-it from `DSH_YAWN_REGISTRATION_TOKEN` and each runner pod reads it from
-the same `dsh-yawn-registration-token` Secret, both at start. To rotate it, set the
+it from `DSH_YAWN_REGISTRATION_TOKEN`, and each runner pod reads the same
+`dsh-yawn-registration-token` Secret into that variable at start. To rotate it, set the
 new value in the Secret, restart the control plane, and recycle the warm pods so they
 pick it up:
 

@@ -477,7 +477,7 @@ order:
 For Kubernetes, put the token in the `dsh-yawn-registration-token` Secret in the
 sandbox namespace and in the host's environment. See
 [`docs/kubernetes.md`](https://github.com/zhming0/dsh-yawn/blob/main/docs/kubernetes.md).
-For Buildkite, the pipeline step passes it to the job as `REGISTRATION_TOKEN`;
+For Buildkite, the pipeline step passes it to the job as `DSH_YAWN_REGISTRATION_TOKEN`;
 see
 [`docs/buildkite.md`](https://github.com/zhming0/dsh-yawn/blob/main/docs/buildkite.md).
 

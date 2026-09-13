@@ -28,18 +28,18 @@ steps:
   - label: dsh sandbox
     command: >-
       docker run --rm
-      -e SANDBOX_ID -e DSH_YAWN_CONTROL_PLANE_URL -e REGISTRATION_TOKEN
+      -e DSH_YAWN_SANDBOX_ID -e DSH_YAWN_CONTROL_PLANE_URL -e DSH_YAWN_REGISTRATION_TOKEN
       "$DSH_YAWN_RUNNER_IMAGE"
     checkout:
       skip: true
     secrets:
-      REGISTRATION_TOKEN: dsh_registration_token
+      DSH_YAWN_REGISTRATION_TOKEN: dsh_registration_token
     timeout_in_minutes: 240
     agents:
       queue: hosted
 ```
 
-- `DSH_YAWN_RUNNER_IMAGE`, `SANDBOX_ID`, and `DSH_YAWN_CONTROL_PLANE_URL` come from the build
+- `DSH_YAWN_RUNNER_IMAGE`, `DSH_YAWN_SANDBOX_ID`, and `DSH_YAWN_CONTROL_PLANE_URL` come from the build
   environment the control plane sets, so the pipeline never pins a runner image and
   cannot drift from the control plane.
 - `secrets` maps a [Buildkite secret](https://buildkite.com/docs/pipelines/security/secrets/buildkite-secrets)

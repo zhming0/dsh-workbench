@@ -43,10 +43,10 @@ func main() {
 	}
 }
 func registrationToken() (string, error) {
-	if token := os.Getenv("REGISTRATION_TOKEN"); token != "" {
+	if token := os.Getenv("DSH_YAWN_REGISTRATION_TOKEN"); token != "" {
 		return token, nil
 	}
-	if file := os.Getenv("REGISTRATION_TOKEN_FILE"); file != "" {
+	if file := os.Getenv("DSH_YAWN_REGISTRATION_TOKEN_FILE"); file != "" {
 		raw, err := os.ReadFile(file)
 		if err != nil {
 			return "", err
@@ -56,7 +56,7 @@ func registrationToken() (string, error) {
 			return token, nil
 		}
 	}
-	return "", errors.New("REGISTRATION_TOKEN or REGISTRATION_TOKEN_FILE is required")
+	return "", errors.New("DSH_YAWN_REGISTRATION_TOKEN or DSH_YAWN_REGISTRATION_TOKEN_FILE is required")
 }
 
 // ensureHome creates the directory HOME names. The image ships one, but a
@@ -74,9 +74,9 @@ func serve(socket string) error {
 	if err := ensureHome(); err != nil {
 		return fmt.Errorf("create home directory: %w", err)
 	}
-	sandboxID := os.Getenv("SANDBOX_ID")
+	sandboxID := os.Getenv("DSH_YAWN_SANDBOX_ID")
 	if sandboxID == "" {
-		return errors.New("SANDBOX_ID is required")
+		return errors.New("DSH_YAWN_SANDBOX_ID is required")
 	}
 	controlPlaneURL := os.Getenv("DSH_YAWN_CONTROL_PLANE_URL")
 	if controlPlaneURL == "" {

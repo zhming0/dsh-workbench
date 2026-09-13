@@ -66,9 +66,9 @@ the remote base.
 
 The base is a `SandboxTemplate` describing the pod a sandbox runs, a
 `SandboxWarmPool` keeping some warm, and nothing else. It is static: the
-template reads `DSH_YAWN_CONTROL_PLANE_URL` and `REGISTRATION_TOKEN` from what the control plane
-wrote, so there is no version to keep in sync. Vary it with the usual overlay
-fields:
+template reads `DSH_YAWN_CONTROL_PLANE_URL` and `DSH_YAWN_REGISTRATION_TOKEN`
+from what the control plane wrote, so there is no version to keep in sync.
+Vary it with the usual overlay fields:
 
 ```yaml
 patches:

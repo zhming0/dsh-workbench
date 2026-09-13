@@ -110,10 +110,11 @@ done
 
 # The pool reads specific keys and the chart writes them. A key renamed on one
 # side is invisible to the name checks above and fails only at runtime: a
-# runner started without REGISTRATION_TOKEN exits with "REGISTRATION_TOKEN or
-# REGISTRATION_TOKEN_FILE is required", and the sandbox never registers.
+# runner started without DSH_YAWN_REGISTRATION_TOKEN exits with
+# "DSH_YAWN_REGISTRATION_TOKEN or DSH_YAWN_REGISTRATION_TOKEN_FILE is required",
+# and the sandbox never registers.
 for expected in "name: DSH_YAWN_CONTROL_PLANE_URL" "key: DSH_YAWN_CONTROL_PLANE_URL" \
-  "name: REGISTRATION_TOKEN" "key: token"; do
+  "name: DSH_YAWN_REGISTRATION_TOKEN" "key: token"; do
   grep -q "$expected" /tmp/kustomize-runner.yaml \
     || { echo "sandbox pool no longer reads: $expected" >&2; exit 1; }
 done
