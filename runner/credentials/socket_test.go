@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
-	v1 "github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1"
-	"github.com/zhming0/dsh-sandbox/runner/service"
+	v1 "github.com/zhming0/dsh-yawn/runner/gen/dsh/yawn/v1"
+	"github.com/zhming0/dsh-yawn/runner/service"
 )
 
 func TestHelperGet(t *testing.T) {

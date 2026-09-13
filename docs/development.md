@@ -1,6 +1,6 @@
 # Development
 
-How to build and test dsh-workbench, run it from a checkout, and cut a
+How to build and test dsh-yawn, run it from a checkout, and cut a
 release. For what the project is and how to deploy it, start with the
 [README](../README.md).
 
@@ -8,10 +8,10 @@ release. For what the project is and how to deploy it, start with the
 
 | Path                 | Purpose                                                                            |
 | -------------------- | ---------------------------------------------------------------------------------- |
-| `provider/`          | TypeScript dsh plugin, bundle patch, lifecycle policy, backends, credential broker |
+| `control-plane/`          | TypeScript dsh plugin, bundle patch, lifecycle policy, backends, credential broker |
 | `runner/`            | Go server that runs inside each sandbox                                            |
-| `proto/`             | Single ConnectRPC contract used by provider and runner                             |
-| `deploy/helm/`       | Helm chart for the control plane (host, tunnel, token, provider identity)          |
+| `proto/`             | Single ConnectRPC contract used by the control plane and the runner                             |
+| `deploy/helm/`       | Helm chart for the control plane (control plane, tunnel, token, RBAC)          |
 | `deploy/kubernetes/` | Kustomize base for the Kubernetes sandbox pool (template, warm pool)             |
 | `scripts/kas/`       | Disposable kind cluster and lifecycle smoke test                                   |
 | `examples/`          | Agent preset for the per-session route                                             |
@@ -38,10 +38,10 @@ pnpm lint
 pnpm test
 pnpm build
 
-(cd runner && go test -race ./... && go build ./cmd/dsh-runner)
+(cd runner && go test -race ./... && go build ./cmd/dsh-yawn-runner)
 docker buildx bake dev --load
 pnpm test:docker
-docker buildx bake dev host-dev --load
+docker buildx bake dev control-plane-dev --load
 pnpm test:kas
 ```
 
@@ -49,12 +49,12 @@ pnpm test:kas
 release build covers `linux/amd64` and `linux/arm64`. The Docker smoke test
 checks runner registration, secret injection, the bundled command-line tools,
 first-run setup, and file survival across stop/start. The Kubernetes test
-creates a disposable kind cluster and checks the provider-to-runner tunnel,
+creates a disposable kind cluster and checks the control plane-to-runner tunnel,
 forced reconnection, hibernate/wake, warm adoption, volume persistence, and
 expiry.
 
-`pnpm lint` lints both sides: ESLint with type-aware rules for the provider
-([`provider/eslint.config.mjs`](../provider/eslint.config.mjs)) and
+`pnpm lint` lints both sides: ESLint with type-aware rules for the control plane
+([`control-plane/eslint.config.mjs`](../control-plane/eslint.config.mjs)) and
 golangci-lint for the runner ([`runner/.golangci.yml`](../runner/.golangci.yml),
 which includes gofmt). Both restrict themselves to rules that catch real
 defects — unchecked errors and promises, dead code, suspicious constructs —
@@ -75,12 +75,12 @@ checks the controller lifecycle against it. See
 
 Instead of the released images, a checkout installs into a dsh you run
 yourself. This needs `@deepseek-ai/dsh` 0.1.5-rc.2 on your PATH. Build first,
-then install the provider directory:
+then install the control plane directory:
 
 ```sh
 docker buildx bake dev --load
 pnpm install && pnpm build
-dsh plugin --profile web add "$PWD/provider"
+dsh plugin --profile web add "$PWD/control-plane"
 ```
 
 Declare one Docker profile that points at the locally built runner image in
@@ -92,7 +92,7 @@ your profile layer, then run `dsh web` and open the `?token=` URL it prints:
     profiles:
       standard:
         backend: docker
-        image: dsh-runner:dev
+        image: dsh-yawn-runner:dev
 ```
 
 To exercise the profile chip without a cluster, declare two Docker profiles
@@ -103,24 +103,24 @@ land on the session record:
 - id: sandbox-manager
   config:
     profiles:
-      standard: { backend: docker, image: dsh-runner:dev }
-      large: { backend: docker, image: dsh-runner:dev }
+      standard: { backend: docker, image: dsh-yawn-runner:dev }
+      large: { backend: docker, image: dsh-yawn-runner:dev }
 ```
 
 ## Releasing
 
 Every release publishes two images together, both built for `linux/amd64` and
-`linux/arm64`: `ghcr.io/zhming0/dsh-host`, the dsh distribution with the web
-profile and this provider assembled, and `ghcr.io/zhming0/dsh-runner`. They
-share one calendar version. The host image build stamps that version into the
-provider and fails if the provider's default runner image tag would not match,
+`linux/arm64`: `ghcr.io/zhming0/dsh-yawn-control-plane`, the dsh distribution with the web
+profile and this control plane assembled, and `ghcr.io/zhming0/dsh-yawn-runner`. They
+share one calendar version. The control-plane image build stamps that version into the
+provider and fails if the control plane's default runner image tag would not match,
 so the pair cannot drift.
 
-The provider is not published to npm. The distribution images are the product,
+The control plane is not published to npm. The distribution images are the product,
 and a checkout install is the contributor path.
 
 Buildkite runs [`.buildkite/pipeline.yml`](../.buildkite/pipeline.yml) on
-every branch: provider checks and tests, runner tests, a check that the
+every branch: control-plane checks and tests, runner tests, a check that the
 generated protobuf code is current, the Docker lifecycle smoke test, and the
 Kubernetes transport and lifecycle test.
 

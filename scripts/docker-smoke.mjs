@@ -2,10 +2,10 @@
 
 import { randomBytes } from "node:crypto";
 
-import { DockerBackend } from "../provider/dist/backends/docker.js";
-import { TunnelServer } from "../provider/dist/tunnel.js";
+import { DockerBackend } from "../control-plane/dist/backends/docker.js";
+import { TunnelServer } from "../control-plane/dist/tunnel.js";
 
-const image = process.env.DSH_RUNNER_IMAGE ?? "dsh-runner:dev";
+const image = process.env.DSH_YAWN_RUNNER_IMAGE ?? "dsh-yawn-runner:dev";
 const workspace = "/workspace/repository";
 const registrationToken = randomBytes(32).toString("hex");
 const tunnel = new TunnelServer({
@@ -16,7 +16,7 @@ const tunnel = new TunnelServer({
 await tunnel.listen();
 const backend = new DockerBackend({
   image,
-  hostUrl: `ws://host.docker.internal:${tunnel.port()}/tunnel`,
+  controlPlaneUrl: `ws://host.docker.internal:${tunnel.port()}/tunnel`,
   registrationToken,
 });
 let handle;

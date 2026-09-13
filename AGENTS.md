@@ -108,39 +108,40 @@ likely to mislead you.
 
 ## Respect the system boundaries
 
-- `provider/` owns session lifecycle, credentials, and the Docker and
+- `control-plane/` owns session lifecycle, credentials, and the Docker and
   Kubernetes backends.
 - `runner/` owns commands and file operations inside one sandbox.
 - `proto/` is the source of truth for the ConnectRPC contract between them.
-- The runner dials out to the host's tunnel listener and authenticates with
-  the shared registration token; RPCs then flow host→runner over that
-  runner-initiated connection. Do not add a listener on the runner for the
-  host to dial, and do not give the runner any other channel back to the dsh
-  host.
-- Keep host paths and sandbox paths separate. Model-facing file and shell work
-  must resolve inside the session's sandbox workspace.
+- The runner dials out to the control plane's tunnel listener and
+  authenticates with the shared registration token; RPCs then flow
+  control-plane→runner over that runner-initiated connection. Do not add a
+  listener on the runner for the control plane to dial, and do not give the
+  runner any other channel back to the control plane.
+- Keep control-plane paths and sandbox paths separate. Model-facing file and
+  shell work must resolve inside the session's sandbox workspace.
 - Preserve lifecycle meaning: hibernation keeps workspace data, wake reuses it,
   and expiry removes it.
 
 ## Preserve the supported product
 
-- The product is the Kubernetes distribution: the host and runner images are
-  released together. Docker and checkout installs are development paths.
+- The product is the Kubernetes distribution: the control-plane and runner
+  images are released together. Docker and checkout installs are development paths.
 - Only `dsh web` is supported. Headless mode exits before the idle lifecycle can
   run.
-- One dsh host is one trust domain. Its sessions, credentials, and sandboxes are
-  not isolated from other users admitted to that host.
-- Secrets are global to the host and are pushed to a runner before commands.
+- One control plane is one trust domain. Its sessions, credentials, and
+  sandboxes are not isolated from other users admitted to that control plane.
+- Secrets are global to the control plane and are pushed to a runner before
+  commands.
   `GITHUB_TOKEN` also supplies Git credentials for github.com. There is no
   GitHub device flow or per-repository secret scoping.
 - Sandbox code can read injected secrets by design. Keep credentials in the
-  provider store, never in pod configuration or workspace files. Two are
+  control-plane store, never in pod configuration or workspace files. Two are
   deliberate exceptions, because a sandbox must never receive them: the shared
-  registration token, which lives in the `dsh-registration-token` Secret
+  registration token, which lives in the `dsh-yawn-registration-token` Secret
   because warm pods must hold it before any session exists (it only lets a
   runner register a tunnel, and grants nothing else), and a Buildkite API
-  token, which the host reads from its own environment at boot because it can
-  create and cancel builds.
+  token, which the control plane reads from its own environment at boot
+  because it can create and cancel builds.
 - The Kubernetes backend uses cluster-owned templates and warm pools. The
   operator publishes them as named sandbox profiles; a session picks a profile,
   never pod privileges or an arbitrary template.
@@ -148,8 +149,8 @@ likely to mislead you.
 ## Protect credentials and generated code
 
 - Never write tokens or secret values into a workspace, log, test fixture, or
-  committed file. The provider stores credentials; the runner holds delivered
-  values in memory.
+  committed file. The control plane stores credentials; the runner holds
+  delivered values in memory.
 - Do not hand-edit generated protobuf files. Change `proto/` and run
   `pnpm proto:generate`.
 - The pinned dsh, agent-sandbox, Go, `jj`, and `mise` versions are intentional.
@@ -189,8 +190,8 @@ For runner changes, also run:
 ```
 
 Run `pnpm test:docker` for Docker lifecycle, runner protocol, setup, credential,
-or sandbox tool changes. Run `pnpm test:kas` for provider-to-runner transport,
-Kubernetes lifecycle, or manifest changes. Regenerate protobuf code and confirm
+or sandbox tool changes. Run `pnpm test:kas` for control-plane-to-runner transport, Kubernetes
+lifecycle, or manifest changes. Regenerate protobuf code and confirm
 there is no generated-code diff when the contract or generator settings change.
 
 Follow [`docs/e2e-testing.md`](docs/e2e-testing.md) for the complete Docker,

@@ -26,7 +26,7 @@ func Start(ctx context.Context) (func(context.Context) error, error) {
 		resource.WithFromEnv(),
 		resource.WithProcess(),
 		resource.WithTelemetrySDK(),
-		resource.WithAttributes(semconv.ServiceName("dsh-runner")),
+		resource.WithAttributes(semconv.ServiceName("dsh-yawn-runner")),
 	)
 	if err != nil {
 		return nil, err

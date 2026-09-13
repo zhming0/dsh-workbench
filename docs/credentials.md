@@ -1,9 +1,9 @@
 # Credentials and secrets
 
-Sandboxes have no credentials of their own; they borrow the host's. The host
+Sandboxes have no credentials of their own; they borrow the control plane's. The control plane
 keeps one store of named secrets and pushes the current values to the runner
 before each command, which injects them into that command's environment. The
-store is global to the host — one trust domain, no per-session or
+store is global to the control plane — one trust domain, no per-session or
 per-repository scoping.
 
 This is the step after [installation](installations.md): the control plane and
@@ -12,7 +12,7 @@ a runner come first.
 ## GITHUB_TOKEN
 
 `GITHUB_TOKEN` is the one secret most installs need. Besides being injected
-like any other, it is the Git credential for github.com: the host serves it to
+like any other, it is the Git credential for github.com: the control plane serves it to
 Git over a Unix socket, so it never lands in the workspace or in a remote URL.
 
 Use a fine-grained personal access token scoped to the repositories sessions
@@ -28,22 +28,22 @@ in — there is no CLI — and values are write-only: the page lists names, neve
 values.
 
 A change applies before the session's next command, running sessions included:
-before every command the provider re-reads the store and pushes it to the
-runner. No host restart is needed.
+before every command the control plane re-reads the store and pushes it to the
+runner. No control-plane restart is needed.
 
-## Credentials the host owns
+## Credentials the control plane owns
 
-Two credentials belong to the host and must never reach a sandbox:
+Two credentials belong to the control plane and must never reach a sandbox:
 
-- the **shared registration token**, in the `dsh-registration-token` Secret the
+- the **shared registration token**, in the `dsh-yawn-registration-token` Secret the
   chart creates — warm pods must hold it before any session exists, and it only
   lets a runner register a tunnel;
-- a **Buildkite API token**, in a Secret you own, read into the host
-  environment by `host.extraEnv` — it can create and cancel builds.
+- a **Buildkite API token**, in a Secret you own, read into the control plane
+  environment by `controlPlane.extraEnv` — it can create and cancel builds.
 
 [`installations-control-plane.md`](installations-control-plane.md#credentials)
 sets both up, and
-[`kubernetes.md`](kubernetes.md#the-in-cluster-dsh-host) covers rotation.
+[`kubernetes.md`](kubernetes.md#the-in-cluster-control-plane) covers rotation.
 
 ## Never write values down
 

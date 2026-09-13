@@ -1,6 +1,6 @@
 node_modules/
 dist/
 coverage/
-.dsh-sandbox/
+.dsh-yawn/
 *.log
-/runner/dsh-runner
+/runner/dsh-yawn-runner

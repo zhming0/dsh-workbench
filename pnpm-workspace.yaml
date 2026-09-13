@@ -1,5 +1,5 @@
 packages:
-  - provider
+  - control-plane
 
 overrides:
   react-dom: 18.2.0

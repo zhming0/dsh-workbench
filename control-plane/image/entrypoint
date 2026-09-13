@@ -1,0 +1,15 @@
+#!/bin/sh
+# Boot the web profile. Extra container arguments are passed to the web app,
+# so a manifest can add flags such as --trusted-host.
+set -eu
+
+dsh-yawn-seed
+
+set -- --port "${DSH_YAWN_WEB_PORT:-3000}" --no-open "$@"
+# DSH_YAWN_CONTROL_PLANE_LAUNCH_TOKEN_ROUTE=1 mounts GET /launch-token (see
+# launch-token.patch.yml). The overlay is a launcher flag, so it goes before
+# the web app's arguments.
+if [ "${DSH_YAWN_CONTROL_PLANE_LAUNCH_TOKEN_ROUTE:-0}" = 1 ]; then
+  set -- --patch /opt/dsh-yawn/launch-token.patch.yml "$@"
+fi
+exec dsh --profile web "$@"

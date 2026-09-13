@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	v1 "github.com/zhming0/dsh-sandbox/runner/gen/dsh/sandbox/v1"
+	v1 "github.com/zhming0/dsh-yawn/runner/gen/dsh/yawn/v1"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -32,7 +32,7 @@ const (
 var execDuration metric.Float64Histogram
 
 func init() {
-	execDuration, _ = otel.Meter("dsh-runner").Float64Histogram(
+	execDuration, _ = otel.Meter("dsh-yawn-runner").Float64Histogram(
 		"dsh.sandbox.exec.duration",
 		metric.WithUnit("s"),
 		metric.WithDescription("Time spent running a command in the sandbox"),

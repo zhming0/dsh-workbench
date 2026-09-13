@@ -7,10 +7,10 @@ steps:
 
   - wait
 
-  # One bake pushes both images. The host image build stamps the release
-  # version into the provider and fails if the provider's default runner tag
+  # One bake pushes both images. The control-plane image build stamps the release
+  # version into the control plane and fails if the control plane's default runner tag
   # would not match, so the pair cannot drift.
-  - label: ":docker: Build & Push host and runner images"
+  - label: ":docker: Build & Push control-plane and runner images"
     secrets:
       - GITHUB_TOKEN
     command: .buildkite/steps/build-and-push-image

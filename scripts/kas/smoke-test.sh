@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NAMESPACE="dsh-sandbox"
-WARM_POOL="dsh-universal"
+NAMESPACE="dsh-yawn"
+WARM_POOL="dsh-yawn-universal"
 TIMEOUT="300s"
 MAIN_CLAIM=""
 DISPOSABLE_CLAIM=""
@@ -76,7 +76,7 @@ echo "Adopted Sandbox/$sandbox in ${adoption_ms}ms"
 (( adoption_ms < 1000 )) || { echo "error: warm Sandbox adoption took 1s or longer" >&2; exit 1; }
 kubectl -n "$NAMESPACE" wait --for=condition=Ready "sandboxclaim/$MAIN_CLAIM" --timeout="$TIMEOUT"
 
-# Runners dial the host tunnel, so the Sandbox has no Service; only the
+# Runners dial the control-plane tunnel, so the Sandbox has no Service; only the
 # in-pod health listener is checked here.
 selector="$(kubectl -n "$NAMESPACE" get sandbox "$sandbox" -o jsonpath='{.status.selector}')"
 [[ -n "$selector" ]] || { echo "error: Sandbox has no status.selector" >&2; exit 1; }

@@ -1,5 +1,5 @@
 {
-  "name": "dsh-workbench-workspace",
+  "name": "dsh-yawn-workspace",
   "private": true,
   "license": "MIT",
   "packageManager": "pnpm@11.7.0",
@@ -7,14 +7,14 @@
     "node": "^22.19.0 || >=24"
   },
   "scripts": {
-    "build": "pnpm --filter @zhming0/dsh-workbench build",
-    "check": "pnpm proto:check && pnpm --filter @zhming0/dsh-workbench check",
-    "format": "pnpm --filter @zhming0/dsh-workbench format",
-    "format:check": "pnpm --filter @zhming0/dsh-workbench format:check",
-    "lint": "pnpm --filter @zhming0/dsh-workbench lint && (cd runner && golangci-lint run)",
+    "build": "pnpm --filter @zhming0/dsh-yawn build",
+    "check": "pnpm proto:check && pnpm --filter @zhming0/dsh-yawn check",
+    "format": "pnpm --filter @zhming0/dsh-yawn format",
+    "format:check": "pnpm --filter @zhming0/dsh-yawn format:check",
+    "lint": "pnpm --filter @zhming0/dsh-yawn lint && (cd runner && golangci-lint run)",
     "proto:check": "buf lint && buf format --diff --exit-code",
     "proto:generate": "buf generate",
-    "test": "pnpm --filter @zhming0/dsh-workbench test",
+    "test": "pnpm --filter @zhming0/dsh-yawn test",
     "test:docker": "node scripts/docker-smoke.mjs",
     "test:kas": "scripts/kas/e2e-test.sh"
   },

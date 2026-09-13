@@ -1,9 +1,9 @@
 variable "IMAGE" {
-  default = "ghcr.io/zhming0/dsh-runner"
+  default = "ghcr.io/zhming0/dsh-yawn-runner"
 }
 
-variable "HOST_IMAGE" {
-  default = "ghcr.io/zhming0/dsh-host"
+variable "CONTROL_PLANE_IMAGE" {
+  default = "ghcr.io/zhming0/dsh-yawn-control-plane"
 }
 
 variable "VERSION" {
@@ -15,17 +15,17 @@ group "default" {
 }
 
 # Everything a release pushes. The two images share one version by
-# construction: the host image build stamps VERSION into the provider and
+# construction: the control-plane image build stamps VERSION into the package and
 # asserts its default runner tag matches.
 group "release" {
-  targets = ["production", "host-production"]
+  targets = ["production", "control-plane-production"]
 }
 
 # Native single-platform build for local work and the CI smoke test.
 target "dev" {
   context    = "runner"
   dockerfile = "Dockerfile"
-  tags       = ["dsh-runner:dev"]
+  tags       = ["dsh-yawn-runner:dev"]
 }
 
 target "production" {
@@ -38,23 +38,23 @@ target "production" {
   platforms = ["linux/amd64", "linux/arm64"]
 }
 
-# Native single-platform host image for local work and the CI composition
+# Native single-platform control-plane image for local work and the CI composition
 # check. The default VERSION is not a valid semver for `npm version`, so the
 # dev build uses its own placeholder.
-target "host-dev" {
+target "control-plane-dev" {
   context    = "."
-  dockerfile = "host/Dockerfile"
+  dockerfile = "control-plane/Dockerfile"
   args       = { VERSION = "0.0.0-dev" }
-  tags       = ["dsh-host:dev"]
+  tags       = ["dsh-yawn-control-plane:dev"]
 }
 
-target "host-production" {
+target "control-plane-production" {
   context    = "."
-  dockerfile = "host/Dockerfile"
+  dockerfile = "control-plane/Dockerfile"
   args       = { VERSION = "${VERSION}" }
   tags = [
-    "${HOST_IMAGE}:${VERSION}",
-    "${HOST_IMAGE}:latest"
+    "${CONTROL_PLANE_IMAGE}:${VERSION}",
+    "${CONTROL_PLANE_IMAGE}:latest"
   ]
   platforms = ["linux/amd64", "linux/arm64"]
 }

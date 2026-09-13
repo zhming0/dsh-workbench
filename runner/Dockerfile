@@ -7,7 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH="${TARGETARCH}" \
-    go build -trimpath -ldflags='-s -w' -o /dsh-runner ./cmd/dsh-runner
+    go build -trimpath -ldflags='-s -w' -o /dsh-yawn-runner ./cmd/dsh-yawn-runner
 
 FROM debian:trixie-slim
 ARG TARGETARCH
@@ -19,7 +19,7 @@ ARG MISE_SHA256_amd64=1445289f35e1a5a7216e1ffee5b34c5b9bd46793224e7e6c335503de9d
 ARG MISE_SHA256_arm64=21a03117d27028b1b4602bc83d9aefdccd55325ac3da45f7e28c9320627dcdc6
 ARG NODE_VERSION=24.19.0
 # ripgrep backs the session's `glob` and `grep` search tools: the stock row
-# names the host's packaged binary, and the provider's subprocess seam resolves
+# names the host's packaged binary, and the control plane's subprocess seam resolves
 # `rg` on the runner's PATH in its place.
 ARG RIPGREP_VERSION=15.2.0
 ARG RIPGREP_SHA256_amd64=33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c
@@ -87,7 +87,7 @@ RUN set -eux; \
     mkdir -p /workspace /run/dsh; \
     useradd --create-home --uid 1000 --home-dir /workspace/home sandbox; \
     chown -R sandbox:sandbox /workspace /run/dsh
-COPY --from=build /dsh-runner /usr/local/bin/dsh-runner
+COPY --from=build /dsh-yawn-runner /usr/local/bin/dsh-yawn-runner
 # $HOME lives on the workspace volume so home files and caches survive a
 # Kubernetes wake. A sandbox mounts its workspace volume over /workspace, which
 # hides this image's copy, so the runner recreates the directory at startup.
@@ -101,4 +101,4 @@ ENV HOME=/workspace/home \
 USER sandbox
 WORKDIR /workspace
 EXPOSE 8080
-ENTRYPOINT ["dsh-runner"]
+ENTRYPOINT ["dsh-yawn-runner"]

@@ -11,7 +11,7 @@ go = "1.26.7"
 kind = "0.33.0"
 kubectl = "1.37.0"
 
-# Lints and packages deploy/helm/dsh-workbench. `kubectl kustomize` renders
+# Lints and packages deploy/helm/dsh-yawn. `kubectl kustomize` renders
 # the sandbox pool with the kubectl pin above.
 helm = "4.2.4"
 

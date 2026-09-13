@@ -1,4 +1,4 @@
-module github.com/zhming0/dsh-sandbox/runner
+module github.com/zhming0/dsh-yawn/runner
 
 go 1.26.7
 

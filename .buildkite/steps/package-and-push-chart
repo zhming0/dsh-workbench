@@ -5,11 +5,11 @@ source "$(dirname "$0")/lib/mise.bash"
 ensure_tools
 
 VERSION="$(buildkite-agent meta-data get release-version)"
-CHART="deploy/helm/dsh-workbench"
+CHART="deploy/helm/dsh-yawn"
 
 # The version goes into places that must agree: the chart's version and
-# appVersion (appVersion is the default host image tag), and the sandbox pool's
-# image tag. Stamping them together is what keeps a release from pairing a host
+# appVersion (appVersion is the default control-plane image tag), and the sandbox pool's
+# image tag. Stamping them together is what keeps a release from pairing a control-plane image
 # and runner of different versions.
 #
 # The stamps are committed before the GitHub release tags the branch, so
@@ -31,8 +31,8 @@ if ! git diff --quiet -- "$CHART/Chart.yaml" deploy/kubernetes; then
   git config url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
   git add "$CHART/Chart.yaml" deploy/kubernetes
   git \
-    -c user.name="dsh-workbench release" \
-    -c user.email="dsh-workbench@users.noreply.github.com" \
+    -c user.name="dsh-yawn release" \
+    -c user.email="dsh-yawn@users.noreply.github.com" \
     commit -m "release: ${VERSION}"
   git push origin "HEAD:${BUILDKITE_BRANCH}"
 fi
@@ -46,4 +46,4 @@ helm package "$CHART"
 
 echo "+++ :helm: Pushing the chart to ghcr.io/zhming0/charts"
 echo "$GITHUB_TOKEN" | helm registry login ghcr.io -u zhming0 --password-stdin
-helm push "dsh-workbench-${VERSION}.tgz" oci://ghcr.io/zhming0/charts
+helm push "dsh-yawn-${VERSION}.tgz" oci://ghcr.io/zhming0/charts

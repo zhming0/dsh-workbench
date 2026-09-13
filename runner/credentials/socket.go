@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zhming0/dsh-sandbox/runner/service"
+	"github.com/zhming0/dsh-yawn/runner/service"
 )
 
 func Serve(path string, s *service.Service) (net.Listener, error) {

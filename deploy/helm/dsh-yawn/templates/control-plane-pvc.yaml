@@ -1,0 +1,23 @@
+{{- include "dsh-yawn.validate" . }}
+{{- if .Values.controlPlane.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "dsh-yawn.fullname" . }}-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-yawn.labels" . | nindent 4 }}
+  annotations:
+    # Everything durable — sessions, credentials, the seeded profile — lives
+    # on this volume. Keep it when the release is uninstalled; deleting the
+    # PVC deletes all of it.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.controlPlane.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.controlPlane.persistence.size }}
+{{- end }}

@@ -12,8 +12,8 @@ buildkite-agent cache restore --name pnpm
 pnpm install --frozen-lockfile
 buildkite-agent cache save --name pnpm
 
-echo "--- :package: Building the provider"
+echo "--- :package: Building the control plane"
 pnpm build
 
 echo "+++ :docker: Running the lifecycle smoke test"
-DSH_RUNNER_IMAGE="dsh-runner:dev" pnpm test:docker
+DSH_YAWN_RUNNER_IMAGE="dsh-yawn-runner:dev" pnpm test:docker

@@ -1,0 +1,12 @@
+# The sandbox pool mounts this ConfigMap. DSH_YAWN_CONTROL_PLANE_URL names the tunnel Service
+# below; both names are fixed because the pool's SandboxTemplate reads them,
+# and that manifest is shared by kustomize installs and this chart.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dsh-yawn-runner-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dsh-yawn.labels" . | nindent 4 }}
+data:
+  DSH_YAWN_CONTROL_PLANE_URL: {{ include "dsh-yawn.tunnelUrl" . | quote }}
