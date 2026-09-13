@@ -510,6 +510,7 @@ export class SandboxLifecycle {
       repositoryUrl: record.repositoryUrl,
       state: "checkpointed",
       checkpoint,
+      createdAt: record.createdAt,
       expiresAt: deadline.toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -579,6 +580,7 @@ export class SandboxLifecycle {
     const started = Date.now();
     const handle = await backend.provision({ sessionId, repositoryUrl });
     claimLatency.record(Date.now() - started, { backend: profile.backend });
+    const now = new Date().toISOString();
     return {
       sessionId,
       backend: backend.name,
@@ -587,7 +589,8 @@ export class SandboxLifecycle {
       reference: handle.reference,
       repositoryUrl,
       state: "running",
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
   }
 
@@ -616,6 +619,9 @@ export class SandboxLifecycle {
         sandboxId: handle.sandboxId,
         reference: handle.reference,
         state: "running",
+        // A wake returns the sandbox the session already had, so its start
+        // time is the one the record carried, not this moment.
+        createdAt: record.createdAt,
         updatedAt: new Date().toISOString(),
       };
       await this.deps.store.set(woken);

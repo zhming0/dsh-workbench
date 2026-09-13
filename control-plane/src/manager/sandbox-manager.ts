@@ -28,6 +28,7 @@ import type { InstructionSettingsView } from "../instructions-remote.js";
 import { ManagedInstructions } from "../managed-instructions.js";
 import { yawnHost } from "../remote-contributions.js";
 import type { RunnerClient } from "../runner-client.js";
+import type { SandboxStatusView } from "../sandbox-status-remote.js";
 import type { SessionProfileView } from "../session-profile-remote.js";
 import { SessionStore } from "../state-store.js";
 import { TunnelServer, type RunnerGateway } from "../tunnel.js";
@@ -45,6 +46,7 @@ import { RunnerAttachment } from "./runner-attachment.js";
 import { rootSessionId } from "./root-session.js";
 import { SandboxLifecycle } from "./sandbox-lifecycle.js";
 import { SandboxNotices } from "./sandbox-notices.js";
+import { SandboxStatus } from "./sandbox-status.js";
 
 const execute = promisify(execFile);
 
@@ -96,6 +98,8 @@ export class SandboxManager extends TypertRemoteService {
   private readonly profileChoice: ProfileChoice;
   private readonly fileIndexHooks: FileIndexHooks;
   private readonly notices: SandboxNotices;
+  private readonly attachment: RunnerAttachment;
+  private readonly status: SandboxStatus;
   private readonly ready: Promise<void>;
   private readonly gateway: RunnerGateway;
   private readonly agentLookup: (sessionId: string) => Agent | undefined;
@@ -157,6 +161,14 @@ export class SandboxManager extends TypertRemoteService {
       broker: this.broker,
       revision: this.config.revision,
       workspace: this.config.workspace,
+    });
+    this.attachment = attachment;
+    // The status read gets the store, the profile map, and a runner lookup —
+    // deliberately not the engine, so it cannot provision or wake.
+    this.status = new SandboxStatus({
+      store,
+      profiles: this.config.profiles,
+      runnerFor: (sessionId) => attachment.clientFor(sessionId),
     });
     const registry = new ProfileRegistry(
       this.config.profiles,
@@ -380,6 +392,15 @@ export class SandboxManager extends TypertRemoteService {
   ): Promise<SessionProfileView> {
     await this.ready;
     return this.profileChoice.set(sessionId, profile);
+  }
+
+  /**
+   * Facts for the session's Sandbox tab. Reading is inert: see SandboxStatus,
+   * which holds no lifecycle engine and so cannot provision or wake.
+   */
+  async getSandboxStatus(sessionId: string): Promise<SandboxStatusView> {
+    await this.ready;
+    return this.status.view(sessionId);
   }
 
   /**

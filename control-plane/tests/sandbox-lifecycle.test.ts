@@ -180,6 +180,7 @@ describe("sandbox lifecycle engine", () => {
       repositoryUrl: REPOSITORY,
       state: "hibernated",
       expiresAt: new Date(Date.now() - 1_000).toISOString(),
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 

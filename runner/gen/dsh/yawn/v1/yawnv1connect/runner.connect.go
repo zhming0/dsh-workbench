@@ -35,6 +35,9 @@ const (
 const (
 	// RunnerServiceHealthProcedure is the fully-qualified name of the RunnerService's Health RPC.
 	RunnerServiceHealthProcedure = "/dsh.yawn.v1.RunnerService/Health"
+	// RunnerServiceSandboxStatusProcedure is the fully-qualified name of the RunnerService's
+	// SandboxStatus RPC.
+	RunnerServiceSandboxStatusProcedure = "/dsh.yawn.v1.RunnerService/SandboxStatus"
 	// RunnerServiceExecProcedure is the fully-qualified name of the RunnerService's Exec RPC.
 	RunnerServiceExecProcedure = "/dsh.yawn.v1.RunnerService/Exec"
 	// RunnerServiceResolveExecutableProcedure is the fully-qualified name of the RunnerService's
@@ -71,6 +74,7 @@ const (
 // RunnerServiceClient is a client for the dsh.yawn.v1.RunnerService service.
 type RunnerServiceClient interface {
 	Health(context.Context, *connect.Request[v1.HealthRequest]) (*connect.Response[v1.HealthResponse], error)
+	SandboxStatus(context.Context, *connect.Request[v1.SandboxStatusRequest]) (*connect.Response[v1.SandboxStatusResponse], error)
 	Exec(context.Context, *connect.Request[v1.ExecRequest]) (*connect.ServerStreamForClient[v1.ExecResponse], error)
 	ResolveExecutable(context.Context, *connect.Request[v1.ResolveExecutableRequest]) (*connect.Response[v1.ResolveExecutableResponse], error)
 	ResolvePath(context.Context, *connect.Request[v1.ResolvePathRequest]) (*connect.Response[v1.ResolvePathResponse], error)
@@ -101,6 +105,12 @@ func NewRunnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+RunnerServiceHealthProcedure,
 			connect.WithSchema(runnerServiceMethods.ByName("Health")),
+			connect.WithClientOptions(opts...),
+		),
+		sandboxStatus: connect.NewClient[v1.SandboxStatusRequest, v1.SandboxStatusResponse](
+			httpClient,
+			baseURL+RunnerServiceSandboxStatusProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("SandboxStatus")),
 			connect.WithClientOptions(opts...),
 		),
 		exec: connect.NewClient[v1.ExecRequest, v1.ExecResponse](
@@ -187,6 +197,7 @@ func NewRunnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 // runnerServiceClient implements RunnerServiceClient.
 type runnerServiceClient struct {
 	health            *connect.Client[v1.HealthRequest, v1.HealthResponse]
+	sandboxStatus     *connect.Client[v1.SandboxStatusRequest, v1.SandboxStatusResponse]
 	exec              *connect.Client[v1.ExecRequest, v1.ExecResponse]
 	resolveExecutable *connect.Client[v1.ResolveExecutableRequest, v1.ResolveExecutableResponse]
 	resolvePath       *connect.Client[v1.ResolvePathRequest, v1.ResolvePathResponse]
@@ -205,6 +216,11 @@ type runnerServiceClient struct {
 // Health calls dsh.yawn.v1.RunnerService.Health.
 func (c *runnerServiceClient) Health(ctx context.Context, req *connect.Request[v1.HealthRequest]) (*connect.Response[v1.HealthResponse], error) {
 	return c.health.CallUnary(ctx, req)
+}
+
+// SandboxStatus calls dsh.yawn.v1.RunnerService.SandboxStatus.
+func (c *runnerServiceClient) SandboxStatus(ctx context.Context, req *connect.Request[v1.SandboxStatusRequest]) (*connect.Response[v1.SandboxStatusResponse], error) {
+	return c.sandboxStatus.CallUnary(ctx, req)
 }
 
 // Exec calls dsh.yawn.v1.RunnerService.Exec.
@@ -275,6 +291,7 @@ func (c *runnerServiceClient) Setup(ctx context.Context, req *connect.Request[v1
 // RunnerServiceHandler is an implementation of the dsh.yawn.v1.RunnerService service.
 type RunnerServiceHandler interface {
 	Health(context.Context, *connect.Request[v1.HealthRequest]) (*connect.Response[v1.HealthResponse], error)
+	SandboxStatus(context.Context, *connect.Request[v1.SandboxStatusRequest]) (*connect.Response[v1.SandboxStatusResponse], error)
 	Exec(context.Context, *connect.Request[v1.ExecRequest], *connect.ServerStream[v1.ExecResponse]) error
 	ResolveExecutable(context.Context, *connect.Request[v1.ResolveExecutableRequest]) (*connect.Response[v1.ResolveExecutableResponse], error)
 	ResolvePath(context.Context, *connect.Request[v1.ResolvePathRequest]) (*connect.Response[v1.ResolvePathResponse], error)
@@ -301,6 +318,12 @@ func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOp
 		RunnerServiceHealthProcedure,
 		svc.Health,
 		connect.WithSchema(runnerServiceMethods.ByName("Health")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runnerServiceSandboxStatusHandler := connect.NewUnaryHandler(
+		RunnerServiceSandboxStatusProcedure,
+		svc.SandboxStatus,
+		connect.WithSchema(runnerServiceMethods.ByName("SandboxStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runnerServiceExecHandler := connect.NewServerStreamHandler(
@@ -385,6 +408,8 @@ func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOp
 		switch r.URL.Path {
 		case RunnerServiceHealthProcedure:
 			runnerServiceHealthHandler.ServeHTTP(w, r)
+		case RunnerServiceSandboxStatusProcedure:
+			runnerServiceSandboxStatusHandler.ServeHTTP(w, r)
 		case RunnerServiceExecProcedure:
 			runnerServiceExecHandler.ServeHTTP(w, r)
 		case RunnerServiceResolveExecutableProcedure:
@@ -422,6 +447,10 @@ type UnimplementedRunnerServiceHandler struct{}
 
 func (UnimplementedRunnerServiceHandler) Health(context.Context, *connect.Request[v1.HealthRequest]) (*connect.Response[v1.HealthResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dsh.yawn.v1.RunnerService.Health is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) SandboxStatus(context.Context, *connect.Request[v1.SandboxStatusRequest]) (*connect.Response[v1.SandboxStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dsh.yawn.v1.RunnerService.SandboxStatus is not implemented"))
 }
 
 func (UnimplementedRunnerServiceHandler) Exec(context.Context, *connect.Request[v1.ExecRequest], *connect.ServerStream[v1.ExecResponse]) error {

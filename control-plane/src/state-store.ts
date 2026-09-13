@@ -91,9 +91,30 @@ function parseState(value: unknown): StateFile {
       : {};
   return {
     version: 1,
-    sessions: value.sessions as Record<string, SessionRecord>,
+    sessions: backfillStartTimes(
+      value.sessions as Record<string, SessionRecord>,
+    ),
     pendingProfiles,
   };
+}
+
+/**
+ * Records persisted before this package tracked a start time carry no
+ * `createdAt`. Leaving it absent would make every read of such a record lie by
+ * omission — the status view would drop the field, and the browser's contract
+ * rejects a view without it. `updatedAt` is the oldest timestamp the host has
+ * for a legacy record, so that is what it becomes. A wake or a checkpoint
+ * copies the field forward, so the backfill survives the next write.
+ */
+function backfillStartTimes(
+  sessions: Record<string, SessionRecord>,
+): Record<string, SessionRecord> {
+  for (const record of Object.values(sessions)) {
+    if (record.createdAt === undefined) {
+      record.createdAt = record.updatedAt;
+    }
+  }
+  return sessions;
 }
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {

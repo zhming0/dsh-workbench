@@ -102,6 +102,20 @@ The **Settings → Instructions** page manages AGENTS.md-style guidance at two
 scopes: one global layer and one layer for each repository Workspace. These
 layers live in host state rather than in repository checkouts.
 
+The conversation gains a third view beside **Chat** and **Trajectory**: a
+read-only **Sandbox** tab describing the session's environment. It reports the
+backend, profile, runner image, sandbox ID, lifecycle state, start time, and
+deletion deadline from the control plane's own record, plus what the machine
+says about itself — hostname, distribution, kernel, architecture, CPU, memory,
+uptime, and disk use for the workspace and the container filesystem. The
+lifecycle half is always available. The machine half needs a live runner, so it
+appears only while the sandbox is running with a runner attached.
+
+Reading the tab never provisions, wakes, or counts as activity, so a hibernated
+sandbox is described rather than started; that is the same rule the `@` file
+index follows. The tab refreshes faster while a turn runs, because a turn is
+when a sandbox is provisioned, woken, or replaced.
+
 The bundle also disables dsh's local shell permission presets and its file
 policy line. The remote shell uses one fixed container boundary and does not
 claim to enforce those per-command sandbox modes. The policy line would tell
@@ -517,4 +531,8 @@ see
   chunked transfer is not implemented.
 - Docker stop/start keeps the same container. Kubernetes suspension removes the
   pod and keeps its workspace volume.
+- The Sandbox tab reads memory and CPU from cgroup v2. A v1 host falls back to
+  the machine's totals, which overstates a container that is limited below
+  them. A session restored from a checkpoint reports the fresh sandbox's start
+  time, not the one it replaced.
 - There is no service exposure or portal support yet.

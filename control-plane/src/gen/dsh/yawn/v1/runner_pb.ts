@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file dsh/yawn/v1/runner.proto.
  */
 export const file_dsh_yawn_v1_runner: GenFile = /*@__PURE__*/
-  fileDesc("Chhkc2gveWF3bi92MS9ydW5uZXIucHJvdG8SC2RzaC55YXduLnYxIg8KDUhlYWx0aFJlcXVlc3QiPAoOSGVhbHRoUmVzcG9uc2USEgoKc2FuZGJveF9pZBgBIAEoCRIWCg5zZXR1cF9jb21wbGV0ZRgCIAEoCCKTAQoLRXhlY1JlcXVlc3QSDAoEYXJndhgBIAMoCRILCgNjd2QYAiABKAkSLgoDZW52GAMgAygLMiEuZHNoLnlhd24udjEuRXhlY1JlcXVlc3QuRW52RW50cnkSDQoFc3RkaW4YBCABKAwaKgoIRW52RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKTAQoMRXhlY1Jlc3BvbnNlEisKB3N0YXJ0ZWQYASABKAsyGC5kc2gueWF3bi52MS5FeGVjU3RhcnRlZEgAEhAKBnN0ZG91dBgCIAEoDEgAEhAKBnN0ZGVychgDIAEoDEgAEikKBmV4aXRlZBgEIAEoCzIXLmRzaC55YXduLnYxLkV4ZWNFeGl0ZWRIAEIHCgVldmVudCIaCgtFeGVjU3RhcnRlZBILCgNwaWQYASABKAMiLwoKRXhlY0V4aXRlZBIRCglleGl0X2NvZGUYASABKAUSDgoGc2lnbmFsGAIgASgJIpQBChhSZXNvbHZlRXhlY3V0YWJsZVJlcXVlc3QSDwoHY29tbWFuZBgBIAEoCRI7CgNlbnYYAiADKAsyLi5kc2gueWF3bi52MS5SZXNvbHZlRXhlY3V0YWJsZVJlcXVlc3QuRW52RW50cnkaKgoIRW52RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIpChlSZXNvbHZlRXhlY3V0YWJsZVJlc3BvbnNlEgwKBHBhdGgYASABKAkiLwoSUmVzb2x2ZVBhdGhSZXF1ZXN0EgwKBHBhdGgYASABKAkSCwoDY3dkGAIgASgJIkMKE1Jlc29sdmVQYXRoUmVzcG9uc2USFgoOY2Fub25pY2FsX3BhdGgYASABKAkSFAoMZGlzcGxheV9wYXRoGAIgASgJIjIKD1JlYWRGaWxlUmVxdWVzdBIMCgRwYXRoGAEgASgJEhEKCW1heF9ieXRlcxgCIAEoAyIjChBSZWFkRmlsZVJlc3BvbnNlEg8KB2NvbnRlbnQYASABKAwiRAoUUmVhZEZpbGVSYW5nZVJlcXVlc3QSDAoEcGF0aBgBIAEoCRIOCgZvZmZzZXQYAiABKAMSDgoGbGVuZ3RoGAMgASgDIigKFVJlYWRGaWxlUmFuZ2VSZXNwb25zZRIPCgdjb250ZW50GAEgASgMInIKEFdyaXRlRmlsZVJlcXVlc3QSDAoEcGF0aBgBIAEoCRIPCgdjb250ZW50GAIgASgMEhoKEGNyZWF0ZV9pZl9hYnNlbnQYAyABKAhIABIaChBleHBlY3RlZF92ZXJzaW9uGAQgASgJSABCBwoFZ3VhcmQiWQoRV3JpdGVGaWxlUmVzcG9uc2USDwoHY3JlYXRlZBgBIAEoCBISCgpoYWRfYmVmb3JlGAIgASgIEg4KBmJlZm9yZRgDIAEoDBIPCgd2ZXJzaW9uGAQgASgJInYKD0VkaXRGaWxlUmVxdWVzdBIMCgRwYXRoGAEgASgJEhIKCm9sZF9zdHJpbmcYAiABKAkSEgoKbmV3X3N0cmluZxgDIAEoCRITCgtyZXBsYWNlX2FsbBgEIAEoCBIYChBleHBlY3RlZF92ZXJzaW9uGAUgASgJIkIKEEVkaXRGaWxlUmVzcG9uc2USDgoGYmVmb3JlGAEgASgMEg0KBWFmdGVyGAIgASgMEg8KB3ZlcnNpb24YAyABKAkiNAoLU3RhdFJlcXVlc3QSDAoEcGF0aBgBIAEoCRIXCg9mb2xsb3dfc3ltbGlua3MYAiABKAgiYgoMU3RhdFJlc3BvbnNlEg4KBmV4aXN0cxgBIAEoCBIjCgR0eXBlGAIgASgOMhUuZHNoLnlhd24udjEuRmlsZVR5cGUSDAoEc2l6ZRgDIAEoAxIPCgd2ZXJzaW9uGAQgASgJIhsKC0xpc3RSZXF1ZXN0EgwKBHBhdGgYASABKAkidQoJTGlzdEVudHJ5EgwKBG5hbWUYASABKAkSFgoOY2Fub25pY2FsX3BhdGgYAiABKAkSIwoEdHlwZRgDIAEoDjIVLmRzaC55YXduLnYxLkZpbGVUeXBlEgwKBHNpemUYBCABKAMSDwoHdmVyc2lvbhgFIAEoCSI3CgxMaXN0UmVzcG9uc2USJwoHZW50cmllcxgBIAMoCzIWLmRzaC55YXduLnYxLkxpc3RFbnRyeSJOCgtUcmVlUmVxdWVzdBIMCgRwYXRoGAEgASgJEhwKFGV4Y2x1ZGVkX2RpcmVjdG9yaWVzGAIgAygJEhMKC21heF9lbnRyaWVzGAMgASgDIkcKCVRyZWVFbnRyeRIVCg1yZWxhdGl2ZV9wYXRoGAEgASgJEiMKBHR5cGUYAiABKA4yFS5kc2gueWF3bi52MS5GaWxlVHlwZSJKCgxUcmVlUmVzcG9uc2USJwoHZW50cmllcxgBIAMoCzIWLmRzaC55YXduLnYxLlRyZWVFbnRyeRIRCgl0cnVuY2F0ZWQYAiABKAgigQEKEVNldFNlY3JldHNSZXF1ZXN0EjwKB3NlY3JldHMYASADKAsyKy5kc2gueWF3bi52MS5TZXRTZWNyZXRzUmVxdWVzdC5TZWNyZXRzRW50cnkaLgoMU2VjcmV0c0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiFAoSU2V0U2VjcmV0c1Jlc3BvbnNlIkEKDUdpdENyZWRlbnRpYWwSDAoEaG9zdBgBIAEoCRIQCgh1c2VybmFtZRgCIAEoCRIQCghwYXNzd29yZBgDIAEoCSJLChhTZXRHaXRDcmVkZW50aWFsc1JlcXVlc3QSLwoLY3JlZGVudGlhbHMYASADKAsyGi5kc2gueWF3bi52MS5HaXRDcmVkZW50aWFsIhsKGVNldEdpdENyZWRlbnRpYWxzUmVzcG9uc2UiSwoMU2V0dXBSZXF1ZXN0EhYKDnJlcG9zaXRvcnlfdXJsGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEhEKCXdvcmtzcGFjZRgDIAEoCSIcCg1TZXR1cFJlc3BvbnNlEgsKA3JhbhgBIAEoCCqBAQoIRmlsZVR5cGUSGQoVRklMRV9UWVBFX1VOU1BFQ0lGSUVEEAASFQoRRklMRV9UWVBFX1JFR1VMQVIQARIXChNGSUxFX1RZUEVfRElSRUNUT1JZEAISFQoRRklMRV9UWVBFX1NZTUxJTksQAxITCg9GSUxFX1RZUEVfT1RIRVIQBDKnCAoNUnVubmVyU2VydmljZRJBCgZIZWFsdGgSGi5kc2gueWF3bi52MS5IZWFsdGhSZXF1ZXN0GhsuZHNoLnlhd24udjEuSGVhbHRoUmVzcG9uc2USPQoERXhlYxIYLmRzaC55YXduLnYxLkV4ZWNSZXF1ZXN0GhkuZHNoLnlhd24udjEuRXhlY1Jlc3BvbnNlMAESYgoRUmVzb2x2ZUV4ZWN1dGFibGUSJS5kc2gueWF3bi52MS5SZXNvbHZlRXhlY3V0YWJsZVJlcXVlc3QaJi5kc2gueWF3bi52MS5SZXNvbHZlRXhlY3V0YWJsZVJlc3BvbnNlElAKC1Jlc29sdmVQYXRoEh8uZHNoLnlhd24udjEuUmVzb2x2ZVBhdGhSZXF1ZXN0GiAuZHNoLnlhd24udjEuUmVzb2x2ZVBhdGhSZXNwb25zZRJHCghSZWFkRmlsZRIcLmRzaC55YXduLnYxLlJlYWRGaWxlUmVxdWVzdBodLmRzaC55YXduLnYxLlJlYWRGaWxlUmVzcG9uc2USVgoNUmVhZEZpbGVSYW5nZRIhLmRzaC55YXduLnYxLlJlYWRGaWxlUmFuZ2VSZXF1ZXN0GiIuZHNoLnlhd24udjEuUmVhZEZpbGVSYW5nZVJlc3BvbnNlEkoKCVdyaXRlRmlsZRIdLmRzaC55YXduLnYxLldyaXRlRmlsZVJlcXVlc3QaHi5kc2gueWF3bi52MS5Xcml0ZUZpbGVSZXNwb25zZRJHCghFZGl0RmlsZRIcLmRzaC55YXduLnYxLkVkaXRGaWxlUmVxdWVzdBodLmRzaC55YXduLnYxLkVkaXRGaWxlUmVzcG9uc2USOwoEU3RhdBIYLmRzaC55YXduLnYxLlN0YXRSZXF1ZXN0GhkuZHNoLnlhd24udjEuU3RhdFJlc3BvbnNlEjsKBExpc3QSGC5kc2gueWF3bi52MS5MaXN0UmVxdWVzdBoZLmRzaC55YXduLnYxLkxpc3RSZXNwb25zZRI7CgRUcmVlEhguZHNoLnlhd24udjEuVHJlZVJlcXVlc3QaGS5kc2gueWF3bi52MS5UcmVlUmVzcG9uc2USTQoKU2V0U2VjcmV0cxIeLmRzaC55YXduLnYxLlNldFNlY3JldHNSZXF1ZXN0Gh8uZHNoLnlhd24udjEuU2V0U2VjcmV0c1Jlc3BvbnNlEmIKEVNldEdpdENyZWRlbnRpYWxzEiUuZHNoLnlhd24udjEuU2V0R2l0Q3JlZGVudGlhbHNSZXF1ZXN0GiYuZHNoLnlhd24udjEuU2V0R2l0Q3JlZGVudGlhbHNSZXNwb25zZRI+CgVTZXR1cBIZLmRzaC55YXduLnYxLlNldHVwUmVxdWVzdBoaLmRzaC55YXduLnYxLlNldHVwUmVzcG9uc2VCO1o5Z2l0aHViLmNvbS96aG1pbmcwL2RzaC15YXduL3J1bm5lci9nZW4vZHNoL3lhd24vdjE7eWF3bnYxYgZwcm90bzM");
+  fileDesc("Chhkc2gveWF3bi92MS9ydW5uZXIucHJvdG8SC2RzaC55YXduLnYxIg8KDUhlYWx0aFJlcXVlc3QiPAoOSGVhbHRoUmVzcG9uc2USEgoKc2FuZGJveF9pZBgBIAEoCRIWCg5zZXR1cF9jb21wbGV0ZRgCIAEoCCIWChRTYW5kYm94U3RhdHVzUmVxdWVzdCLTAgoVU2FuZGJveFN0YXR1c1Jlc3BvbnNlEhIKCnNhbmRib3hfaWQYASABKAkSEAoIaG9zdG5hbWUYAiABKAkSDwoHb3NfbmFtZRgDIAEoCRIWCg5rZXJuZWxfdmVyc2lvbhgEIAEoCRIUCgxhcmNoaXRlY3R1cmUYBSABKAkSEQoJY3B1X2NvdW50GAYgASgFEhoKEm1lbW9yeV90b3RhbF9ieXRlcxgHIAEoAxIhChl3b3Jrc3BhY2VfZGlza191c2VkX2J5dGVzGAggASgDEiIKGndvcmtzcGFjZV9kaXNrX3RvdGFsX2J5dGVzGAkgASgDEiIKGmZpbGVzeXN0ZW1fZGlza191c2VkX2J5dGVzGAogASgDEiMKG2ZpbGVzeXN0ZW1fZGlza190b3RhbF9ieXRlcxgLIAEoAxIWCg51cHRpbWVfc2Vjb25kcxgMIAEoAyKTAQoLRXhlY1JlcXVlc3QSDAoEYXJndhgBIAMoCRILCgNjd2QYAiABKAkSLgoDZW52GAMgAygLMiEuZHNoLnlhd24udjEuRXhlY1JlcXVlc3QuRW52RW50cnkSDQoFc3RkaW4YBCABKAwaKgoIRW52RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKTAQoMRXhlY1Jlc3BvbnNlEisKB3N0YXJ0ZWQYASABKAsyGC5kc2gueWF3bi52MS5FeGVjU3RhcnRlZEgAEhAKBnN0ZG91dBgCIAEoDEgAEhAKBnN0ZGVychgDIAEoDEgAEikKBmV4aXRlZBgEIAEoCzIXLmRzaC55YXduLnYxLkV4ZWNFeGl0ZWRIAEIHCgVldmVudCIaCgtFeGVjU3RhcnRlZBILCgNwaWQYASABKAMiLwoKRXhlY0V4aXRlZBIRCglleGl0X2NvZGUYASABKAUSDgoGc2lnbmFsGAIgASgJIpQBChhSZXNvbHZlRXhlY3V0YWJsZVJlcXVlc3QSDwoHY29tbWFuZBgBIAEoCRI7CgNlbnYYAiADKAsyLi5kc2gueWF3bi52MS5SZXNvbHZlRXhlY3V0YWJsZVJlcXVlc3QuRW52RW50cnkaKgoIRW52RW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIpChlSZXNvbHZlRXhlY3V0YWJsZVJlc3BvbnNlEgwKBHBhdGgYASABKAkiLwoSUmVzb2x2ZVBhdGhSZXF1ZXN0EgwKBHBhdGgYASABKAkSCwoDY3dkGAIgASgJIkMKE1Jlc29sdmVQYXRoUmVzcG9uc2USFgoOY2Fub25pY2FsX3BhdGgYASABKAkSFAoMZGlzcGxheV9wYXRoGAIgASgJIjIKD1JlYWRGaWxlUmVxdWVzdBIMCgRwYXRoGAEgASgJEhEKCW1heF9ieXRlcxgCIAEoAyIjChBSZWFkRmlsZVJlc3BvbnNlEg8KB2NvbnRlbnQYASABKAwiRAoUUmVhZEZpbGVSYW5nZVJlcXVlc3QSDAoEcGF0aBgBIAEoCRIOCgZvZmZzZXQYAiABKAMSDgoGbGVuZ3RoGAMgASgDIigKFVJlYWRGaWxlUmFuZ2VSZXNwb25zZRIPCgdjb250ZW50GAEgASgMInIKEFdyaXRlRmlsZVJlcXVlc3QSDAoEcGF0aBgBIAEoCRIPCgdjb250ZW50GAIgASgMEhoKEGNyZWF0ZV9pZl9hYnNlbnQYAyABKAhIABIaChBleHBlY3RlZF92ZXJzaW9uGAQgASgJSABCBwoFZ3VhcmQiWQoRV3JpdGVGaWxlUmVzcG9uc2USDwoHY3JlYXRlZBgBIAEoCBISCgpoYWRfYmVmb3JlGAIgASgIEg4KBmJlZm9yZRgDIAEoDBIPCgd2ZXJzaW9uGAQgASgJInYKD0VkaXRGaWxlUmVxdWVzdBIMCgRwYXRoGAEgASgJEhIKCm9sZF9zdHJpbmcYAiABKAkSEgoKbmV3X3N0cmluZxgDIAEoCRITCgtyZXBsYWNlX2FsbBgEIAEoCBIYChBleHBlY3RlZF92ZXJzaW9uGAUgASgJIkIKEEVkaXRGaWxlUmVzcG9uc2USDgoGYmVmb3JlGAEgASgMEg0KBWFmdGVyGAIgASgMEg8KB3ZlcnNpb24YAyABKAkiNAoLU3RhdFJlcXVlc3QSDAoEcGF0aBgBIAEoCRIXCg9mb2xsb3dfc3ltbGlua3MYAiABKAgiYgoMU3RhdFJlc3BvbnNlEg4KBmV4aXN0cxgBIAEoCBIjCgR0eXBlGAIgASgOMhUuZHNoLnlhd24udjEuRmlsZVR5cGUSDAoEc2l6ZRgDIAEoAxIPCgd2ZXJzaW9uGAQgASgJIhsKC0xpc3RSZXF1ZXN0EgwKBHBhdGgYASABKAkidQoJTGlzdEVudHJ5EgwKBG5hbWUYASABKAkSFgoOY2Fub25pY2FsX3BhdGgYAiABKAkSIwoEdHlwZRgDIAEoDjIVLmRzaC55YXduLnYxLkZpbGVUeXBlEgwKBHNpemUYBCABKAMSDwoHdmVyc2lvbhgFIAEoCSI3CgxMaXN0UmVzcG9uc2USJwoHZW50cmllcxgBIAMoCzIWLmRzaC55YXduLnYxLkxpc3RFbnRyeSJOCgtUcmVlUmVxdWVzdBIMCgRwYXRoGAEgASgJEhwKFGV4Y2x1ZGVkX2RpcmVjdG9yaWVzGAIgAygJEhMKC21heF9lbnRyaWVzGAMgASgDIkcKCVRyZWVFbnRyeRIVCg1yZWxhdGl2ZV9wYXRoGAEgASgJEiMKBHR5cGUYAiABKA4yFS5kc2gueWF3bi52MS5GaWxlVHlwZSJKCgxUcmVlUmVzcG9uc2USJwoHZW50cmllcxgBIAMoCzIWLmRzaC55YXduLnYxLlRyZWVFbnRyeRIRCgl0cnVuY2F0ZWQYAiABKAgigQEKEVNldFNlY3JldHNSZXF1ZXN0EjwKB3NlY3JldHMYASADKAsyKy5kc2gueWF3bi52MS5TZXRTZWNyZXRzUmVxdWVzdC5TZWNyZXRzRW50cnkaLgoMU2VjcmV0c0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiFAoSU2V0U2VjcmV0c1Jlc3BvbnNlIkEKDUdpdENyZWRlbnRpYWwSDAoEaG9zdBgBIAEoCRIQCgh1c2VybmFtZRgCIAEoCRIQCghwYXNzd29yZBgDIAEoCSJLChhTZXRHaXRDcmVkZW50aWFsc1JlcXVlc3QSLwoLY3JlZGVudGlhbHMYASADKAsyGi5kc2gueWF3bi52MS5HaXRDcmVkZW50aWFsIhsKGVNldEdpdENyZWRlbnRpYWxzUmVzcG9uc2UiSwoMU2V0dXBSZXF1ZXN0EhYKDnJlcG9zaXRvcnlfdXJsGAEgASgJEhAKCHJldmlzaW9uGAIgASgJEhEKCXdvcmtzcGFjZRgDIAEoCSIcCg1TZXR1cFJlc3BvbnNlEgsKA3JhbhgBIAEoCCqBAQoIRmlsZVR5cGUSGQoVRklMRV9UWVBFX1VOU1BFQ0lGSUVEEAASFQoRRklMRV9UWVBFX1JFR1VMQVIQARIXChNGSUxFX1RZUEVfRElSRUNUT1JZEAISFQoRRklMRV9UWVBFX1NZTUxJTksQAxITCg9GSUxFX1RZUEVfT1RIRVIQBDL/CAoNUnVubmVyU2VydmljZRJBCgZIZWFsdGgSGi5kc2gueWF3bi52MS5IZWFsdGhSZXF1ZXN0GhsuZHNoLnlhd24udjEuSGVhbHRoUmVzcG9uc2USVgoNU2FuZGJveFN0YXR1cxIhLmRzaC55YXduLnYxLlNhbmRib3hTdGF0dXNSZXF1ZXN0GiIuZHNoLnlhd24udjEuU2FuZGJveFN0YXR1c1Jlc3BvbnNlEj0KBEV4ZWMSGC5kc2gueWF3bi52MS5FeGVjUmVxdWVzdBoZLmRzaC55YXduLnYxLkV4ZWNSZXNwb25zZTABEmIKEVJlc29sdmVFeGVjdXRhYmxlEiUuZHNoLnlhd24udjEuUmVzb2x2ZUV4ZWN1dGFibGVSZXF1ZXN0GiYuZHNoLnlhd24udjEuUmVzb2x2ZUV4ZWN1dGFibGVSZXNwb25zZRJQCgtSZXNvbHZlUGF0aBIfLmRzaC55YXduLnYxLlJlc29sdmVQYXRoUmVxdWVzdBogLmRzaC55YXduLnYxLlJlc29sdmVQYXRoUmVzcG9uc2USRwoIUmVhZEZpbGUSHC5kc2gueWF3bi52MS5SZWFkRmlsZVJlcXVlc3QaHS5kc2gueWF3bi52MS5SZWFkRmlsZVJlc3BvbnNlElYKDVJlYWRGaWxlUmFuZ2USIS5kc2gueWF3bi52MS5SZWFkRmlsZVJhbmdlUmVxdWVzdBoiLmRzaC55YXduLnYxLlJlYWRGaWxlUmFuZ2VSZXNwb25zZRJKCglXcml0ZUZpbGUSHS5kc2gueWF3bi52MS5Xcml0ZUZpbGVSZXF1ZXN0Gh4uZHNoLnlhd24udjEuV3JpdGVGaWxlUmVzcG9uc2USRwoIRWRpdEZpbGUSHC5kc2gueWF3bi52MS5FZGl0RmlsZVJlcXVlc3QaHS5kc2gueWF3bi52MS5FZGl0RmlsZVJlc3BvbnNlEjsKBFN0YXQSGC5kc2gueWF3bi52MS5TdGF0UmVxdWVzdBoZLmRzaC55YXduLnYxLlN0YXRSZXNwb25zZRI7CgRMaXN0EhguZHNoLnlhd24udjEuTGlzdFJlcXVlc3QaGS5kc2gueWF3bi52MS5MaXN0UmVzcG9uc2USOwoEVHJlZRIYLmRzaC55YXduLnYxLlRyZWVSZXF1ZXN0GhkuZHNoLnlhd24udjEuVHJlZVJlc3BvbnNlEk0KClNldFNlY3JldHMSHi5kc2gueWF3bi52MS5TZXRTZWNyZXRzUmVxdWVzdBofLmRzaC55YXduLnYxLlNldFNlY3JldHNSZXNwb25zZRJiChFTZXRHaXRDcmVkZW50aWFscxIlLmRzaC55YXduLnYxLlNldEdpdENyZWRlbnRpYWxzUmVxdWVzdBomLmRzaC55YXduLnYxLlNldEdpdENyZWRlbnRpYWxzUmVzcG9uc2USPgoFU2V0dXASGS5kc2gueWF3bi52MS5TZXR1cFJlcXVlc3QaGi5kc2gueWF3bi52MS5TZXR1cFJlc3BvbnNlQjtaOWdpdGh1Yi5jb20vemhtaW5nMC9kc2gteWF3bi9ydW5uZXIvZ2VuL2RzaC95YXduL3YxO3lhd252MWIGcHJvdG8z");
 
 /**
  * @generated from message dsh.yawn.v1.HealthRequest
@@ -48,6 +48,105 @@ export const HealthResponseSchema: GenMessage<HealthResponse> = /*@__PURE__*/
   messageDesc(file_dsh_yawn_v1_runner, 1);
 
 /**
+ * @generated from message dsh.yawn.v1.SandboxStatusRequest
+ */
+export type SandboxStatusRequest = Message<"dsh.yawn.v1.SandboxStatusRequest"> & {
+};
+
+/**
+ * Describes the message dsh.yawn.v1.SandboxStatusRequest.
+ * Use `create(SandboxStatusRequestSchema)` to create a new message.
+ */
+export const SandboxStatusRequestSchema: GenMessage<SandboxStatusRequest> = /*@__PURE__*/
+  messageDesc(file_dsh_yawn_v1_runner, 2);
+
+/**
+ * What the sandbox machine reports about itself for the session's Sandbox tab.
+ * Everything here is a fact only the machine can answer; the host contributes
+ * the sandbox lifecycle facts it owns around this response.
+ *
+ * @generated from message dsh.yawn.v1.SandboxStatusResponse
+ */
+export type SandboxStatusResponse = Message<"dsh.yawn.v1.SandboxStatusResponse"> & {
+  /**
+   * @generated from field: string sandbox_id = 1;
+   */
+  sandboxId: string;
+
+  /**
+   * @generated from field: string hostname = 2;
+   */
+  hostname: string;
+
+  /**
+   * @generated from field: string os_name = 3;
+   */
+  osName: string;
+
+  /**
+   * @generated from field: string kernel_version = 4;
+   */
+  kernelVersion: string;
+
+  /**
+   * @generated from field: string architecture = 5;
+   */
+  architecture: string;
+
+  /**
+   * @generated from field: int32 cpu_count = 6;
+   */
+  cpuCount: number;
+
+  /**
+   * Total memory the sandbox may use: the cgroup limit when one is set, the
+   * machine's total otherwise.
+   *
+   * @generated from field: int64 memory_total_bytes = 7;
+   */
+  memoryTotalBytes: bigint;
+
+  /**
+   * The repository checkout. Split out from the filesystem below because on
+   * Kubernetes this is the volume that survives a wake, so it answers "will my
+   * work still fit" rather than "how full is the container".
+   *
+   * @generated from field: int64 workspace_disk_used_bytes = 8;
+   */
+  workspaceDiskUsedBytes: bigint;
+
+  /**
+   * @generated from field: int64 workspace_disk_total_bytes = 9;
+   */
+  workspaceDiskTotalBytes: bigint;
+
+  /**
+   * @generated from field: int64 filesystem_disk_used_bytes = 10;
+   */
+  filesystemDiskUsedBytes: bigint;
+
+  /**
+   * @generated from field: int64 filesystem_disk_total_bytes = 11;
+   */
+  filesystemDiskTotalBytes: bigint;
+
+  /**
+   * Seconds since the runner process started, which is when the sandbox began
+   * serving this session.
+   *
+   * @generated from field: int64 uptime_seconds = 12;
+   */
+  uptimeSeconds: bigint;
+};
+
+/**
+ * Describes the message dsh.yawn.v1.SandboxStatusResponse.
+ * Use `create(SandboxStatusResponseSchema)` to create a new message.
+ */
+export const SandboxStatusResponseSchema: GenMessage<SandboxStatusResponse> = /*@__PURE__*/
+  messageDesc(file_dsh_yawn_v1_runner, 3);
+
+/**
  * @generated from message dsh.yawn.v1.ExecRequest
  */
 export type ExecRequest = Message<"dsh.yawn.v1.ExecRequest"> & {
@@ -77,7 +176,7 @@ export type ExecRequest = Message<"dsh.yawn.v1.ExecRequest"> & {
  * Use `create(ExecRequestSchema)` to create a new message.
  */
 export const ExecRequestSchema: GenMessage<ExecRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 2);
+  messageDesc(file_dsh_yawn_v1_runner, 4);
 
 /**
  * @generated from message dsh.yawn.v1.ExecResponse
@@ -118,7 +217,7 @@ export type ExecResponse = Message<"dsh.yawn.v1.ExecResponse"> & {
  * Use `create(ExecResponseSchema)` to create a new message.
  */
 export const ExecResponseSchema: GenMessage<ExecResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 3);
+  messageDesc(file_dsh_yawn_v1_runner, 5);
 
 /**
  * @generated from message dsh.yawn.v1.ExecStarted
@@ -135,7 +234,7 @@ export type ExecStarted = Message<"dsh.yawn.v1.ExecStarted"> & {
  * Use `create(ExecStartedSchema)` to create a new message.
  */
 export const ExecStartedSchema: GenMessage<ExecStarted> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 4);
+  messageDesc(file_dsh_yawn_v1_runner, 6);
 
 /**
  * @generated from message dsh.yawn.v1.ExecExited
@@ -157,7 +256,7 @@ export type ExecExited = Message<"dsh.yawn.v1.ExecExited"> & {
  * Use `create(ExecExitedSchema)` to create a new message.
  */
 export const ExecExitedSchema: GenMessage<ExecExited> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 5);
+  messageDesc(file_dsh_yawn_v1_runner, 7);
 
 /**
  * @generated from message dsh.yawn.v1.ResolveExecutableRequest
@@ -179,7 +278,7 @@ export type ResolveExecutableRequest = Message<"dsh.yawn.v1.ResolveExecutableReq
  * Use `create(ResolveExecutableRequestSchema)` to create a new message.
  */
 export const ResolveExecutableRequestSchema: GenMessage<ResolveExecutableRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 6);
+  messageDesc(file_dsh_yawn_v1_runner, 8);
 
 /**
  * @generated from message dsh.yawn.v1.ResolveExecutableResponse
@@ -196,7 +295,7 @@ export type ResolveExecutableResponse = Message<"dsh.yawn.v1.ResolveExecutableRe
  * Use `create(ResolveExecutableResponseSchema)` to create a new message.
  */
 export const ResolveExecutableResponseSchema: GenMessage<ResolveExecutableResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 7);
+  messageDesc(file_dsh_yawn_v1_runner, 9);
 
 /**
  * @generated from message dsh.yawn.v1.ResolvePathRequest
@@ -218,7 +317,7 @@ export type ResolvePathRequest = Message<"dsh.yawn.v1.ResolvePathRequest"> & {
  * Use `create(ResolvePathRequestSchema)` to create a new message.
  */
 export const ResolvePathRequestSchema: GenMessage<ResolvePathRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 8);
+  messageDesc(file_dsh_yawn_v1_runner, 10);
 
 /**
  * @generated from message dsh.yawn.v1.ResolvePathResponse
@@ -240,7 +339,7 @@ export type ResolvePathResponse = Message<"dsh.yawn.v1.ResolvePathResponse"> & {
  * Use `create(ResolvePathResponseSchema)` to create a new message.
  */
 export const ResolvePathResponseSchema: GenMessage<ResolvePathResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 9);
+  messageDesc(file_dsh_yawn_v1_runner, 11);
 
 /**
  * @generated from message dsh.yawn.v1.ReadFileRequest
@@ -262,7 +361,7 @@ export type ReadFileRequest = Message<"dsh.yawn.v1.ReadFileRequest"> & {
  * Use `create(ReadFileRequestSchema)` to create a new message.
  */
 export const ReadFileRequestSchema: GenMessage<ReadFileRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 10);
+  messageDesc(file_dsh_yawn_v1_runner, 12);
 
 /**
  * @generated from message dsh.yawn.v1.ReadFileResponse
@@ -279,7 +378,7 @@ export type ReadFileResponse = Message<"dsh.yawn.v1.ReadFileResponse"> & {
  * Use `create(ReadFileResponseSchema)` to create a new message.
  */
 export const ReadFileResponseSchema: GenMessage<ReadFileResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 11);
+  messageDesc(file_dsh_yawn_v1_runner, 13);
 
 /**
  * One byte window of a regular file. Unlike ReadFile, a file larger than the
@@ -311,7 +410,7 @@ export type ReadFileRangeRequest = Message<"dsh.yawn.v1.ReadFileRangeRequest"> &
  * Use `create(ReadFileRangeRequestSchema)` to create a new message.
  */
 export const ReadFileRangeRequestSchema: GenMessage<ReadFileRangeRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 12);
+  messageDesc(file_dsh_yawn_v1_runner, 14);
 
 /**
  * @generated from message dsh.yawn.v1.ReadFileRangeResponse
@@ -328,7 +427,7 @@ export type ReadFileRangeResponse = Message<"dsh.yawn.v1.ReadFileRangeResponse">
  * Use `create(ReadFileRangeResponseSchema)` to create a new message.
  */
 export const ReadFileRangeResponseSchema: GenMessage<ReadFileRangeResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 13);
+  messageDesc(file_dsh_yawn_v1_runner, 15);
 
 /**
  * @generated from message dsh.yawn.v1.WriteFileRequest
@@ -367,7 +466,7 @@ export type WriteFileRequest = Message<"dsh.yawn.v1.WriteFileRequest"> & {
  * Use `create(WriteFileRequestSchema)` to create a new message.
  */
 export const WriteFileRequestSchema: GenMessage<WriteFileRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 14);
+  messageDesc(file_dsh_yawn_v1_runner, 16);
 
 /**
  * @generated from message dsh.yawn.v1.WriteFileResponse
@@ -399,7 +498,7 @@ export type WriteFileResponse = Message<"dsh.yawn.v1.WriteFileResponse"> & {
  * Use `create(WriteFileResponseSchema)` to create a new message.
  */
 export const WriteFileResponseSchema: GenMessage<WriteFileResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 15);
+  messageDesc(file_dsh_yawn_v1_runner, 17);
 
 /**
  * @generated from message dsh.yawn.v1.EditFileRequest
@@ -436,7 +535,7 @@ export type EditFileRequest = Message<"dsh.yawn.v1.EditFileRequest"> & {
  * Use `create(EditFileRequestSchema)` to create a new message.
  */
 export const EditFileRequestSchema: GenMessage<EditFileRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 16);
+  messageDesc(file_dsh_yawn_v1_runner, 18);
 
 /**
  * @generated from message dsh.yawn.v1.EditFileResponse
@@ -463,7 +562,7 @@ export type EditFileResponse = Message<"dsh.yawn.v1.EditFileResponse"> & {
  * Use `create(EditFileResponseSchema)` to create a new message.
  */
 export const EditFileResponseSchema: GenMessage<EditFileResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 17);
+  messageDesc(file_dsh_yawn_v1_runner, 19);
 
 /**
  * @generated from message dsh.yawn.v1.StatRequest
@@ -485,7 +584,7 @@ export type StatRequest = Message<"dsh.yawn.v1.StatRequest"> & {
  * Use `create(StatRequestSchema)` to create a new message.
  */
 export const StatRequestSchema: GenMessage<StatRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 18);
+  messageDesc(file_dsh_yawn_v1_runner, 20);
 
 /**
  * @generated from message dsh.yawn.v1.StatResponse
@@ -517,7 +616,7 @@ export type StatResponse = Message<"dsh.yawn.v1.StatResponse"> & {
  * Use `create(StatResponseSchema)` to create a new message.
  */
 export const StatResponseSchema: GenMessage<StatResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 19);
+  messageDesc(file_dsh_yawn_v1_runner, 21);
 
 /**
  * @generated from message dsh.yawn.v1.ListRequest
@@ -534,7 +633,7 @@ export type ListRequest = Message<"dsh.yawn.v1.ListRequest"> & {
  * Use `create(ListRequestSchema)` to create a new message.
  */
 export const ListRequestSchema: GenMessage<ListRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 20);
+  messageDesc(file_dsh_yawn_v1_runner, 22);
 
 /**
  * @generated from message dsh.yawn.v1.ListEntry
@@ -571,7 +670,7 @@ export type ListEntry = Message<"dsh.yawn.v1.ListEntry"> & {
  * Use `create(ListEntrySchema)` to create a new message.
  */
 export const ListEntrySchema: GenMessage<ListEntry> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 21);
+  messageDesc(file_dsh_yawn_v1_runner, 23);
 
 /**
  * @generated from message dsh.yawn.v1.ListResponse
@@ -588,7 +687,7 @@ export type ListResponse = Message<"dsh.yawn.v1.ListResponse"> & {
  * Use `create(ListResponseSchema)` to create a new message.
  */
 export const ListResponseSchema: GenMessage<ListResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 22);
+  messageDesc(file_dsh_yawn_v1_runner, 24);
 
 /**
  * Recursive workspace listing for host-side file-reference discovery ("@"
@@ -624,7 +723,7 @@ export type TreeRequest = Message<"dsh.yawn.v1.TreeRequest"> & {
  * Use `create(TreeRequestSchema)` to create a new message.
  */
 export const TreeRequestSchema: GenMessage<TreeRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 23);
+  messageDesc(file_dsh_yawn_v1_runner, 25);
 
 /**
  * @generated from message dsh.yawn.v1.TreeEntry
@@ -648,7 +747,7 @@ export type TreeEntry = Message<"dsh.yawn.v1.TreeEntry"> & {
  * Use `create(TreeEntrySchema)` to create a new message.
  */
 export const TreeEntrySchema: GenMessage<TreeEntry> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 24);
+  messageDesc(file_dsh_yawn_v1_runner, 26);
 
 /**
  * @generated from message dsh.yawn.v1.TreeResponse
@@ -672,7 +771,7 @@ export type TreeResponse = Message<"dsh.yawn.v1.TreeResponse"> & {
  * Use `create(TreeResponseSchema)` to create a new message.
  */
 export const TreeResponseSchema: GenMessage<TreeResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 25);
+  messageDesc(file_dsh_yawn_v1_runner, 27);
 
 /**
  * @generated from message dsh.yawn.v1.SetSecretsRequest
@@ -689,7 +788,7 @@ export type SetSecretsRequest = Message<"dsh.yawn.v1.SetSecretsRequest"> & {
  * Use `create(SetSecretsRequestSchema)` to create a new message.
  */
 export const SetSecretsRequestSchema: GenMessage<SetSecretsRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 26);
+  messageDesc(file_dsh_yawn_v1_runner, 28);
 
 /**
  * @generated from message dsh.yawn.v1.SetSecretsResponse
@@ -702,7 +801,7 @@ export type SetSecretsResponse = Message<"dsh.yawn.v1.SetSecretsResponse"> & {
  * Use `create(SetSecretsResponseSchema)` to create a new message.
  */
 export const SetSecretsResponseSchema: GenMessage<SetSecretsResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 27);
+  messageDesc(file_dsh_yawn_v1_runner, 29);
 
 /**
  * @generated from message dsh.yawn.v1.GitCredential
@@ -729,7 +828,7 @@ export type GitCredential = Message<"dsh.yawn.v1.GitCredential"> & {
  * Use `create(GitCredentialSchema)` to create a new message.
  */
 export const GitCredentialSchema: GenMessage<GitCredential> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 28);
+  messageDesc(file_dsh_yawn_v1_runner, 30);
 
 /**
  * @generated from message dsh.yawn.v1.SetGitCredentialsRequest
@@ -746,7 +845,7 @@ export type SetGitCredentialsRequest = Message<"dsh.yawn.v1.SetGitCredentialsReq
  * Use `create(SetGitCredentialsRequestSchema)` to create a new message.
  */
 export const SetGitCredentialsRequestSchema: GenMessage<SetGitCredentialsRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 29);
+  messageDesc(file_dsh_yawn_v1_runner, 31);
 
 /**
  * @generated from message dsh.yawn.v1.SetGitCredentialsResponse
@@ -759,7 +858,7 @@ export type SetGitCredentialsResponse = Message<"dsh.yawn.v1.SetGitCredentialsRe
  * Use `create(SetGitCredentialsResponseSchema)` to create a new message.
  */
 export const SetGitCredentialsResponseSchema: GenMessage<SetGitCredentialsResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 30);
+  messageDesc(file_dsh_yawn_v1_runner, 32);
 
 /**
  * @generated from message dsh.yawn.v1.SetupRequest
@@ -786,7 +885,7 @@ export type SetupRequest = Message<"dsh.yawn.v1.SetupRequest"> & {
  * Use `create(SetupRequestSchema)` to create a new message.
  */
 export const SetupRequestSchema: GenMessage<SetupRequest> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 31);
+  messageDesc(file_dsh_yawn_v1_runner, 33);
 
 /**
  * @generated from message dsh.yawn.v1.SetupResponse
@@ -803,7 +902,7 @@ export type SetupResponse = Message<"dsh.yawn.v1.SetupResponse"> & {
  * Use `create(SetupResponseSchema)` to create a new message.
  */
 export const SetupResponseSchema: GenMessage<SetupResponse> = /*@__PURE__*/
-  messageDesc(file_dsh_yawn_v1_runner, 32);
+  messageDesc(file_dsh_yawn_v1_runner, 34);
 
 /**
  * @generated from enum dsh.yawn.v1.FileType
@@ -852,6 +951,14 @@ export const RunnerService: GenService<{
     methodKind: "unary";
     input: typeof HealthRequestSchema;
     output: typeof HealthResponseSchema;
+  },
+  /**
+   * @generated from rpc dsh.yawn.v1.RunnerService.SandboxStatus
+   */
+  sandboxStatus: {
+    methodKind: "unary";
+    input: typeof SandboxStatusRequestSchema;
+    output: typeof SandboxStatusResponseSchema;
   },
   /**
    * @generated from rpc dsh.yawn.v1.RunnerService.Exec

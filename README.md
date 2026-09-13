@@ -20,6 +20,7 @@
 * Repository-centric workspaces: paste a URL, the session clones it.
 * Credentials management in the Web UI: Secrets only reach a sandbox only when its commands run, .
 * AGENTS.md editing in the Web UI.
+* A Sandbox tab in every session showing what the environment is and how much disk it is using.
 
 ## Rationale
 

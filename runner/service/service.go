@@ -41,6 +41,7 @@ func init() {
 
 type Service struct {
 	sandboxID   string
+	startedAt   time.Time
 	mu          sync.RWMutex
 	secrets     map[string]string
 	credentials map[string]Credential
@@ -50,7 +51,7 @@ type Service struct {
 type Credential struct{ Username, Password string }
 
 func New(sandboxID string) *Service {
-	return &Service{sandboxID: sandboxID, secrets: map[string]string{}, credentials: map[string]Credential{}, locks: map[string]*sync.Mutex{}}
+	return &Service{sandboxID: sandboxID, startedAt: time.Now(), secrets: map[string]string{}, credentials: map[string]Credential{}, locks: map[string]*sync.Mutex{}}
 }
 
 func (s *Service) lock(path string) func() {

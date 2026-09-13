@@ -140,6 +140,7 @@ describe("session profile choice", () => {
       repositoryUrl: "https://github.com/example/public.git",
       state: "hibernated",
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
     // Same profile name, but the profile now points at a different backend.
@@ -152,6 +153,7 @@ describe("session profile choice", () => {
       repositoryUrl: "https://github.com/example/public.git",
       state: "hibernated",
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
     const backend = new FakeBackend();

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -29,10 +29,43 @@ describe("session state store", () => {
       reference: { id: "one" },
       repositoryUrl: "https://github.com/example/repo.git",
       state: "running",
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
     const reopened = new SessionStore(path);
     await reopened.initialize();
     expect(reopened.get("one")).toMatchObject({ sandboxId: "sandbox-one" });
+  });
+
+  it("gives a record written before createdAt existed one, from updatedAt", async () => {
+    const path = join(directory, "sessions.json");
+    await writeFile(
+      path,
+      `${JSON.stringify(
+        {
+          version: 1,
+          sessions: {
+            legacy: {
+              sessionId: "legacy",
+              backend: "docker",
+              profile: "standard",
+              sandboxId: "sandbox-legacy",
+              reference: { id: "legacy" },
+              repositoryUrl: "https://github.com/example/repo.git",
+              state: "hibernated",
+              expiresAt: "2026-08-08T00:00:00.000Z",
+              updatedAt: "2026-08-01T00:00:00.000Z",
+            },
+          },
+          pendingProfiles: {},
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const store = new SessionStore(path);
+    await store.initialize();
+    expect(store.get("legacy")?.createdAt).toBe("2026-08-01T00:00:00.000Z");
   });
 });
