@@ -63,6 +63,7 @@ control plane over `kubectl port-forward` and open `/launch-token`.
 | `oidc.image` | `quay.io/oauth2-proxy/oauth2-proxy:v7.15.4` | Proxy image |
 | `oidc.existingSecret` | `dsh-yawn-oidc` | Secret with the proxy's OIDC and cookie configuration |
 | `oidc.emailDomains` | `*` | `OAUTH2_PROXY_EMAIL_DOMAINS` — restrict before trusting an issuer's whole user base |
+| `oidc.upstreamTimeout` | `900s` | `OAUTH2_PROXY_UPSTREAM_TIMEOUT` — a slow `/api` command such as `/compact` sends no response bytes until it finishes, so the proxy's 30-second default would cut it |
 | `oidc.extraEnv` | `[]` | Extra env vars for the proxy, appended after the fixed ones |
 | `service.type` | `ClusterIP` | Exposure type for the proxy Service |
 | `service.port` | `80` | Service port in front of the proxy's 4180 |

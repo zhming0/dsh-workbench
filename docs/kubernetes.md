@@ -344,6 +344,32 @@ explicitly trusted — its defense against DNS rebinding. The proxy passes the
 browser's Host through, so the external hostname is handed to dsh as
 `--trusted-host`. If you change the hostname, change it there too.
 
+**Time to first byte.** A single-shot `/api` command is silent on the wire
+until it finishes: dsh writes the response headers only when `/compact` (or
+another blocking command) resolves, and file discovery on a cold workspace is
+the same shape. Every hop in front has to allow that, not just long-lived
+WebSockets:
+
+- **ingress-nginx**: the `proxy-read-timeout` above is the limit (default
+  60 seconds).
+- **Envoy-based gateways** (Envoy Gateway, Istio, a Gateway API `HTTPRoute`):
+  the request timeout defaults to **15 seconds**. Set
+  `timeouts.request: "900s"`, or another value covering your slowest command.
+- **oauth2-proxy**: its upstream timeout defaults to 30 seconds and is the
+  last hop before dsh. The chart sets `OAUTH2_PROXY_UPSTREAM_TIMEOUT` (the
+  `oidc.upstreamTimeout` value, default 900s); a proxy you run yourself needs
+  `--upstream-timeout` raised to match.
+
+Fifteen minutes is a safety net, not a work budget: the provider adapters
+abort a stream that goes silent for 300 seconds, and a manual compaction is a
+direct one-shot `llm.stream()` call that gets no retry, so a compaction still
+running at that point is making progress. When one of the proxy timeouts does
+fire it closes the request, and dsh reports the caller cancellation rather
+than the proxy's error. So a session log shows `command/done` with text like
+`This operation was aborted` and `compaction/end` with error `DeepSeek request
+aborted by caller`: a front door cutting a slow request, not a compaction
+failure.
+
 Behind the proxy, dsh still asks each browser for its own launch token, the one
 it prints at startup. The patch sets `DSH_YAWN_CONTROL_PLANE_LAUNCH_TOKEN_ROUTE=1` on the dsh
 container, which mounts a `/launch-token` route that redirects the browser to

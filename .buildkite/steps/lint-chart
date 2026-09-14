@@ -30,6 +30,12 @@ for expected in "type: LoadBalancer" "foo: bar" "OAUTH2_PROXY_INSECURE_OIDC_ALLO
   grep -q "$expected" /tmp/chart-proxy.yaml \
     || { echo "proxy render lost: $expected" >&2; exit 1; }
 done
+# dsh writes no response bytes until a slow /api call finishes, so the proxy
+# has to outwait them instead of cutting them at its 30-second default.
+grep -q "name: OAUTH2_PROXY_UPSTREAM_TIMEOUT" /tmp/chart-proxy.yaml \
+  || { echo "proxy render lost the upstream timeout" >&2; exit 1; }
+grep -q 'value: "900s"' /tmp/chart-proxy.yaml \
+  || { echo "proxy render lost the upstream timeout value" >&2; exit 1; }
 # controlPlane.extraEnv is how a boot-time credential (the Buildkite API token)
 # reaches the process from a Secret, so the block has to render where dsh
 # reads it.

@@ -98,6 +98,14 @@ oidc:
   # or use authenticated-emails-file, before trusting the issuer's whole user
   # base with your control plane.
   emailDomains: "*"
+  # How long the proxy waits for dsh to begin a response (Go duration). dsh
+  # writes no response headers until a single-shot /api call finishes, so a
+  # long `/compact` summary is silent for minutes and the proxy's 30-second
+  # default would cut it, surfacing as a caller cancellation. The provider
+  # adapters already abort a stream that goes silent for 300 seconds, so this
+  # is a safety net above a working call, not a work budget; raise it for
+  # providers slower than that.
+  upstreamTimeout: 900s
   # Extra environment variables for the proxy, appended after the fixed ones.
   # For an identity provider that needs a non-default flag, for example:
   #   - name: OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL

@@ -163,6 +163,12 @@ spec:
               value: {{ .Values.oidc.emailDomains | quote }}
             - name: OAUTH2_PROXY_COOKIE_SECURE
               value: "true"
+            # dsh writes no response headers until a long /api call finishes
+            # (a `/compact` summary), so the proxy's 30-second default would
+            # cut those calls and surface them as a caller cancellation. See
+            # docs/kubernetes.md, "Time to first byte".
+            - name: OAUTH2_PROXY_UPSTREAM_TIMEOUT
+              value: {{ .Values.oidc.upstreamTimeout | quote }}
             {{- with .Values.oidc.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

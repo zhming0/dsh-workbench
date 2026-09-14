@@ -57,8 +57,10 @@ is all a Kubernetes runner needs from you.
 
 The Service is a ClusterIP anchor by default. Set `service.type=LoadBalancer`
 or point your own Ingress or Gateway API route at it; whatever fronts dsh must
-serve https and pass WebSockets and large RPC bodies.
-[`kubernetes.md`](kubernetes.md) has the nginx-ingress values.
+serve https, pass WebSockets and large RPC bodies, and allow a slow first byte
+on long single-shot `/api` calls such as `/compact`.
+[`kubernetes.md`](kubernetes.md) has the nginx-ingress values and the timeout
+each kind of proxy needs.
 
 Without `oidc.enabled`, reach the control plane over `kubectl port-forward` and open
 `/launch-token`; NOTES.txt prints the command.
