@@ -13,12 +13,13 @@ spec:
     ingress: []
     egress:
       # The runner-initiated WebSocket tunnel to the control plane; all RPCs
-      # flow over it.
+      # flow over it. A peer with a podSelector and no namespaceSelector means
+      # the NetworkPolicy's own namespace, which is the namespace the overlay
+      # puts the pool in — the control plane's. Naming the namespace here would
+      # not follow the overlay's `namespace:` and would need a patch in every
+      # install that is not in `dsh-yawn`.
       - to:
-          - namespaceSelector:
-              matchLabels:
-                kubernetes.io/metadata.name: dsh-yawn
-            podSelector:
+          - podSelector:
               matchLabels:
                 app.kubernetes.io/name: dsh-yawn-control-plane
         ports:
