@@ -78,8 +78,16 @@ pod from another version fails when it dials the tunnel.
 The base is a `SandboxTemplate` describing the pod a sandbox runs, a
 `SandboxWarmPool` keeping some warm, and nothing else. Apart from the runner
 tag, it is static: the template reads `DSH_YAWN_CONTROL_PLANE_URL` and
-`DSH_YAWN_REGISTRATION_TOKEN` from what the control plane wrote, so there is
-nothing else to keep in sync. Vary it with the usual overlay fields:
+`DSH_YAWN_REGISTRATION_TOKEN` from what the control plane wrote, and its
+tunnel egress rule selects the control-plane pod in the pool's own namespace,
+so the `namespace:` above is the only place a namespace appears.
+
+## Configure the pool
+
+An overlay varies the pool with JSON patches. **Address a list as a whole,
+never by index.** Kubernetes sees a custom resource's list as one value, so an
+index is only a position in the base revision you vendored; a release that
+reorders an entry moves it.
 
 ```yaml
 patches:
@@ -88,7 +96,39 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 4
+  - target: { kind: SandboxTemplate, name: dsh-yawn-universal }
+    patch: |-
+      # Replacing the whole list restates every part you keep, `accessModes`
+      # included.
+      - op: replace
+        path: /spec/volumeClaimTemplates
+        value:
+          - metadata:
+              name: workspace
+            spec:
+              accessModes: [ReadWriteOnce]
+              storageClassName: rook-ceph-block
+              resources:
+                requests:
+                  storage: 5Gi
+      # Pod resources: one ceiling the kubelet splits across the containers.
+      - op: add
+        path: /spec/podTemplate/spec/resources
+        value:
+          requests: {cpu: 200m, memory: 512Mi}
+          limits: {cpu: "4", memory: 6Gi}
 ```
+
+Egress is a list as well: `/spec/networkPolicy/egress/-` appends a rule, and
+replacing `/spec/networkPolicy/egress` as a whole changes the existing ones.
+The checked-in list is the tunnel to the control plane (TCP 8081), DNS to
+kube-dns (TCP/UDP 53), and HTTPS (443); narrow the 443 rule in production.
+`podTemplate.spec.volumes`, which carries the Docker data mount's `emptyDir`
+sizeLimit, takes the same whole-list patch.
+
+An overlay that patched the tunnel rule's `namespaceSelector` (a path like
+`/spec/networkPolicy/egress/0/to/0/namespaceSelector/...`) must delete that op
+when it bumps `?ref=`: the path is gone, and the render fails until then.
 
 ## Point the control plane at the pool
 

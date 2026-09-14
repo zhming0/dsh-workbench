@@ -464,11 +464,14 @@ reachability, not trust.
 The template asks the extension controller to manage a default-deny
 NetworkPolicy. Ingress is empty. The egress allow-list contains the tunnel to
 the dsh-yawn-control-plane pod (TCP 8081), DNS to kube-dns (TCP/UDP 53), and HTTPS (TCP 443).
+The tunnel peer is a `podSelector` with no `namespaceSelector`, so it selects
+that pod in the pool's own namespace and follows an overlay's `namespace:`.
 Everything else is denied by a conforming NetworkPolicy CNI. The broad 443 rule
 also permits cluster and private addresses on 443, potentially including the
 API server; production deployments should replace it with approved CIDRs or an
-FQDN-aware CNI policy and adapt DNS labels for their DNS provider. NetworkPolicy
-is connectivity control, not a sandbox boundary.
+FQDN-aware CNI policy and adapt DNS labels for their DNS provider.
+[`installations-kas.md`](installations-kas.md#configure-the-pool) has the patch
+recipes. NetworkPolicy is connectivity control, not a sandbox boundary.
 
 The pod does not mount a service-account token and runs non-root. The runner
 container has dropped capabilities and RuntimeDefault seccomp; the `docker`

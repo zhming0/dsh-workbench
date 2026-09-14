@@ -25,6 +25,11 @@
 #           path: /spec/replicas
 #           value: 4
 #
+# That one namespace also covers the tunnel egress rule, which selects the
+# control-plane pod in the pool's own namespace. Vary storage or pod resources
+# with a whole-list or map patch, never a list index:
+# docs/installations-kas.md#configure-the-pool has the recipes.
+#
 # The base names the runner image without a tag: the image is the same artifact
 # for every release, and which version a cluster runs belongs to whoever
 # installed the control plane. The overlay pins it, and the chart's appVersion

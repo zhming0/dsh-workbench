@@ -119,6 +119,19 @@ for expected in "name: DSH_YAWN_CONTROL_PLANE_URL" "key: DSH_YAWN_CONTROL_PLANE_
     || { echo "sandbox pool no longer reads: $expected" >&2; exit 1; }
 done
 
+# The tunnel egress rule selects the control-plane pod in the NetworkPolicy's
+# own namespace. A namespaceSelector here would name one install's namespace,
+# which the namespace transformer cannot rewrite, so every overlay outside
+# `dsh-yawn` would have to patch the rule by list index. kube-system stays: DNS
+# is cluster-wide.
+grep -q "app.kubernetes.io/name: dsh-yawn-control-plane" /tmp/kustomize-runner.yaml \
+  || { echo "sandbox pool no longer selects the control-plane pod" >&2; exit 1; }
+grep -q "kubernetes.io/metadata.name: kube-system" /tmp/kustomize-runner.yaml \
+  || { echo "sandbox pool lost its kube-dns egress rule" >&2; exit 1; }
+if grep -qE "kubernetes.io/metadata.name: dsh-yawn$" /tmp/kustomize-runner.yaml; then
+  echo "sandbox pool pins the tunnel egress rule to the dsh-yawn namespace" >&2; exit 1
+fi
+
 # The pool has to land in the control plane's namespace, so the base refuses to
 # pick one: it carries a placeholder no cluster has, and an overlay's namespace
 # has to replace it. Without both halves, a control plane installed outside dsh-yawn
@@ -127,7 +140,8 @@ grep -q "namespace: dsh-set-your-namespace" /tmp/kustomize-runner.yaml \
   || { echo "sandbox pool no longer requires an explicit namespace" >&2; exit 1; }
 ns_overlay="$(mktemp -d "$PWD/.dsh-lint-namespace.XXXXXX")"
 pin_overlay="$(mktemp -d "$PWD/.dsh-lint-pin.XXXXXX")"
-trap 'rm -rf "$ns_overlay" "$pin_overlay"' EXIT
+config_overlay="$(mktemp -d "$PWD/.dsh-lint-config.XXXXXX")"
+trap 'rm -rf "$ns_overlay" "$pin_overlay" "$config_overlay"' EXIT
 cat >"$ns_overlay/kustomization.yaml" <<'EOF'
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -164,6 +178,57 @@ EOF
 kubectl kustomize "$pin_overlay" >/tmp/kustomize-runner-pin.yaml
 grep -q "image: ghcr.io/zhming0/dsh-yawn-runner:v9.9.9-test" /tmp/kustomize-runner-pin.yaml \
   || { echo "an overlay cannot pin the runner image" >&2; exit 1; }
+
+# An operator varies the pool without naming a list index: the workspace claim
+# is replaced as a whole, pod resources are a map, and one egress rule is
+# appended. This renders the recipes docs/installations-kas.md documents, so a
+# re-vendor that moves or renames a list entry fails here instead of in an
+# operator's overlay.
+cat >"$config_overlay/kustomization.yaml" <<'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: operator-ns
+resources:
+  - ../deploy/kubernetes/runner
+images:
+  - name: ghcr.io/zhming0/dsh-yawn-runner
+    newTag: v9.9.9-test
+patches:
+  - target: { kind: SandboxWarmPool, name: dsh-yawn-universal }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 4
+  - target: { kind: SandboxTemplate, name: dsh-yawn-universal }
+    patch: |-
+      - op: replace
+        path: /spec/volumeClaimTemplates
+        value:
+          - metadata:
+              name: workspace
+            spec:
+              accessModes: [ReadWriteOnce]
+              storageClassName: rook-ceph-block
+              resources:
+                requests:
+                  storage: 5Gi
+      - op: add
+        path: /spec/podTemplate/spec/resources
+        value:
+          requests: {cpu: 200m, memory: 512Mi}
+          limits: {cpu: "4", memory: 6Gi}
+      - op: add
+        path: /spec/networkPolicy/egress/-
+        value:
+          to: [{ipBlock: {cidr: 10.0.0.0/8}}]
+          ports: [{protocol: TCP, port: 8443}]
+EOF
+kubectl kustomize "$config_overlay" >/tmp/kustomize-runner-config.yaml
+for expected in "replicas: 4" "storageClassName: rook-ceph-block" "storage: 5Gi" \
+  "mountPath: /workspace" "memory: 6Gi" "cidr: 10.0.0.0/8"; do
+  grep -q "$expected" /tmp/kustomize-runner-config.yaml \
+    || { echo "operator configurability lost: $expected" >&2; exit 1; }
+done
 
 # The chart must render everything the pool reads, and the control plane's API
 # access must cover the claims and sandboxes it operates.
