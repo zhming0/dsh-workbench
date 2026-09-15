@@ -44,7 +44,7 @@ export interface BuildkiteBackendOptions {
   /** How long a build may sit in the queue before its job starts. */
   readyTimeoutMs: number;
   /** API token with read_builds and write_builds on the pipeline. */
-  token: string;
+  token: () => Promise<string>;
 }
 
 /**
@@ -203,10 +203,13 @@ export class BuildkiteBackend implements SandboxBackend {
     body?: unknown,
   ): Promise<T> {
     const url = `${API_URL}/organizations/${encodeURIComponent(this.options.organization)}/pipelines/${encodeURIComponent(this.options.pipeline)}${path}`;
+    // Resolved per request, so a token entered in the Web UI reaches the next
+    // call without rebuilding the backend.
+    const token = await this.options.token();
     const response = await this.fetchImpl(url, {
       method,
       headers: {
-        authorization: `Bearer ${this.options.token}`,
+        authorization: `Bearer ${token}`,
         accept: "application/json",
         ...(body === undefined ? {} : { "content-type": "application/json" }),
       },

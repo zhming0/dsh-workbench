@@ -140,8 +140,9 @@ likely to mislead you.
   registration token, which lives in the `dsh-yawn-registration-token` Secret
   because warm pods must hold it before any session exists (it only lets a
   runner register a tunnel, and grants nothing else), and a Buildkite API
-  token, which the control plane reads from its own environment at boot
-  because it can create and cancel builds.
+  token, which the control plane resolves for its own Buildkite calls from the
+  process environment or the host credential document (write-only from the
+  Sandboxes page) because it can create and cancel builds.
 - The Kubernetes backend uses cluster-owned templates and warm pools. The
   operator publishes them as named sandbox profiles; a session picks a profile,
   never pod privileges or an arbitrary template.

@@ -99,17 +99,20 @@ gets a replacement build under the same profile.
 | `controlPlaneUrl`        | required              | Tunnel endpoint the runner dials, `wss://host/tunnel` or `ws://host:port/tunnel` |
 | `image`          | matching release tag  | Runner image the job runs, sent to the build as `DSH_YAWN_RUNNER_IMAGE`       |
 | `readyTimeoutMs` | `600000`              | How long a build may sit `scheduled` before the control plane cancels it      |
-| `tokenEnv`       | `BUILDKITE_API_TOKEN` | Environment variable on the control plane that holds the API token                |
 
-The control plane process must have, at boot:
+The control plane needs an [API access token](https://buildkite.com/docs/apis/managing-api-tokens)
+for the organization with the `read_builds` and `write_builds` scopes: enter it
+on **Settings → Sandboxes** when you create the profile, which stores it
+write-only in the host credential document, or set `BUILDKITE_API_TOKEN` on the
+control plane. It is resolved per Buildkite request, so a changed token reaches
+the next call without a restart, and a profile whose token resolves nowhere
+does not stop the host: its sessions fail at the first prompt with the setting
+to fix. The token stays in the control plane process; it is never sent to a
+build or a runner.
 
-- the API token in `tokenEnv`, an [API access token](https://buildkite.com/docs/apis/managing-api-tokens)
-  for the organization with the `read_builds` and `write_builds` scopes. The
-  control plane refuses to start a Buildkite profile without it. The token stays in
-  the control plane process; it is never sent to a build or a runner.
-- the registration token, in `registrationToken` or
-  `DSH_YAWN_REGISTRATION_TOKEN`. The backend does not generate one because
-  the pipeline must hold the same value.
+The control plane also needs the registration token, in `registrationToken` or
+`DSH_YAWN_REGISTRATION_TOKEN`. The backend does not generate one because the
+pipeline must hold the same value.
 
 `controlPlaneUrl` must be reachable from Buildkite agents, which are never on the control plane
 machine. The tunnel is a WebSocket on the control plane's plaintext tunnel port, so

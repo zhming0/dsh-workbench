@@ -11,7 +11,6 @@ import type { SandboxProfile } from "./types.js";
 // Queue wait is the unknown here: a hosted queue dispatches in seconds, a
 // self-hosted one may be busy.
 export const DEFAULT_BUILDKITE_READY_TIMEOUT_MS = 10 * 60_000;
-export const DEFAULT_BUILDKITE_TOKEN_ENV = "BUILDKITE_API_TOKEN";
 
 /** A profile as written in the settings file: a backend plus its settings. */
 export type ProfileConfig =
@@ -35,7 +34,6 @@ export type ProfileConfig =
       controlPlaneUrl: string;
       image?: string;
       readyTimeoutMs?: number;
-      tokenEnv?: string;
     };
 
 export interface Config {
@@ -78,10 +76,34 @@ export interface ResolvedConfig {
 }
 
 /**
- * The schema cordis validates the row config against. Every default here must
- * stay in sync with resolveConfig, which applies the same defaults at runtime.
+ * The settings that can change while the host runs: sandbox profiles and the
+ * idle and expiry timers. Everything else in {@link Config} shapes the boot
+ * (state directories, the tunnel listener, the registration token) and is
+ * read once.
  */
-export const configSchema: Schemastery<Config> = z.object({
+export type RuntimeConfig = Pick<
+  Config,
+  "profiles" | "defaultProfile" | "idleMs" | "expiresAfterMs"
+>;
+
+/** {@link ResolvedConfig} minus the boot-only fields. */
+export interface ResolvedRuntime {
+  profiles: Record<string, SandboxProfile>;
+  /**
+   * Undefined when no profile is configured. Provisioning then fails with a
+   * message naming the missing settings instead of the host failing to boot.
+   */
+  defaultProfile: string | undefined;
+  idleMs: number;
+  expiresAfterMs: number;
+}
+
+/**
+ * The fields of the runtime slice, built fresh for each schema so the row
+ * schema and the settings namespace schema can never share a schema instance
+ * or disagree about a default.
+ */
+const runtimeFields = () => ({
   profiles: z
     .dict(
       z.union([
@@ -108,16 +130,11 @@ export const configSchema: Schemastery<Config> = z.object({
             .number()
             .min(1)
             .default(DEFAULT_BUILDKITE_READY_TIMEOUT_MS),
-          tokenEnv: z.string().default(DEFAULT_BUILDKITE_TOKEN_ENV),
         }),
       ]),
     )
     .default({}),
   defaultProfile: z.string(),
-  stateDir: z.string(),
-  repository: z.string(),
-  revision: z.string().default(""),
-  workspace: z.string().default("/workspace/repository"),
   idleMs: z
     .number()
     .min(1)
@@ -126,6 +143,27 @@ export const configSchema: Schemastery<Config> = z.object({
     .number()
     .min(1)
     .default(7 * 24 * 60 * 60_000),
+});
+
+/**
+ * The schema of the `sandbox-manager` settings namespace: the slice of this
+ * row's config that the settings document and the Web Sandboxes page can
+ * override at runtime, layered over this row's config as the composition
+ * base.
+ */
+export const runtimeSettingsSchema: Schemastery<RuntimeConfig> =
+  z.object(runtimeFields());
+
+/**
+ * The schema cordis validates the row config against. Every default here must
+ * stay in sync with resolveConfig, which applies the same defaults at runtime.
+ */
+export const configSchema: Schemastery<Config> = z.object({
+  ...runtimeFields(),
+  stateDir: z.string(),
+  repository: z.string(),
+  revision: z.string().default(""),
+  workspace: z.string().default("/workspace/repository"),
   registrationToken: z.string(),
   tunnel: z.object({
     port: z.natural().min(1).max(65_535).default(8081),
@@ -134,13 +172,14 @@ export const configSchema: Schemastery<Config> = z.object({
 });
 
 /**
- * Apply every default and check the settings hold together. A configuration
- * with no profiles is valid: the host comes up without a backend, and the
- * first prompt explains what to add.
+ * Apply every default and check the runtime slice holds together. A
+ * configuration with no profiles is valid: the host comes up without a
+ * backend, and the first prompt explains what to add.
  */
-export function resolveConfig(config: Config): ResolvedConfig {
-  const stateDir = config.stateDir ?? join(homedir(), ".dsh-yawn");
-  const tunnelPort = config.tunnel?.port ?? 8081;
+export function resolveRuntime(
+  config: RuntimeConfig,
+  tunnelPort: number,
+): ResolvedRuntime {
   const profiles = Object.fromEntries(
     Object.entries(config.profiles ?? {}).map(([name, profile]) => [
       name,
@@ -160,24 +199,11 @@ export function resolveConfig(config: Config): ResolvedConfig {
       `defaultProfile ${defaultProfile} is not a configured profile`,
     );
   }
-  const resolved: ResolvedConfig = {
+  const resolved: ResolvedRuntime = {
     profiles,
     defaultProfile,
-    stateDir,
-    ...(config.repository === undefined
-      ? {}
-      : { repository: config.repository }),
-    revision: config.revision ?? "",
-    workspace: config.workspace ?? "/workspace/repository",
     idleMs: config.idleMs ?? 10 * 60_000,
     expiresAfterMs: config.expiresAfterMs ?? 7 * 24 * 60 * 60_000,
-    ...(config.registrationToken === undefined
-      ? {}
-      : { registrationToken: config.registrationToken }),
-    tunnel: {
-      port: tunnelPort,
-      bind: config.tunnel?.bind ?? "0.0.0.0",
-    },
   };
   for (const [name, value] of [
     ["idleMs", resolved.idleMs],
@@ -187,6 +213,33 @@ export function resolveConfig(config: Config): ResolvedConfig {
       throw new Error(`${name} must be positive`);
     }
   }
+  return resolved;
+}
+
+/**
+ * Apply every default and check the settings hold together. A configuration
+ * with no profiles is valid: the host comes up without a backend, and the
+ * first prompt explains what to add.
+ */
+export function resolveConfig(config: Config): ResolvedConfig {
+  const stateDir = config.stateDir ?? join(homedir(), ".dsh-yawn");
+  const tunnelPort = config.tunnel?.port ?? 8081;
+  const resolved: ResolvedConfig = {
+    ...resolveRuntime(config, tunnelPort),
+    stateDir,
+    ...(config.repository === undefined
+      ? {}
+      : { repository: config.repository }),
+    revision: config.revision ?? "",
+    workspace: config.workspace ?? "/workspace/repository",
+    ...(config.registrationToken === undefined
+      ? {}
+      : { registrationToken: config.registrationToken }),
+    tunnel: {
+      port: tunnelPort,
+      bind: config.tunnel?.bind ?? "0.0.0.0",
+    },
+  };
   if (!resolved.workspace.startsWith("/")) {
     throw new Error("workspace must be an absolute Linux path");
   }
@@ -223,7 +276,6 @@ function resolveProfile(
       controlPlaneUrl: checkControlPlaneUrl(name, profile.controlPlaneUrl),
       readyTimeoutMs:
         profile.readyTimeoutMs ?? DEFAULT_BUILDKITE_READY_TIMEOUT_MS,
-      tokenEnv: profile.tokenEnv ?? DEFAULT_BUILDKITE_TOKEN_ENV,
     };
   }
   return {

@@ -1,16 +1,17 @@
 import type { SessionProfileView } from "../session-profile-remote.js";
 import type { SessionStore } from "../state-store.js";
 import type { SandboxProfile } from "../types.js";
+import type { RuntimeSettings } from "./runtime-settings.js";
 
 /**
  * The profile a session runs under: what the composer chip shows before the
  * first prompt, what a session without a sandbox is provisioned with, and the
- * lock that stops the choice once a sandbox exists.
+ * lock that stops the choice once a sandbox exists. Reads the live settings
+ * holder, so a profile added at runtime appears without a restart.
  */
 export class ProfileChoice {
   constructor(
-    private readonly profiles: Record<string, SandboxProfile>,
-    private readonly defaultProfile: string | undefined,
+    private readonly settings: RuntimeSettings,
     private readonly store: SessionStore,
   ) {}
 
@@ -18,10 +19,9 @@ export class ProfileChoice {
   view(sessionId: string): SessionProfileView {
     const record = this.store.get(sessionId);
     return {
-      profiles: Object.values(this.profiles).map(({ name, backend }) => ({
-        name,
-        backend,
-      })),
+      profiles: Object.values(this.settings.profiles).map(
+        ({ name, backend }) => ({ name, backend }),
+      ),
       // A read for the UI never throws: with no profiles configured the chip
       // hides itself (it needs two choices), so the empty name is not shown.
       selected: record?.profile ?? this.pendingName(sessionId) ?? "",
@@ -31,7 +31,7 @@ export class ProfileChoice {
 
   /** Pick a profile for a session that has no sandbox yet; answer the view. */
   async set(sessionId: string, profile: string): Promise<SessionProfileView> {
-    if (this.profiles[profile] === undefined) {
+    if (this.settings.profiles[profile] === undefined) {
       throw new Error(`unknown sandbox profile: ${profile}`);
     }
     if (this.store.get(sessionId) !== undefined) {
@@ -49,7 +49,7 @@ export class ProfileChoice {
         "no sandbox profile is configured; add one to the sandbox-manager settings",
       );
     }
-    const profile = this.profiles[name];
+    const profile = this.settings.profiles[name];
     if (profile === undefined) {
       throw new Error(
         `sandbox profile ${name} is no longer configured; pick another profile`,
@@ -60,6 +60,6 @@ export class ProfileChoice {
 
   /** The profile name a new sandbox would try to use, if any. */
   private pendingName(sessionId: string): string | undefined {
-    return this.store.pendingProfile(sessionId) ?? this.defaultProfile;
+    return this.store.pendingProfile(sessionId) ?? this.settings.defaultProfile;
   }
 }

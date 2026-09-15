@@ -42,8 +42,6 @@ export interface BuildkiteProfile {
   /** The tunnel endpoint runners dial; Buildkite agents are never local. */
   controlPlaneUrl: string;
   readyTimeoutMs: number;
-  /** Host environment variable holding the API token. */
-  tokenEnv: string;
 }
 
 /**
