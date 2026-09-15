@@ -6,6 +6,7 @@ option go_package = "github.com/zhming0/dsh-yawn/runner/gen/dsh/yawn/v1;yawnv1";
 
 service RunnerService {
   rpc Health(HealthRequest) returns (HealthResponse);
+  rpc SandboxStatus(SandboxStatusRequest) returns (SandboxStatusResponse);
   rpc Exec(ExecRequest) returns (stream ExecResponse);
   rpc ResolveExecutable(ResolveExecutableRequest) returns (ResolveExecutableResponse);
   rpc ResolvePath(ResolvePathRequest) returns (ResolvePathResponse);
@@ -26,6 +27,33 @@ message HealthRequest {}
 message HealthResponse {
   string sandbox_id = 1;
   bool setup_complete = 2;
+}
+
+message SandboxStatusRequest {}
+
+// What the sandbox machine reports about itself for the session's Sandbox tab.
+// Everything here is a fact only the machine can answer; the host contributes
+// the sandbox lifecycle facts it owns around this response.
+message SandboxStatusResponse {
+  string sandbox_id = 1;
+  string hostname = 2;
+  string os_name = 3;
+  string kernel_version = 4;
+  string architecture = 5;
+  int32 cpu_count = 6;
+  // Total memory the sandbox may use: the cgroup limit when one is set, the
+  // machine's total otherwise.
+  int64 memory_total_bytes = 7;
+  // The repository checkout. Split out from the filesystem below because on
+  // Kubernetes this is the volume that survives a wake, so it answers "will my
+  // work still fit" rather than "how full is the container".
+  int64 workspace_disk_used_bytes = 8;
+  int64 workspace_disk_total_bytes = 9;
+  int64 filesystem_disk_used_bytes = 10;
+  int64 filesystem_disk_total_bytes = 11;
+  // Seconds since the runner process started, which is when the sandbox began
+  // serving this session.
+  int64 uptime_seconds = 12;
 }
 
 message ExecRequest {

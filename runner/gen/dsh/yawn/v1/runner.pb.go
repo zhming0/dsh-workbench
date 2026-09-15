@@ -164,6 +164,184 @@ func (x *HealthResponse) GetSetupComplete() bool {
 	return false
 }
 
+type SandboxStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SandboxStatusRequest) Reset() {
+	*x = SandboxStatusRequest{}
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SandboxStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SandboxStatusRequest) ProtoMessage() {}
+
+func (x *SandboxStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SandboxStatusRequest.ProtoReflect.Descriptor instead.
+func (*SandboxStatusRequest) Descriptor() ([]byte, []int) {
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{2}
+}
+
+// What the sandbox machine reports about itself for the session's Sandbox tab.
+// Everything here is a fact only the machine can answer; the host contributes
+// the sandbox lifecycle facts it owns around this response.
+type SandboxStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SandboxId     string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	Hostname      string                 `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
+	OsName        string                 `protobuf:"bytes,3,opt,name=os_name,json=osName,proto3" json:"os_name,omitempty"`
+	KernelVersion string                 `protobuf:"bytes,4,opt,name=kernel_version,json=kernelVersion,proto3" json:"kernel_version,omitempty"`
+	Architecture  string                 `protobuf:"bytes,5,opt,name=architecture,proto3" json:"architecture,omitempty"`
+	CpuCount      int32                  `protobuf:"varint,6,opt,name=cpu_count,json=cpuCount,proto3" json:"cpu_count,omitempty"`
+	// Total memory the sandbox may use: the cgroup limit when one is set, the
+	// machine's total otherwise.
+	MemoryTotalBytes int64 `protobuf:"varint,7,opt,name=memory_total_bytes,json=memoryTotalBytes,proto3" json:"memory_total_bytes,omitempty"`
+	// The repository checkout. Split out from the filesystem below because on
+	// Kubernetes this is the volume that survives a wake, so it answers "will my
+	// work still fit" rather than "how full is the container".
+	WorkspaceDiskUsedBytes   int64 `protobuf:"varint,8,opt,name=workspace_disk_used_bytes,json=workspaceDiskUsedBytes,proto3" json:"workspace_disk_used_bytes,omitempty"`
+	WorkspaceDiskTotalBytes  int64 `protobuf:"varint,9,opt,name=workspace_disk_total_bytes,json=workspaceDiskTotalBytes,proto3" json:"workspace_disk_total_bytes,omitempty"`
+	FilesystemDiskUsedBytes  int64 `protobuf:"varint,10,opt,name=filesystem_disk_used_bytes,json=filesystemDiskUsedBytes,proto3" json:"filesystem_disk_used_bytes,omitempty"`
+	FilesystemDiskTotalBytes int64 `protobuf:"varint,11,opt,name=filesystem_disk_total_bytes,json=filesystemDiskTotalBytes,proto3" json:"filesystem_disk_total_bytes,omitempty"`
+	// Seconds since the runner process started, which is when the sandbox began
+	// serving this session.
+	UptimeSeconds int64 `protobuf:"varint,12,opt,name=uptime_seconds,json=uptimeSeconds,proto3" json:"uptime_seconds,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SandboxStatusResponse) Reset() {
+	*x = SandboxStatusResponse{}
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SandboxStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SandboxStatusResponse) ProtoMessage() {}
+
+func (x *SandboxStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SandboxStatusResponse.ProtoReflect.Descriptor instead.
+func (*SandboxStatusResponse) Descriptor() ([]byte, []int) {
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SandboxStatusResponse) GetSandboxId() string {
+	if x != nil {
+		return x.SandboxId
+	}
+	return ""
+}
+
+func (x *SandboxStatusResponse) GetHostname() string {
+	if x != nil {
+		return x.Hostname
+	}
+	return ""
+}
+
+func (x *SandboxStatusResponse) GetOsName() string {
+	if x != nil {
+		return x.OsName
+	}
+	return ""
+}
+
+func (x *SandboxStatusResponse) GetKernelVersion() string {
+	if x != nil {
+		return x.KernelVersion
+	}
+	return ""
+}
+
+func (x *SandboxStatusResponse) GetArchitecture() string {
+	if x != nil {
+		return x.Architecture
+	}
+	return ""
+}
+
+func (x *SandboxStatusResponse) GetCpuCount() int32 {
+	if x != nil {
+		return x.CpuCount
+	}
+	return 0
+}
+
+func (x *SandboxStatusResponse) GetMemoryTotalBytes() int64 {
+	if x != nil {
+		return x.MemoryTotalBytes
+	}
+	return 0
+}
+
+func (x *SandboxStatusResponse) GetWorkspaceDiskUsedBytes() int64 {
+	if x != nil {
+		return x.WorkspaceDiskUsedBytes
+	}
+	return 0
+}
+
+func (x *SandboxStatusResponse) GetWorkspaceDiskTotalBytes() int64 {
+	if x != nil {
+		return x.WorkspaceDiskTotalBytes
+	}
+	return 0
+}
+
+func (x *SandboxStatusResponse) GetFilesystemDiskUsedBytes() int64 {
+	if x != nil {
+		return x.FilesystemDiskUsedBytes
+	}
+	return 0
+}
+
+func (x *SandboxStatusResponse) GetFilesystemDiskTotalBytes() int64 {
+	if x != nil {
+		return x.FilesystemDiskTotalBytes
+	}
+	return 0
+}
+
+func (x *SandboxStatusResponse) GetUptimeSeconds() int64 {
+	if x != nil {
+		return x.UptimeSeconds
+	}
+	return 0
+}
+
 type ExecRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Argv          []string               `protobuf:"bytes,1,rep,name=argv,proto3" json:"argv,omitempty"`
@@ -176,7 +354,7 @@ type ExecRequest struct {
 
 func (x *ExecRequest) Reset() {
 	*x = ExecRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[2]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -188,7 +366,7 @@ func (x *ExecRequest) String() string {
 func (*ExecRequest) ProtoMessage() {}
 
 func (x *ExecRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[2]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -201,7 +379,7 @@ func (x *ExecRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecRequest.ProtoReflect.Descriptor instead.
 func (*ExecRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{2}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ExecRequest) GetArgv() []string {
@@ -247,7 +425,7 @@ type ExecResponse struct {
 
 func (x *ExecResponse) Reset() {
 	*x = ExecResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[3]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -259,7 +437,7 @@ func (x *ExecResponse) String() string {
 func (*ExecResponse) ProtoMessage() {}
 
 func (x *ExecResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[3]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -272,7 +450,7 @@ func (x *ExecResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecResponse.ProtoReflect.Descriptor instead.
 func (*ExecResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{3}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ExecResponse) GetEvent() isExecResponse_Event {
@@ -355,7 +533,7 @@ type ExecStarted struct {
 
 func (x *ExecStarted) Reset() {
 	*x = ExecStarted{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[4]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -367,7 +545,7 @@ func (x *ExecStarted) String() string {
 func (*ExecStarted) ProtoMessage() {}
 
 func (x *ExecStarted) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[4]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -380,7 +558,7 @@ func (x *ExecStarted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecStarted.ProtoReflect.Descriptor instead.
 func (*ExecStarted) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{4}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ExecStarted) GetPid() int64 {
@@ -400,7 +578,7 @@ type ExecExited struct {
 
 func (x *ExecExited) Reset() {
 	*x = ExecExited{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[5]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -412,7 +590,7 @@ func (x *ExecExited) String() string {
 func (*ExecExited) ProtoMessage() {}
 
 func (x *ExecExited) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[5]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -425,7 +603,7 @@ func (x *ExecExited) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecExited.ProtoReflect.Descriptor instead.
 func (*ExecExited) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{5}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ExecExited) GetExitCode() int32 {
@@ -452,7 +630,7 @@ type ResolveExecutableRequest struct {
 
 func (x *ResolveExecutableRequest) Reset() {
 	*x = ResolveExecutableRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[6]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -464,7 +642,7 @@ func (x *ResolveExecutableRequest) String() string {
 func (*ResolveExecutableRequest) ProtoMessage() {}
 
 func (x *ResolveExecutableRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[6]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -477,7 +655,7 @@ func (x *ResolveExecutableRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveExecutableRequest.ProtoReflect.Descriptor instead.
 func (*ResolveExecutableRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{6}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ResolveExecutableRequest) GetCommand() string {
@@ -503,7 +681,7 @@ type ResolveExecutableResponse struct {
 
 func (x *ResolveExecutableResponse) Reset() {
 	*x = ResolveExecutableResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[7]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -515,7 +693,7 @@ func (x *ResolveExecutableResponse) String() string {
 func (*ResolveExecutableResponse) ProtoMessage() {}
 
 func (x *ResolveExecutableResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[7]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -528,7 +706,7 @@ func (x *ResolveExecutableResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveExecutableResponse.ProtoReflect.Descriptor instead.
 func (*ResolveExecutableResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{7}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ResolveExecutableResponse) GetPath() string {
@@ -548,7 +726,7 @@ type ResolvePathRequest struct {
 
 func (x *ResolvePathRequest) Reset() {
 	*x = ResolvePathRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[8]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -560,7 +738,7 @@ func (x *ResolvePathRequest) String() string {
 func (*ResolvePathRequest) ProtoMessage() {}
 
 func (x *ResolvePathRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[8]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -573,7 +751,7 @@ func (x *ResolvePathRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolvePathRequest.ProtoReflect.Descriptor instead.
 func (*ResolvePathRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{8}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ResolvePathRequest) GetPath() string {
@@ -600,7 +778,7 @@ type ResolvePathResponse struct {
 
 func (x *ResolvePathResponse) Reset() {
 	*x = ResolvePathResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[9]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -612,7 +790,7 @@ func (x *ResolvePathResponse) String() string {
 func (*ResolvePathResponse) ProtoMessage() {}
 
 func (x *ResolvePathResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[9]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -625,7 +803,7 @@ func (x *ResolvePathResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolvePathResponse.ProtoReflect.Descriptor instead.
 func (*ResolvePathResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{9}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ResolvePathResponse) GetCanonicalPath() string {
@@ -652,7 +830,7 @@ type ReadFileRequest struct {
 
 func (x *ReadFileRequest) Reset() {
 	*x = ReadFileRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[10]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -664,7 +842,7 @@ func (x *ReadFileRequest) String() string {
 func (*ReadFileRequest) ProtoMessage() {}
 
 func (x *ReadFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[10]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -677,7 +855,7 @@ func (x *ReadFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadFileRequest.ProtoReflect.Descriptor instead.
 func (*ReadFileRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{10}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ReadFileRequest) GetPath() string {
@@ -703,7 +881,7 @@ type ReadFileResponse struct {
 
 func (x *ReadFileResponse) Reset() {
 	*x = ReadFileResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[11]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -715,7 +893,7 @@ func (x *ReadFileResponse) String() string {
 func (*ReadFileResponse) ProtoMessage() {}
 
 func (x *ReadFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[11]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -728,7 +906,7 @@ func (x *ReadFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadFileResponse.ProtoReflect.Descriptor instead.
 func (*ReadFileResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{11}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ReadFileResponse) GetContent() []byte {
@@ -753,7 +931,7 @@ type ReadFileRangeRequest struct {
 
 func (x *ReadFileRangeRequest) Reset() {
 	*x = ReadFileRangeRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[12]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -765,7 +943,7 @@ func (x *ReadFileRangeRequest) String() string {
 func (*ReadFileRangeRequest) ProtoMessage() {}
 
 func (x *ReadFileRangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[12]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -778,7 +956,7 @@ func (x *ReadFileRangeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadFileRangeRequest.ProtoReflect.Descriptor instead.
 func (*ReadFileRangeRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{12}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ReadFileRangeRequest) GetPath() string {
@@ -811,7 +989,7 @@ type ReadFileRangeResponse struct {
 
 func (x *ReadFileRangeResponse) Reset() {
 	*x = ReadFileRangeResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[13]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -823,7 +1001,7 @@ func (x *ReadFileRangeResponse) String() string {
 func (*ReadFileRangeResponse) ProtoMessage() {}
 
 func (x *ReadFileRangeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[13]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -836,7 +1014,7 @@ func (x *ReadFileRangeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadFileRangeResponse.ProtoReflect.Descriptor instead.
 func (*ReadFileRangeResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{13}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ReadFileRangeResponse) GetContent() []byte {
@@ -861,7 +1039,7 @@ type WriteFileRequest struct {
 
 func (x *WriteFileRequest) Reset() {
 	*x = WriteFileRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[14]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -873,7 +1051,7 @@ func (x *WriteFileRequest) String() string {
 func (*WriteFileRequest) ProtoMessage() {}
 
 func (x *WriteFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[14]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -886,7 +1064,7 @@ func (x *WriteFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteFileRequest.ProtoReflect.Descriptor instead.
 func (*WriteFileRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{14}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *WriteFileRequest) GetPath() string {
@@ -956,7 +1134,7 @@ type WriteFileResponse struct {
 
 func (x *WriteFileResponse) Reset() {
 	*x = WriteFileResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[15]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -968,7 +1146,7 @@ func (x *WriteFileResponse) String() string {
 func (*WriteFileResponse) ProtoMessage() {}
 
 func (x *WriteFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[15]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -981,7 +1159,7 @@ func (x *WriteFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteFileResponse.ProtoReflect.Descriptor instead.
 func (*WriteFileResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{15}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *WriteFileResponse) GetCreated() bool {
@@ -1025,7 +1203,7 @@ type EditFileRequest struct {
 
 func (x *EditFileRequest) Reset() {
 	*x = EditFileRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[16]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1037,7 +1215,7 @@ func (x *EditFileRequest) String() string {
 func (*EditFileRequest) ProtoMessage() {}
 
 func (x *EditFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[16]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1050,7 +1228,7 @@ func (x *EditFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditFileRequest.ProtoReflect.Descriptor instead.
 func (*EditFileRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{16}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *EditFileRequest) GetPath() string {
@@ -1099,7 +1277,7 @@ type EditFileResponse struct {
 
 func (x *EditFileResponse) Reset() {
 	*x = EditFileResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[17]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1111,7 +1289,7 @@ func (x *EditFileResponse) String() string {
 func (*EditFileResponse) ProtoMessage() {}
 
 func (x *EditFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[17]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1124,7 +1302,7 @@ func (x *EditFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditFileResponse.ProtoReflect.Descriptor instead.
 func (*EditFileResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{17}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *EditFileResponse) GetBefore() []byte {
@@ -1158,7 +1336,7 @@ type StatRequest struct {
 
 func (x *StatRequest) Reset() {
 	*x = StatRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[18]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1170,7 +1348,7 @@ func (x *StatRequest) String() string {
 func (*StatRequest) ProtoMessage() {}
 
 func (x *StatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[18]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1183,7 +1361,7 @@ func (x *StatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatRequest.ProtoReflect.Descriptor instead.
 func (*StatRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{18}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *StatRequest) GetPath() string {
@@ -1212,7 +1390,7 @@ type StatResponse struct {
 
 func (x *StatResponse) Reset() {
 	*x = StatResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[19]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1224,7 +1402,7 @@ func (x *StatResponse) String() string {
 func (*StatResponse) ProtoMessage() {}
 
 func (x *StatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[19]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1237,7 +1415,7 @@ func (x *StatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatResponse.ProtoReflect.Descriptor instead.
 func (*StatResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{19}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *StatResponse) GetExists() bool {
@@ -1277,7 +1455,7 @@ type ListRequest struct {
 
 func (x *ListRequest) Reset() {
 	*x = ListRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[20]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1289,7 +1467,7 @@ func (x *ListRequest) String() string {
 func (*ListRequest) ProtoMessage() {}
 
 func (x *ListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[20]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1302,7 +1480,7 @@ func (x *ListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRequest.ProtoReflect.Descriptor instead.
 func (*ListRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{20}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ListRequest) GetPath() string {
@@ -1325,7 +1503,7 @@ type ListEntry struct {
 
 func (x *ListEntry) Reset() {
 	*x = ListEntry{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[21]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1337,7 +1515,7 @@ func (x *ListEntry) String() string {
 func (*ListEntry) ProtoMessage() {}
 
 func (x *ListEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[21]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1350,7 +1528,7 @@ func (x *ListEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEntry.ProtoReflect.Descriptor instead.
 func (*ListEntry) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{21}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ListEntry) GetName() string {
@@ -1397,7 +1575,7 @@ type ListResponse struct {
 
 func (x *ListResponse) Reset() {
 	*x = ListResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[22]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1409,7 +1587,7 @@ func (x *ListResponse) String() string {
 func (*ListResponse) ProtoMessage() {}
 
 func (x *ListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[22]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1422,7 +1600,7 @@ func (x *ListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListResponse.ProtoReflect.Descriptor instead.
 func (*ListResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{22}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ListResponse) GetEntries() []*ListEntry {
@@ -1448,7 +1626,7 @@ type TreeRequest struct {
 
 func (x *TreeRequest) Reset() {
 	*x = TreeRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[23]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1460,7 +1638,7 @@ func (x *TreeRequest) String() string {
 func (*TreeRequest) ProtoMessage() {}
 
 func (x *TreeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[23]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1473,7 +1651,7 @@ func (x *TreeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TreeRequest.ProtoReflect.Descriptor instead.
 func (*TreeRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{23}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *TreeRequest) GetPath() string {
@@ -1508,7 +1686,7 @@ type TreeEntry struct {
 
 func (x *TreeEntry) Reset() {
 	*x = TreeEntry{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[24]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1520,7 +1698,7 @@ func (x *TreeEntry) String() string {
 func (*TreeEntry) ProtoMessage() {}
 
 func (x *TreeEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[24]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1533,7 +1711,7 @@ func (x *TreeEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TreeEntry.ProtoReflect.Descriptor instead.
 func (*TreeEntry) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{24}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *TreeEntry) GetRelativePath() string {
@@ -1561,7 +1739,7 @@ type TreeResponse struct {
 
 func (x *TreeResponse) Reset() {
 	*x = TreeResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[25]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1573,7 +1751,7 @@ func (x *TreeResponse) String() string {
 func (*TreeResponse) ProtoMessage() {}
 
 func (x *TreeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[25]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1586,7 +1764,7 @@ func (x *TreeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TreeResponse.ProtoReflect.Descriptor instead.
 func (*TreeResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{25}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *TreeResponse) GetEntries() []*TreeEntry {
@@ -1612,7 +1790,7 @@ type SetSecretsRequest struct {
 
 func (x *SetSecretsRequest) Reset() {
 	*x = SetSecretsRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[26]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1624,7 +1802,7 @@ func (x *SetSecretsRequest) String() string {
 func (*SetSecretsRequest) ProtoMessage() {}
 
 func (x *SetSecretsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[26]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1637,7 +1815,7 @@ func (x *SetSecretsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSecretsRequest.ProtoReflect.Descriptor instead.
 func (*SetSecretsRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{26}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *SetSecretsRequest) GetSecrets() map[string]string {
@@ -1655,7 +1833,7 @@ type SetSecretsResponse struct {
 
 func (x *SetSecretsResponse) Reset() {
 	*x = SetSecretsResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[27]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1667,7 +1845,7 @@ func (x *SetSecretsResponse) String() string {
 func (*SetSecretsResponse) ProtoMessage() {}
 
 func (x *SetSecretsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[27]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1680,7 +1858,7 @@ func (x *SetSecretsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSecretsResponse.ProtoReflect.Descriptor instead.
 func (*SetSecretsResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{27}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{29}
 }
 
 type GitCredential struct {
@@ -1694,7 +1872,7 @@ type GitCredential struct {
 
 func (x *GitCredential) Reset() {
 	*x = GitCredential{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[28]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1706,7 +1884,7 @@ func (x *GitCredential) String() string {
 func (*GitCredential) ProtoMessage() {}
 
 func (x *GitCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[28]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1719,7 +1897,7 @@ func (x *GitCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitCredential.ProtoReflect.Descriptor instead.
 func (*GitCredential) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{28}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GitCredential) GetHost() string {
@@ -1752,7 +1930,7 @@ type SetGitCredentialsRequest struct {
 
 func (x *SetGitCredentialsRequest) Reset() {
 	*x = SetGitCredentialsRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[29]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1764,7 +1942,7 @@ func (x *SetGitCredentialsRequest) String() string {
 func (*SetGitCredentialsRequest) ProtoMessage() {}
 
 func (x *SetGitCredentialsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[29]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1777,7 +1955,7 @@ func (x *SetGitCredentialsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGitCredentialsRequest.ProtoReflect.Descriptor instead.
 func (*SetGitCredentialsRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{29}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SetGitCredentialsRequest) GetCredentials() []*GitCredential {
@@ -1795,7 +1973,7 @@ type SetGitCredentialsResponse struct {
 
 func (x *SetGitCredentialsResponse) Reset() {
 	*x = SetGitCredentialsResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[30]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1807,7 +1985,7 @@ func (x *SetGitCredentialsResponse) String() string {
 func (*SetGitCredentialsResponse) ProtoMessage() {}
 
 func (x *SetGitCredentialsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[30]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1820,7 +1998,7 @@ func (x *SetGitCredentialsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGitCredentialsResponse.ProtoReflect.Descriptor instead.
 func (*SetGitCredentialsResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{30}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{32}
 }
 
 type SetupRequest struct {
@@ -1834,7 +2012,7 @@ type SetupRequest struct {
 
 func (x *SetupRequest) Reset() {
 	*x = SetupRequest{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[31]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1846,7 +2024,7 @@ func (x *SetupRequest) String() string {
 func (*SetupRequest) ProtoMessage() {}
 
 func (x *SetupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[31]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1859,7 +2037,7 @@ func (x *SetupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupRequest.ProtoReflect.Descriptor instead.
 func (*SetupRequest) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{31}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *SetupRequest) GetRepositoryUrl() string {
@@ -1892,7 +2070,7 @@ type SetupResponse struct {
 
 func (x *SetupResponse) Reset() {
 	*x = SetupResponse{}
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[32]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1904,7 +2082,7 @@ func (x *SetupResponse) String() string {
 func (*SetupResponse) ProtoMessage() {}
 
 func (x *SetupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[32]
+	mi := &file_dsh_yawn_v1_runner_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1917,7 +2095,7 @@ func (x *SetupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetupResponse.ProtoReflect.Descriptor instead.
 func (*SetupResponse) Descriptor() ([]byte, []int) {
-	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{32}
+	return file_dsh_yawn_v1_runner_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SetupResponse) GetRan() bool {
@@ -1936,7 +2114,23 @@ const file_dsh_yawn_v1_runner_proto_rawDesc = "" +
 	"\x0eHealthResponse\x12\x1d\n" +
 	"\n" +
 	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12%\n" +
-	"\x0esetup_complete\x18\x02 \x01(\bR\rsetupComplete\"\xb6\x01\n" +
+	"\x0esetup_complete\x18\x02 \x01(\bR\rsetupComplete\"\x16\n" +
+	"\x14SandboxStatusRequest\"\x9c\x04\n" +
+	"\x15SandboxStatusResponse\x12\x1d\n" +
+	"\n" +
+	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12\x1a\n" +
+	"\bhostname\x18\x02 \x01(\tR\bhostname\x12\x17\n" +
+	"\aos_name\x18\x03 \x01(\tR\x06osName\x12%\n" +
+	"\x0ekernel_version\x18\x04 \x01(\tR\rkernelVersion\x12\"\n" +
+	"\farchitecture\x18\x05 \x01(\tR\farchitecture\x12\x1b\n" +
+	"\tcpu_count\x18\x06 \x01(\x05R\bcpuCount\x12,\n" +
+	"\x12memory_total_bytes\x18\a \x01(\x03R\x10memoryTotalBytes\x129\n" +
+	"\x19workspace_disk_used_bytes\x18\b \x01(\x03R\x16workspaceDiskUsedBytes\x12;\n" +
+	"\x1aworkspace_disk_total_bytes\x18\t \x01(\x03R\x17workspaceDiskTotalBytes\x12;\n" +
+	"\x1afilesystem_disk_used_bytes\x18\n" +
+	" \x01(\x03R\x17filesystemDiskUsedBytes\x12=\n" +
+	"\x1bfilesystem_disk_total_bytes\x18\v \x01(\x03R\x18filesystemDiskTotalBytes\x12%\n" +
+	"\x0euptime_seconds\x18\f \x01(\x03R\ruptimeSeconds\"\xb6\x01\n" +
 	"\vExecRequest\x12\x12\n" +
 	"\x04argv\x18\x01 \x03(\tR\x04argv\x12\x10\n" +
 	"\x03cwd\x18\x02 \x01(\tR\x03cwd\x123\n" +
@@ -2060,9 +2254,10 @@ const file_dsh_yawn_v1_runner_proto_rawDesc = "" +
 	"\x11FILE_TYPE_REGULAR\x10\x01\x12\x17\n" +
 	"\x13FILE_TYPE_DIRECTORY\x10\x02\x12\x15\n" +
 	"\x11FILE_TYPE_SYMLINK\x10\x03\x12\x13\n" +
-	"\x0fFILE_TYPE_OTHER\x10\x042\xa7\b\n" +
+	"\x0fFILE_TYPE_OTHER\x10\x042\xff\b\n" +
 	"\rRunnerService\x12A\n" +
-	"\x06Health\x12\x1a.dsh.yawn.v1.HealthRequest\x1a\x1b.dsh.yawn.v1.HealthResponse\x12=\n" +
+	"\x06Health\x12\x1a.dsh.yawn.v1.HealthRequest\x1a\x1b.dsh.yawn.v1.HealthResponse\x12V\n" +
+	"\rSandboxStatus\x12!.dsh.yawn.v1.SandboxStatusRequest\x1a\".dsh.yawn.v1.SandboxStatusResponse\x12=\n" +
 	"\x04Exec\x12\x18.dsh.yawn.v1.ExecRequest\x1a\x19.dsh.yawn.v1.ExecResponse0\x01\x12b\n" +
 	"\x11ResolveExecutable\x12%.dsh.yawn.v1.ResolveExecutableRequest\x1a&.dsh.yawn.v1.ResolveExecutableResponse\x12P\n" +
 	"\vResolvePath\x12\x1f.dsh.yawn.v1.ResolvePathRequest\x1a .dsh.yawn.v1.ResolvePathResponse\x12G\n" +
@@ -2091,88 +2286,92 @@ func file_dsh_yawn_v1_runner_proto_rawDescGZIP() []byte {
 }
 
 var file_dsh_yawn_v1_runner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_dsh_yawn_v1_runner_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
+var file_dsh_yawn_v1_runner_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_dsh_yawn_v1_runner_proto_goTypes = []any{
 	(FileType)(0),                     // 0: dsh.yawn.v1.FileType
 	(*HealthRequest)(nil),             // 1: dsh.yawn.v1.HealthRequest
 	(*HealthResponse)(nil),            // 2: dsh.yawn.v1.HealthResponse
-	(*ExecRequest)(nil),               // 3: dsh.yawn.v1.ExecRequest
-	(*ExecResponse)(nil),              // 4: dsh.yawn.v1.ExecResponse
-	(*ExecStarted)(nil),               // 5: dsh.yawn.v1.ExecStarted
-	(*ExecExited)(nil),                // 6: dsh.yawn.v1.ExecExited
-	(*ResolveExecutableRequest)(nil),  // 7: dsh.yawn.v1.ResolveExecutableRequest
-	(*ResolveExecutableResponse)(nil), // 8: dsh.yawn.v1.ResolveExecutableResponse
-	(*ResolvePathRequest)(nil),        // 9: dsh.yawn.v1.ResolvePathRequest
-	(*ResolvePathResponse)(nil),       // 10: dsh.yawn.v1.ResolvePathResponse
-	(*ReadFileRequest)(nil),           // 11: dsh.yawn.v1.ReadFileRequest
-	(*ReadFileResponse)(nil),          // 12: dsh.yawn.v1.ReadFileResponse
-	(*ReadFileRangeRequest)(nil),      // 13: dsh.yawn.v1.ReadFileRangeRequest
-	(*ReadFileRangeResponse)(nil),     // 14: dsh.yawn.v1.ReadFileRangeResponse
-	(*WriteFileRequest)(nil),          // 15: dsh.yawn.v1.WriteFileRequest
-	(*WriteFileResponse)(nil),         // 16: dsh.yawn.v1.WriteFileResponse
-	(*EditFileRequest)(nil),           // 17: dsh.yawn.v1.EditFileRequest
-	(*EditFileResponse)(nil),          // 18: dsh.yawn.v1.EditFileResponse
-	(*StatRequest)(nil),               // 19: dsh.yawn.v1.StatRequest
-	(*StatResponse)(nil),              // 20: dsh.yawn.v1.StatResponse
-	(*ListRequest)(nil),               // 21: dsh.yawn.v1.ListRequest
-	(*ListEntry)(nil),                 // 22: dsh.yawn.v1.ListEntry
-	(*ListResponse)(nil),              // 23: dsh.yawn.v1.ListResponse
-	(*TreeRequest)(nil),               // 24: dsh.yawn.v1.TreeRequest
-	(*TreeEntry)(nil),                 // 25: dsh.yawn.v1.TreeEntry
-	(*TreeResponse)(nil),              // 26: dsh.yawn.v1.TreeResponse
-	(*SetSecretsRequest)(nil),         // 27: dsh.yawn.v1.SetSecretsRequest
-	(*SetSecretsResponse)(nil),        // 28: dsh.yawn.v1.SetSecretsResponse
-	(*GitCredential)(nil),             // 29: dsh.yawn.v1.GitCredential
-	(*SetGitCredentialsRequest)(nil),  // 30: dsh.yawn.v1.SetGitCredentialsRequest
-	(*SetGitCredentialsResponse)(nil), // 31: dsh.yawn.v1.SetGitCredentialsResponse
-	(*SetupRequest)(nil),              // 32: dsh.yawn.v1.SetupRequest
-	(*SetupResponse)(nil),             // 33: dsh.yawn.v1.SetupResponse
-	nil,                               // 34: dsh.yawn.v1.ExecRequest.EnvEntry
-	nil,                               // 35: dsh.yawn.v1.ResolveExecutableRequest.EnvEntry
-	nil,                               // 36: dsh.yawn.v1.SetSecretsRequest.SecretsEntry
+	(*SandboxStatusRequest)(nil),      // 3: dsh.yawn.v1.SandboxStatusRequest
+	(*SandboxStatusResponse)(nil),     // 4: dsh.yawn.v1.SandboxStatusResponse
+	(*ExecRequest)(nil),               // 5: dsh.yawn.v1.ExecRequest
+	(*ExecResponse)(nil),              // 6: dsh.yawn.v1.ExecResponse
+	(*ExecStarted)(nil),               // 7: dsh.yawn.v1.ExecStarted
+	(*ExecExited)(nil),                // 8: dsh.yawn.v1.ExecExited
+	(*ResolveExecutableRequest)(nil),  // 9: dsh.yawn.v1.ResolveExecutableRequest
+	(*ResolveExecutableResponse)(nil), // 10: dsh.yawn.v1.ResolveExecutableResponse
+	(*ResolvePathRequest)(nil),        // 11: dsh.yawn.v1.ResolvePathRequest
+	(*ResolvePathResponse)(nil),       // 12: dsh.yawn.v1.ResolvePathResponse
+	(*ReadFileRequest)(nil),           // 13: dsh.yawn.v1.ReadFileRequest
+	(*ReadFileResponse)(nil),          // 14: dsh.yawn.v1.ReadFileResponse
+	(*ReadFileRangeRequest)(nil),      // 15: dsh.yawn.v1.ReadFileRangeRequest
+	(*ReadFileRangeResponse)(nil),     // 16: dsh.yawn.v1.ReadFileRangeResponse
+	(*WriteFileRequest)(nil),          // 17: dsh.yawn.v1.WriteFileRequest
+	(*WriteFileResponse)(nil),         // 18: dsh.yawn.v1.WriteFileResponse
+	(*EditFileRequest)(nil),           // 19: dsh.yawn.v1.EditFileRequest
+	(*EditFileResponse)(nil),          // 20: dsh.yawn.v1.EditFileResponse
+	(*StatRequest)(nil),               // 21: dsh.yawn.v1.StatRequest
+	(*StatResponse)(nil),              // 22: dsh.yawn.v1.StatResponse
+	(*ListRequest)(nil),               // 23: dsh.yawn.v1.ListRequest
+	(*ListEntry)(nil),                 // 24: dsh.yawn.v1.ListEntry
+	(*ListResponse)(nil),              // 25: dsh.yawn.v1.ListResponse
+	(*TreeRequest)(nil),               // 26: dsh.yawn.v1.TreeRequest
+	(*TreeEntry)(nil),                 // 27: dsh.yawn.v1.TreeEntry
+	(*TreeResponse)(nil),              // 28: dsh.yawn.v1.TreeResponse
+	(*SetSecretsRequest)(nil),         // 29: dsh.yawn.v1.SetSecretsRequest
+	(*SetSecretsResponse)(nil),        // 30: dsh.yawn.v1.SetSecretsResponse
+	(*GitCredential)(nil),             // 31: dsh.yawn.v1.GitCredential
+	(*SetGitCredentialsRequest)(nil),  // 32: dsh.yawn.v1.SetGitCredentialsRequest
+	(*SetGitCredentialsResponse)(nil), // 33: dsh.yawn.v1.SetGitCredentialsResponse
+	(*SetupRequest)(nil),              // 34: dsh.yawn.v1.SetupRequest
+	(*SetupResponse)(nil),             // 35: dsh.yawn.v1.SetupResponse
+	nil,                               // 36: dsh.yawn.v1.ExecRequest.EnvEntry
+	nil,                               // 37: dsh.yawn.v1.ResolveExecutableRequest.EnvEntry
+	nil,                               // 38: dsh.yawn.v1.SetSecretsRequest.SecretsEntry
 }
 var file_dsh_yawn_v1_runner_proto_depIdxs = []int32{
-	34, // 0: dsh.yawn.v1.ExecRequest.env:type_name -> dsh.yawn.v1.ExecRequest.EnvEntry
-	5,  // 1: dsh.yawn.v1.ExecResponse.started:type_name -> dsh.yawn.v1.ExecStarted
-	6,  // 2: dsh.yawn.v1.ExecResponse.exited:type_name -> dsh.yawn.v1.ExecExited
-	35, // 3: dsh.yawn.v1.ResolveExecutableRequest.env:type_name -> dsh.yawn.v1.ResolveExecutableRequest.EnvEntry
+	36, // 0: dsh.yawn.v1.ExecRequest.env:type_name -> dsh.yawn.v1.ExecRequest.EnvEntry
+	7,  // 1: dsh.yawn.v1.ExecResponse.started:type_name -> dsh.yawn.v1.ExecStarted
+	8,  // 2: dsh.yawn.v1.ExecResponse.exited:type_name -> dsh.yawn.v1.ExecExited
+	37, // 3: dsh.yawn.v1.ResolveExecutableRequest.env:type_name -> dsh.yawn.v1.ResolveExecutableRequest.EnvEntry
 	0,  // 4: dsh.yawn.v1.StatResponse.type:type_name -> dsh.yawn.v1.FileType
 	0,  // 5: dsh.yawn.v1.ListEntry.type:type_name -> dsh.yawn.v1.FileType
-	22, // 6: dsh.yawn.v1.ListResponse.entries:type_name -> dsh.yawn.v1.ListEntry
+	24, // 6: dsh.yawn.v1.ListResponse.entries:type_name -> dsh.yawn.v1.ListEntry
 	0,  // 7: dsh.yawn.v1.TreeEntry.type:type_name -> dsh.yawn.v1.FileType
-	25, // 8: dsh.yawn.v1.TreeResponse.entries:type_name -> dsh.yawn.v1.TreeEntry
-	36, // 9: dsh.yawn.v1.SetSecretsRequest.secrets:type_name -> dsh.yawn.v1.SetSecretsRequest.SecretsEntry
-	29, // 10: dsh.yawn.v1.SetGitCredentialsRequest.credentials:type_name -> dsh.yawn.v1.GitCredential
+	27, // 8: dsh.yawn.v1.TreeResponse.entries:type_name -> dsh.yawn.v1.TreeEntry
+	38, // 9: dsh.yawn.v1.SetSecretsRequest.secrets:type_name -> dsh.yawn.v1.SetSecretsRequest.SecretsEntry
+	31, // 10: dsh.yawn.v1.SetGitCredentialsRequest.credentials:type_name -> dsh.yawn.v1.GitCredential
 	1,  // 11: dsh.yawn.v1.RunnerService.Health:input_type -> dsh.yawn.v1.HealthRequest
-	3,  // 12: dsh.yawn.v1.RunnerService.Exec:input_type -> dsh.yawn.v1.ExecRequest
-	7,  // 13: dsh.yawn.v1.RunnerService.ResolveExecutable:input_type -> dsh.yawn.v1.ResolveExecutableRequest
-	9,  // 14: dsh.yawn.v1.RunnerService.ResolvePath:input_type -> dsh.yawn.v1.ResolvePathRequest
-	11, // 15: dsh.yawn.v1.RunnerService.ReadFile:input_type -> dsh.yawn.v1.ReadFileRequest
-	13, // 16: dsh.yawn.v1.RunnerService.ReadFileRange:input_type -> dsh.yawn.v1.ReadFileRangeRequest
-	15, // 17: dsh.yawn.v1.RunnerService.WriteFile:input_type -> dsh.yawn.v1.WriteFileRequest
-	17, // 18: dsh.yawn.v1.RunnerService.EditFile:input_type -> dsh.yawn.v1.EditFileRequest
-	19, // 19: dsh.yawn.v1.RunnerService.Stat:input_type -> dsh.yawn.v1.StatRequest
-	21, // 20: dsh.yawn.v1.RunnerService.List:input_type -> dsh.yawn.v1.ListRequest
-	24, // 21: dsh.yawn.v1.RunnerService.Tree:input_type -> dsh.yawn.v1.TreeRequest
-	27, // 22: dsh.yawn.v1.RunnerService.SetSecrets:input_type -> dsh.yawn.v1.SetSecretsRequest
-	30, // 23: dsh.yawn.v1.RunnerService.SetGitCredentials:input_type -> dsh.yawn.v1.SetGitCredentialsRequest
-	32, // 24: dsh.yawn.v1.RunnerService.Setup:input_type -> dsh.yawn.v1.SetupRequest
-	2,  // 25: dsh.yawn.v1.RunnerService.Health:output_type -> dsh.yawn.v1.HealthResponse
-	4,  // 26: dsh.yawn.v1.RunnerService.Exec:output_type -> dsh.yawn.v1.ExecResponse
-	8,  // 27: dsh.yawn.v1.RunnerService.ResolveExecutable:output_type -> dsh.yawn.v1.ResolveExecutableResponse
-	10, // 28: dsh.yawn.v1.RunnerService.ResolvePath:output_type -> dsh.yawn.v1.ResolvePathResponse
-	12, // 29: dsh.yawn.v1.RunnerService.ReadFile:output_type -> dsh.yawn.v1.ReadFileResponse
-	14, // 30: dsh.yawn.v1.RunnerService.ReadFileRange:output_type -> dsh.yawn.v1.ReadFileRangeResponse
-	16, // 31: dsh.yawn.v1.RunnerService.WriteFile:output_type -> dsh.yawn.v1.WriteFileResponse
-	18, // 32: dsh.yawn.v1.RunnerService.EditFile:output_type -> dsh.yawn.v1.EditFileResponse
-	20, // 33: dsh.yawn.v1.RunnerService.Stat:output_type -> dsh.yawn.v1.StatResponse
-	23, // 34: dsh.yawn.v1.RunnerService.List:output_type -> dsh.yawn.v1.ListResponse
-	26, // 35: dsh.yawn.v1.RunnerService.Tree:output_type -> dsh.yawn.v1.TreeResponse
-	28, // 36: dsh.yawn.v1.RunnerService.SetSecrets:output_type -> dsh.yawn.v1.SetSecretsResponse
-	31, // 37: dsh.yawn.v1.RunnerService.SetGitCredentials:output_type -> dsh.yawn.v1.SetGitCredentialsResponse
-	33, // 38: dsh.yawn.v1.RunnerService.Setup:output_type -> dsh.yawn.v1.SetupResponse
-	25, // [25:39] is the sub-list for method output_type
-	11, // [11:25] is the sub-list for method input_type
+	3,  // 12: dsh.yawn.v1.RunnerService.SandboxStatus:input_type -> dsh.yawn.v1.SandboxStatusRequest
+	5,  // 13: dsh.yawn.v1.RunnerService.Exec:input_type -> dsh.yawn.v1.ExecRequest
+	9,  // 14: dsh.yawn.v1.RunnerService.ResolveExecutable:input_type -> dsh.yawn.v1.ResolveExecutableRequest
+	11, // 15: dsh.yawn.v1.RunnerService.ResolvePath:input_type -> dsh.yawn.v1.ResolvePathRequest
+	13, // 16: dsh.yawn.v1.RunnerService.ReadFile:input_type -> dsh.yawn.v1.ReadFileRequest
+	15, // 17: dsh.yawn.v1.RunnerService.ReadFileRange:input_type -> dsh.yawn.v1.ReadFileRangeRequest
+	17, // 18: dsh.yawn.v1.RunnerService.WriteFile:input_type -> dsh.yawn.v1.WriteFileRequest
+	19, // 19: dsh.yawn.v1.RunnerService.EditFile:input_type -> dsh.yawn.v1.EditFileRequest
+	21, // 20: dsh.yawn.v1.RunnerService.Stat:input_type -> dsh.yawn.v1.StatRequest
+	23, // 21: dsh.yawn.v1.RunnerService.List:input_type -> dsh.yawn.v1.ListRequest
+	26, // 22: dsh.yawn.v1.RunnerService.Tree:input_type -> dsh.yawn.v1.TreeRequest
+	29, // 23: dsh.yawn.v1.RunnerService.SetSecrets:input_type -> dsh.yawn.v1.SetSecretsRequest
+	32, // 24: dsh.yawn.v1.RunnerService.SetGitCredentials:input_type -> dsh.yawn.v1.SetGitCredentialsRequest
+	34, // 25: dsh.yawn.v1.RunnerService.Setup:input_type -> dsh.yawn.v1.SetupRequest
+	2,  // 26: dsh.yawn.v1.RunnerService.Health:output_type -> dsh.yawn.v1.HealthResponse
+	4,  // 27: dsh.yawn.v1.RunnerService.SandboxStatus:output_type -> dsh.yawn.v1.SandboxStatusResponse
+	6,  // 28: dsh.yawn.v1.RunnerService.Exec:output_type -> dsh.yawn.v1.ExecResponse
+	10, // 29: dsh.yawn.v1.RunnerService.ResolveExecutable:output_type -> dsh.yawn.v1.ResolveExecutableResponse
+	12, // 30: dsh.yawn.v1.RunnerService.ResolvePath:output_type -> dsh.yawn.v1.ResolvePathResponse
+	14, // 31: dsh.yawn.v1.RunnerService.ReadFile:output_type -> dsh.yawn.v1.ReadFileResponse
+	16, // 32: dsh.yawn.v1.RunnerService.ReadFileRange:output_type -> dsh.yawn.v1.ReadFileRangeResponse
+	18, // 33: dsh.yawn.v1.RunnerService.WriteFile:output_type -> dsh.yawn.v1.WriteFileResponse
+	20, // 34: dsh.yawn.v1.RunnerService.EditFile:output_type -> dsh.yawn.v1.EditFileResponse
+	22, // 35: dsh.yawn.v1.RunnerService.Stat:output_type -> dsh.yawn.v1.StatResponse
+	25, // 36: dsh.yawn.v1.RunnerService.List:output_type -> dsh.yawn.v1.ListResponse
+	28, // 37: dsh.yawn.v1.RunnerService.Tree:output_type -> dsh.yawn.v1.TreeResponse
+	30, // 38: dsh.yawn.v1.RunnerService.SetSecrets:output_type -> dsh.yawn.v1.SetSecretsResponse
+	33, // 39: dsh.yawn.v1.RunnerService.SetGitCredentials:output_type -> dsh.yawn.v1.SetGitCredentialsResponse
+	35, // 40: dsh.yawn.v1.RunnerService.Setup:output_type -> dsh.yawn.v1.SetupResponse
+	26, // [26:41] is the sub-list for method output_type
+	11, // [11:26] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -2183,13 +2382,13 @@ func file_dsh_yawn_v1_runner_proto_init() {
 	if File_dsh_yawn_v1_runner_proto != nil {
 		return
 	}
-	file_dsh_yawn_v1_runner_proto_msgTypes[3].OneofWrappers = []any{
+	file_dsh_yawn_v1_runner_proto_msgTypes[5].OneofWrappers = []any{
 		(*ExecResponse_Started)(nil),
 		(*ExecResponse_Stdout)(nil),
 		(*ExecResponse_Stderr)(nil),
 		(*ExecResponse_Exited)(nil),
 	}
-	file_dsh_yawn_v1_runner_proto_msgTypes[14].OneofWrappers = []any{
+	file_dsh_yawn_v1_runner_proto_msgTypes[16].OneofWrappers = []any{
 		(*WriteFileRequest_CreateIfAbsent)(nil),
 		(*WriteFileRequest_ExpectedVersion)(nil),
 	}
@@ -2199,7 +2398,7 @@ func file_dsh_yawn_v1_runner_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dsh_yawn_v1_runner_proto_rawDesc), len(file_dsh_yawn_v1_runner_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   36,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -53,6 +53,24 @@ export class FakeRunnerClient {
     return { sandboxId: "sandbox-one", setupComplete: this.setups > 0 };
   }
 
+  /** What the machine reports for the Sandbox tab. */
+  async sandboxStatus() {
+    return {
+      sandboxId: "sandbox-one",
+      hostname: "sandbox-one-host",
+      osName: "Debian GNU/Linux 13 (trixie)",
+      kernelVersion: "6.8.0",
+      architecture: "amd64",
+      cpuCount: 4,
+      memoryTotalBytes: 2n * 1024n ** 3n,
+      workspaceDiskUsedBytes: 1024n ** 3n,
+      workspaceDiskTotalBytes: 8n * 1024n ** 3n,
+      filesystemDiskUsedBytes: 3n * 1024n ** 3n,
+      filesystemDiskTotalBytes: 16n * 1024n ** 3n,
+      uptimeSeconds: 90n,
+    };
+  }
+
   async setSecrets(secrets: Record<string, string>) {
     this.secrets = secrets;
   }

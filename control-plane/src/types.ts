@@ -46,6 +46,18 @@ export interface BuildkiteProfile {
   tokenEnv: string;
 }
 
+/**
+ * Whether this backend provisions the sandbox from a runner image. Docker and
+ * Buildkite name one; Kubernetes takes the image from the warm pool's pod
+ * template, so a profile that answers true is also one whose `image` may be
+ * shown to a user.
+ */
+export function provisionsFromImage(
+  profile: SandboxProfile,
+): profile is DockerProfile | BuildkiteProfile {
+  return "image" in profile;
+}
+
 export interface SandboxSpec {
   sessionId: string;
   repositoryUrl: string;
@@ -97,6 +109,13 @@ interface SessionRecordBase {
   /** Profile the sandbox was provisioned with. */
   profile: string;
   repositoryUrl: string;
+  /**
+   * When the current sandbox incarnation was provisioned, as opposed to
+   * `updatedAt`, which every transition rewrites. A wake keeps it, because a
+   * wake returns the same machine; a restore from a checkpoint resets it,
+   * because that provisioned a fresh one.
+   */
+  createdAt: string;
   updatedAt: string;
 }
 

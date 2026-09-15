@@ -29,6 +29,10 @@ export class RunnerClient {
     return this.client.health({}, options);
   }
 
+  sandboxStatus(options?: CallOptions) {
+    return this.client.sandboxStatus({}, options);
+  }
+
   exec(request: Omit<ExecRequest, "$typeName">, options?: CallOptions) {
     return this.client.exec(request, options);
   }

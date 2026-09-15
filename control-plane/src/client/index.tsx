@@ -9,6 +9,7 @@ import { yawnRemote } from "../remote-contributions.js";
 import { InstructionsSettings } from "./instructions.js";
 import { SandboxProfileChip } from "./profile.js";
 import { RepositoryDirectoryFlow } from "./repository-directory-flow.js";
+import { SandboxStatusTab } from "./sandbox.js";
 import { SecretsSettings } from "./secrets.js";
 
 /**
@@ -104,6 +105,31 @@ export async function apply(ctx: Context) {
             inject: injectedProfile,
           },
           SandboxProfileChip,
+        );
+      },
+    );
+    const injectedStatus = () => ({
+      getSandboxStatus: async (sessionId: string) =>
+        unwrap(
+          await remoteCtx.remote.sandboxManager.getSandboxStatus(sessionId),
+        ),
+    });
+    remoteCtx.slots.inject(
+      "conversation.view",
+      function* registerSandboxView() {
+        yield remoteCtx.slots.register(
+          {
+            name: "conversation.view",
+            id: "dsh-yawn.sandbox",
+            // After Chat (0) and Trajectory (10).
+            order: 20,
+            label: () => "Sandbox",
+            inject: (sessionId) => ({
+              sessionId,
+              ...injectedStatus(),
+            }),
+          },
+          SandboxStatusTab,
         );
       },
     );

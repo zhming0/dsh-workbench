@@ -29,6 +29,7 @@ try {
 
   let client = await waitForRunner(tunnel, handle.sandboxId);
   await client.setSecrets({ SMOKE_VALUE: "present" });
+  await assertSandboxStatus(client);
   await run(client, [
     "/bin/bash",
     "-lc",
@@ -152,6 +153,30 @@ async function waitForRunner(tunnel, sandboxId) {
     }
   }
   throw new Error(`runner did not become ready: ${String(lastError)}`);
+}
+
+/**
+ * The Sandbox tab reads these facts from the runner. A regression in the
+ * runner or in the generated contract should fail here, not in the UI.
+ */
+async function assertSandboxStatus(client) {
+  const status = await client.sandboxStatus({ timeoutMs: 10_000 });
+  if (status.sandboxId.length === 0) {
+    throw new Error("SandboxStatus returned no sandbox id");
+  }
+  if (status.hostname.length === 0) {
+    throw new Error("SandboxStatus returned no hostname");
+  }
+  if (status.osName.length === 0 || status.kernelVersion.length === 0) {
+    throw new Error("SandboxStatus returned no OS facts");
+  }
+  if (status.cpuCount < 1) {
+    throw new Error(`SandboxStatus returned ${status.cpuCount} CPUs`);
+  }
+  if (status.memoryTotalBytes <= 0n || status.filesystemDiskTotalBytes <= 0n) {
+    throw new Error("SandboxStatus returned no memory or disk size");
+  }
+  process.stdout.write(`sandbox status: ${status.hostname} (${status.osName})\n`);
 }
 
 async function run(client, argv, cwd = "/workspace") {

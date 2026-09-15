@@ -783,6 +783,7 @@ describe("archive release", () => {
       repositoryUrl: "https://github.com/example/public",
       state: "hibernated",
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
