@@ -44,8 +44,10 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 # Workspace. The docker CLI lets the Docker backend manage sibling sandbox
 # containers when the control plane itself runs in a container; it is the
 # same static binary the sandbox pods' dind sidecar ships (docker:29.8.0).
+# socat is the published-port listener the entrypoint starts under
+# DSH_YAWN_BIND_ALL: dsh itself stays on loopback.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates \
+    && apt-get install -y --no-install-recommends git ca-certificates socat \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=docker:29.8.0-cli /usr/local/bin/docker /usr/local/bin/docker
 
@@ -70,7 +72,7 @@ RUN DSH_HOME=/opt/dsh-yawn/seed dsh plugin --profile web add /opt/dsh-yawn/dsh-y
     && rm -rf /opt/dsh-yawn/seed \
     && cp /opt/dsh-yawn/meta/version /opt/dsh-yawn/version
 
-COPY control-plane/image/settings.patch.yml control-plane/image/launch-token.patch.yml /opt/dsh-yawn/
+COPY control-plane/image/settings.patch.yml control-plane/image/launch-token.patch.yml control-plane/image/bind-all.patch.yml /opt/dsh-yawn/
 COPY control-plane/image/seed /usr/local/bin/dsh-yawn-seed
 COPY control-plane/image/entrypoint /usr/local/bin/dsh-yawn-entrypoint
 

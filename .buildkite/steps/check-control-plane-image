@@ -4,10 +4,21 @@ set -euo pipefail
 echo "--- :docker: Building the control-plane image"
 docker buildx bake control-plane-dev --load
 
-# Seed a throwaway home and dump the composed tree. The grep proves the
-# sandbox-manager row from the bundle patch survives composition against this
-# image's dsh version.
+# Seed a throwaway home and dump the composed tree. The greps prove the rows
+# this image renders and overlays survive composition against its dsh version.
 echo "+++ :mag: Checking the composed profile"
 docker run --rm --entrypoint sh dsh-yawn-control-plane:dev -c \
   'dsh-yawn-seed && dsh --profile web --dump-config' | grep -q "sandbox-manager"
 echo "sandbox-manager row composes"
+
+echo "+++ :mag: Checking the rendered sandbox profile"
+docker run --rm --entrypoint sh -e DSH_YAWN_SANDBOX_BACKEND=docker dsh-yawn-control-plane:dev -c \
+  'dsh-yawn-seed && cat "$HOME/cordis.patch.yml" && dsh --profile web --dump-config' |
+  grep -q "backend: docker"
+echo "DSH_YAWN_SANDBOX_BACKEND renders a profile"
+
+echo "+++ :mag: Checking the published-port bind"
+docker run --rm --entrypoint sh -e DSH_YAWN_BIND_ALL=1 dsh-yawn-control-plane:dev -c \
+  'dsh-yawn-seed && dsh --profile web --patch "$HOME/.dsh/profiles/web/bind-all.patch.yml" --dump-config' |
+  grep -q "0.0.0.0"
+echo "DSH_YAWN_BIND_ALL overrides the bind host"

@@ -165,6 +165,25 @@ the row in a patch layer:
       name: "@zhming0/dsh-yawn/launch-token"
 ```
 
+Two more environment variables belong to the image rather than to dsh. They
+exist so a deployment without the Helm chart never edits settings by hand:
+
+- `DSH_YAWN_SANDBOX_BACKEND` names the backend for the single `standard`
+  profile. `dsh-yawn-seed` renders `$HOME/cordis.patch.yml` from it at every
+  container start, and `DSH_YAWN_CONTROL_PLANE_URL` overrides the tunnel
+  address runners dial back on (default `ws://host.docker.internal:8081/tunnel`).
+  The file is image-owned, so a container recreate cannot leave a stale profile
+  behind; put your own settings in the profile's `cordis.patch.yml`, which that
+  home-level layer outranks. The Kubernetes chart mounts its own home-level
+  file instead and leaves the variable unset.
+- `DSH_YAWN_BIND_ALL=1` puts the Web UI on the container's network interface, so
+  a published port reaches it. dsh's launcher rejects `--host 0.0.0.0`, so the
+  entrypoint adds an overlay that replaces the web bundle's bind value, and
+  starts `socat` on `DSH_YAWN_UI_PORT` (default 3000) forwarding to dsh on
+  `DSH_YAWN_WEB_PORT` (default 3000). dsh itself stays on loopback either way.
+  Unset, nothing listens outside loopback and the Kubernetes deployment keeps
+  its oauth2-proxy in front.
+
 The default backend uses Docker on the same machine as dsh. The Kubernetes
 backend uses Kubernetes SIG agent-sandbox. The Buildkite backend runs each
 sandbox as one build on a pipeline you create. Runners connect out to the host's

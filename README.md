@@ -35,53 +35,46 @@ file and command tools run inside that sandbox, never on the control plane or
 your laptop, so whatever the agents do stays there. Hence the name: you can
 lay back and yawn :)
 
-## Quick start (demo)
+## Quick start (single machine)
 
 This runs the control plane in one Docker container and starts sandboxes as
 sibling containers through your Docker daemon. It is the fastest way to see a
-session run, not a supported deployment — for that, read
+session run. For an always-on deployment with OIDC, read
 [`docs/installations.md`](docs/installations.md).
 
 ```sh
 docker run -d --name dsh-yawn \
   -p 127.0.0.1:3000:3000 -p 8081:8081 \
-  -e DSH_YAWN_WEB_PORT=13000 \
+  -e DSH_YAWN_SANDBOX_BACKEND=docker \
+  -e DSH_YAWN_BIND_ALL=1 \
   -e DSH_YAWN_CONTROL_PLANE_LAUNCH_TOKEN_ROUTE=1 \
   --group-add "$(stat -c %g /var/run/docker.sock 2>/dev/null || echo 0)" \
   -v dsh-yawn-data:/data \
   -v /var/run/docker.sock:/var/run/docker.sock \
   ghcr.io/zhming0/dsh-yawn-control-plane
-
-# dsh serves its UI on loopback only, so a sidecar publishes it. This is the
-# same shape as the oauth2-proxy sidecar in the Kubernetes install.
-docker run -d --name dsh-yawn-ui --network container:dsh-yawn --restart unless-stopped \
-  alpine/socat TCP-LISTEN:3000,fork,reuseaddr TCP4:127.0.0.1:13000
-
-# Tell the control plane to use the Docker backend, then restart to apply.
-docker exec -i dsh-yawn sh -c 'cat > /data/.dsh/profiles/web/cordis.patch.yml' <<'EOF'
-- id: sandbox-manager
-  config:
-    profiles:
-      standard:
-        backend: docker
-EOF
-docker restart dsh-yawn
 ```
-
-What the pieces do:
-
-- The Docker socket mount lets the control plane start sibling sandbox
-  containers; `--group-add` grants the socket's group (0 on Docker Desktop,
-  the `docker` group on Linux).
-- The sandbox profile needs only `backend: docker`: the runner image defaults
-  to the tag matching the control plane, and runners dial back through
-  `host.docker.internal` on the published tunnel port 8081.
 
 Then open <http://localhost:3000/launch-token>, choose **New session**, use
 **Add workspace…** with a repository URL, and send a message. The first message
 needs a model credential; add one in the Web UI settings.
 
-To clean up: `docker rm -f dsh-yawn dsh-yawn-ui`.
+To clean up: `docker rm -f dsh-yawn`.
+
+What the pieces do:
+
+- The Docker socket mount lets the control plane start sibling sandbox
+  containers, and `--group-add` grants the socket's group (0 on Docker Desktop,
+  the `docker` group on Linux). This gives the container control of your Docker
+  daemon — root-equivalent power over the host. Keep it on a machine you
+  administer, and keep the published port on loopback.
+- `DSH_YAWN_SANDBOX_BACKEND=docker` states the sandbox profile, so no settings
+  file is edited by hand. The runner image defaults to the tag matching the
+  control plane, and runners dial back through `host.docker.internal` on the
+  tunnel port 8081.
+- `DSH_YAWN_BIND_ALL=1` puts the Web UI on the container's network interface,
+  so the published port reaches it. dsh keeps listening on loopback inside the
+  container, and the tunnel port is always separate. Leave this off when
+  something else in front of dsh authenticates users.
 
 ## FAQ
 

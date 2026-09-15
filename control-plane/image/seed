@@ -8,9 +8,12 @@
 set -eu
 
 : "${HOME:?HOME must be set}"
+# The image root is overridable so a test can run this script without the
+# image around it. Production always uses the default.
+: "${DSH_YAWN_IMAGE_ROOT:=/opt/dsh-yawn}"
 profile="$HOME/.dsh/profiles/web"
 marker="$profile/.dsh-yawn-image-version"
-version="$(cat /opt/dsh-yawn/version)"
+version="$(cat "$DSH_YAWN_IMAGE_ROOT/version")"
 
 if [ ! -e "$marker" ] || [ "$(cat "$marker")" != "$version" ]; then
   mkdir -p "$profile"
@@ -18,11 +21,42 @@ if [ ! -e "$marker" ] || [ "$(cat "$marker")" != "$version" ]; then
   # stale files from an older layout merged underneath the new one.
   rm -rf "$profile/node_modules" "$profile/package.json" \
     "$profile/pnpm-lock.yaml" "$profile/pnpm-workspace.yaml"
-  cp -a /opt/dsh-yawn/profile/. "$profile/"
+  cp -a "$DSH_YAWN_IMAGE_ROOT/profile/." "$profile/"
   printf '%s\n' "$version" >"$marker"
 fi
 
 # The starter settings are seeded once; after that the file is the user's.
 if [ ! -e "$profile/cordis.patch.yml" ]; then
-  cp /opt/dsh-yawn/settings.patch.yml "$profile/cordis.patch.yml"
+  cp "$DSH_YAWN_IMAGE_ROOT/settings.patch.yml" "$profile/cordis.patch.yml"
+fi
+
+# A deployment with no chart states its sandbox profile in the environment,
+# and this renders it into the home-level layer that outranks the profile file.
+# The name and image are what the bundled defaults already resolve to, so the
+# only input a single-machine install needs is `DSH_YAWN_SANDBOX_BACKEND=docker`;
+# DSH_YAWN_CONTROL_PLANE_URL overrides the tunnel address runners dial back on.
+# The image owns this file, so re-creating the container re-renders it and
+# changing a flag cannot leave a stale profile behind.
+if [ -n "${DSH_YAWN_SANDBOX_BACKEND:-}" ]; then
+  cat >"$HOME/cordis.patch.yml" <<EOF
+# Rendered by dsh-yawn-seed from DSH_YAWN_SANDBOX_BACKEND. Edit settings in
+# $profile/cordis.patch.yml; this layer replaces the sandbox-manager row.
+- id: sandbox-manager
+  config:
+    profiles:
+      standard:
+        backend: ${DSH_YAWN_SANDBOX_BACKEND}
+        controlPlaneUrl: ${DSH_YAWN_CONTROL_PLANE_URL:-ws://host.docker.internal:8081/tunnel}
+EOF
+fi
+
+# DSH_YAWN_BIND_ALL=1 exposes the Web UI on every interface, so a published
+# port reaches it and nothing has to forward from this container's loopback.
+# The launcher rejects `--host 0.0.0.0`, so an overlay replaces the web
+# bundle's bind value instead of passing the flag. Kubernetes leaves this unset
+# and keeps dsh on pod loopback, behind its oauth2-proxy.
+if [ "${DSH_YAWN_BIND_ALL:-0}" = 1 ]; then
+  cp "$DSH_YAWN_IMAGE_ROOT/bind-all.patch.yml" "$profile/bind-all.patch.yml"
+else
+  rm -f "$profile/bind-all.patch.yml"
 fi

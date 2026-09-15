@@ -5,11 +5,23 @@ set -eu
 
 dsh-yawn-seed
 
+# DSH_YAWN_BIND_ALL=1 puts dsh on every interface, and this listener answers on
+# the published port and forwards to it. dsh's own port stays loopback-only, so
+# the image keeps one exposed surface either way.
+if [ "${DSH_YAWN_BIND_ALL:-0}" = 1 ]; then
+  socat "TCP-LISTEN:${DSH_YAWN_UI_PORT:-3000},fork,reuseaddr" \
+    "TCP4:127.0.0.1:${DSH_YAWN_WEB_PORT:-3000}" &
+fi
+
 set -- --port "${DSH_YAWN_WEB_PORT:-3000}" --no-open "$@"
 # DSH_YAWN_CONTROL_PLANE_LAUNCH_TOKEN_ROUTE=1 mounts GET /launch-token (see
 # launch-token.patch.yml). The overlay is a launcher flag, so it goes before
 # the web app's arguments.
 if [ "${DSH_YAWN_CONTROL_PLANE_LAUNCH_TOKEN_ROUTE:-0}" = 1 ]; then
   set -- --patch /opt/dsh-yawn/launch-token.patch.yml "$@"
+fi
+# The bind overlay reproduces the bundle's webserver row with a fallback host.
+if [ "${DSH_YAWN_BIND_ALL:-0}" = 1 ]; then
+  set -- --patch "$HOME/.dsh/profiles/web/bind-all.patch.yml" "$@"
 fi
 exec dsh --profile web "$@"
