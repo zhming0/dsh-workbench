@@ -6,6 +6,10 @@
 min_version = "2025.11.0"
 
 [tools]
+# Node 24.19.0 is the newest release without the HTTP/2 regression in
+# https://github.com/nodejs/node/issues/65677: 24.20.0 and 24.21.0 report
+# ERR_STREAM_PREMATURE_CLOSE for buffered responses, and the control plane's
+# Connect HTTP/2 tunnel is exposed to it. Move only to a release with the fix.
 node = "24.19.0"
 go = "1.26.7"
 kind = "0.33.0"

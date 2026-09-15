@@ -9,7 +9,7 @@
 # configuration.
 
 # Keep the Node version equal to mise.toml, which pins it for CI and local
-# development.
+# development and records why it stays below 24.20.0 (nodejs/node#65677).
 FROM node:24.19.0-bookworm-slim AS build
 ARG VERSION=0.0.0-dev
 WORKDIR /build

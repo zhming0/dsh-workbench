@@ -122,7 +122,8 @@ patches:
 Egress is a list as well: `/spec/networkPolicy/egress/-` appends a rule, and
 replacing `/spec/networkPolicy/egress` as a whole changes the existing ones.
 The checked-in list is the tunnel to the control plane (TCP 8081), DNS to
-kube-dns (TCP/UDP 53), and HTTPS (443); narrow the 443 rule in production.
+kube-dns (TCP/UDP 53), and HTTP and HTTPS (80 and 443); narrow the 80/443 rule
+in production.
 `podTemplate.spec.volumes`, which carries the Docker data mount's `emptyDir`
 sizeLimit, takes the same whole-list patch.
 

@@ -151,9 +151,9 @@ pod's own loopback (`--disable-host-loopback`), including the runner's health
 port.
 
 Container traffic leaves through the pod's network namespace, so the sandbox
-NetworkPolicy applies to it unchanged: registries on 443 and kube-dns are
-reachable, nothing else is. Both image pulls and the model's own commands share
-that allow-list.
+NetworkPolicy applies to it unchanged: registries on 443, plain HTTP on 80, and
+kube-dns are reachable, nothing else is. Both image pulls and the model's own
+commands share that allow-list.
 
 Images, containers, and volumes live on an `emptyDir` sized at 10Gi, not on
 the workspace volume. Hibernation removes the pod and that storage with it, so
@@ -463,13 +463,14 @@ reachability, not trust.
 
 The template asks the extension controller to manage a default-deny
 NetworkPolicy. Ingress is empty. The egress allow-list contains the tunnel to
-the dsh-yawn-control-plane pod (TCP 8081), DNS to kube-dns (TCP/UDP 53), and HTTPS (TCP 443).
+the dsh-yawn-control-plane pod (TCP 8081), DNS to kube-dns (TCP/UDP 53), and HTTP
+and HTTPS (TCP 80 and 443).
 The tunnel peer is a `podSelector` with no `namespaceSelector`, so it selects
 that pod in the pool's own namespace and follows an overlay's `namespace:`.
-Everything else is denied by a conforming NetworkPolicy CNI. The broad 443 rule
-also permits cluster and private addresses on 443, potentially including the
-API server; production deployments should replace it with approved CIDRs or an
-FQDN-aware CNI policy and adapt DNS labels for their DNS provider.
+Everything else is denied by a conforming NetworkPolicy CNI. The broad 80/443
+rule also permits cluster and private addresses on those ports, potentially
+including the API server; production deployments should replace it with approved
+CIDRs or an FQDN-aware CNI policy and adapt DNS labels for their DNS provider.
 [`installations-kas.md`](installations-kas.md#configure-the-pool) has the patch
 recipes. NetworkPolicy is connectivity control, not a sandbox boundary.
 
