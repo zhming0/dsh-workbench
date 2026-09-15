@@ -38,10 +38,13 @@ spec:
             port: 53
           - protocol: TCP
             port: 53
-      # HTTPS is needed for source/package downloads. This also permits private
-      # and cluster IPs on 443; replace it with organization CIDRs/FQDN-aware
-      # CNI policy in production. All other egress is denied.
+      # HTTP and HTTPS are needed for source/package downloads and for services
+      # that only speak plain HTTP. This also permits private and cluster IPs on
+      # 80 and 443; replace it with organization CIDRs/FQDN-aware CNI policy in
+      # production. All other egress is denied.
       - ports:
+          - protocol: TCP
+            port: 80
           - protocol: TCP
             port: 443
   volumeClaimTemplates:

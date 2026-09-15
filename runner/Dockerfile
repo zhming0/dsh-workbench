@@ -17,6 +17,7 @@ ARG JJ_SHA256_arm64=60d42fa2a9abaa445eff10cd2087458562aaad5a54b90309e5a3787ecc98
 ARG MISE_VERSION=2026.8.16
 ARG MISE_SHA256_amd64=1445289f35e1a5a7216e1ffee5b34c5b9bd46793224e7e6c335503de9d9df0b2
 ARG MISE_SHA256_arm64=21a03117d27028b1b4602bc83d9aefdccd55325ac3da45f7e28c9320627dcdc6
+# Keep equal to mise.toml, which explains the 24.19.0 pin (nodejs/node#65677).
 ARG NODE_VERSION=24.19.0
 # ripgrep backs the session's `glob` and `grep` search tools: the stock row
 # names the host's packaged binary, and the control plane's subprocess seam resolves
