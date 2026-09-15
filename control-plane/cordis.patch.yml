@@ -111,3 +111,11 @@
     # of injecting them, so a headless profile still boots with this row.
     - id: sandbox-workspace-files
       name: '@zhming0/dsh-yawn/workspace-files'
+
+    # Serves the web client one injected global, `__DSH_TRANSPORT__ = { ownsHost:
+    # true }`, so settings (model credentials above all) persist to the host on
+    # any address, not only loopback pages. Without it the model-provider page
+    # fails behind every named address with "settings are unavailable in this
+    # browser". Same wait-not-inject shape as the row above.
+    - id: ui-owns-host
+      name: '@zhming0/dsh-yawn/owns-host'

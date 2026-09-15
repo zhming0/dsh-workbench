@@ -51,6 +51,10 @@
       "types": "./dist/launch-token.d.ts",
       "default": "./dist/launch-token.js"
     },
+    "./owns-host": {
+      "types": "./dist/owns-host.d.ts",
+      "default": "./dist/owns-host.js"
+    },
     "./client": {
       "types": "./dist/client/index.d.ts",
       "default": "./dist/client.js"
