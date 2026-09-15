@@ -96,7 +96,10 @@ falls back to waking the sandbox.
 
 The Web profile also gains a **Settings → Secrets** page. It edits the
 control plane's broker store: the browser sends names and values in and receives
-only names back, never a value.
+only names back, never a value. **Settings → Sandboxes** edits the live slice
+of the sandbox-manager settings described under
+[Settings](#settings): sandbox profiles, the default profile, and the idle
+and expiry timers, applied on the host without a restart.
 
 The **Settings → Instructions** page manages AGENTS.md-style guidance at two
 scopes: one global layer and one layer for each repository Workspace. These
@@ -262,6 +265,36 @@ Configuration is YAML in the profile's own layer,
     idleMs: 300000
 ```
 
+That layer is the **base**: the host also registers a `sandbox-manager`
+namespace with dsh's settings service, so everything in the table below that
+is marked _live_ can be changed at runtime — through the Web UI's
+**Settings → Sandboxes** page or by editing the settings document
+(`$DSH_HOME/settings.yaml`, hot-reloaded) — and applies without a restart.
+The settings document's section wins per field, a reset returns to this
+layer's value, and a change re-resolves the profiles (backends of unchanged
+profiles are kept), the default profile, and the idle and expiry timers,
+which take effect for the next armed countdown and the next hibernation.
+Sessions that already have a sandbox keep it; a profile whose sessions are
+still on record can be removed, and those sessions behave exactly as they do
+across a restart with the profile missing.
+
+Writes are validated where they land: the page refuses a save the host cannot
+apply (a `defaultProfile` no profile defines, a `controlPlaneUrl` that is not
+a WebSocket URL), and a stored section that turns invalid keeps the last good
+values with a warning rather than stopping the host. Every write carries the
+revision it read, so a concurrent editor or a direct document edit is refused
+as a conflict instead of being overwritten.
+
+The settings page is writable by anyone the control plane admits, like the
+Secrets page: one control plane is one operator domain. The stock dsh
+settings mirror refuses to persist writes from a non-loopback page, which is
+every page of a deployed control plane, so this page talks to the settings
+API directly instead of through it.
+
+Fields marked _boot_ are read once at startup — the state directory must
+exist before any settings store could, and the tunnel listener binds before
+the Web UI is up — so they stay in this layer.
+
 `profiles` may be empty. The host then boots and serves sessions normally,
 but the first prompt fails with `no sandbox profile is configured` until a
 profile is added; nothing is provisioned and no backend is contacted. That is
@@ -269,19 +302,19 @@ the intended state while installing the control plane before its sandbox
 backend exists, and it keeps a mistyped profile map from stopping the host from
 starting, so the settings can still be corrected.
 
-| Setting             | Default                 | Meaning                                                          |
-| ------------------- | ----------------------- | ---------------------------------------------------------------- |
-| `profiles.<name>`   | none                    | One sandbox profile; its fields are listed in the next table     |
-| `defaultProfile`    | first profile           | Profile used when a session does not pick one                    |
-| `repository`        | session repository      | Fallback repository for non-anchor sessions                      |
-| `revision`          | repository default      | Optional branch, tag, or commit to check out                     |
-| `workspace`         | `/workspace/repository` | Repository checkout and working directory                        |
-| `idleMs`            | 10 minutes              | Idle delay after the last turn or wake before hibernating        |
-| `expiresAfterMs`    | 7 days                  | How long a hibernated workspace is retained                      |
-| `stateDir`          | `~/.dsh-yawn`           | Records, broker data, token, instructions, and Workspace anchors |
-| `registrationToken` | see below               | Token(s) runners must present, comma-separated                   |
-| `tunnel.port`       | `8081`                  | Port the host listens on for runner tunnels (see Tunnel)         |
-| `tunnel.bind`       | `0.0.0.0`               | Address the tunnel listener binds to                             |
+| Setting             | When | Default                 | Meaning                                                          |
+| ------------------- | ---- | ----------------------- | ---------------------------------------------------------------- |
+| `profiles.<name>`   | live | none                    | One sandbox profile; its fields are listed in the next table     |
+| `defaultProfile`    | live | first profile           | Profile used when a session does not pick one                    |
+| `idleMs`            | live | 10 minutes              | Idle delay after the last turn or wake before hibernating        |
+| `expiresAfterMs`    | live | 7 days                  | How long a hibernated workspace is retained                      |
+| `repository`        | boot | session repository      | Fallback repository for non-anchor sessions                      |
+| `revision`          | boot | repository default      | Optional branch, tag, or commit to check out                     |
+| `workspace`         | boot | `/workspace/repository` | Repository checkout and working directory                        |
+| `stateDir`          | boot | `~/.dsh-yawn`           | Records, broker data, token, instructions, and Workspace anchors |
+| `registrationToken` | boot | see below               | Token(s) runners must present, comma-separated                   |
+| `tunnel.port`       | boot | `8081`                  | Port the host listens on for runner tunnels (see Tunnel)         |
+| `tunnel.bind`       | boot | `0.0.0.0`               | Address the tunnel listener binds to                             |
 
 Each profile carries the settings of its own backend. Profiles do not share
 settings with each other, so two Kubernetes profiles in one namespace both
@@ -301,12 +334,24 @@ name that namespace.
 | `pipeline`        | `buildkite`           | required               | Pipeline slug whose job runs the runner                           |
 | `controlPlaneUrl` | `buildkite`           | required               | `DSH_YAWN_CONTROL_PLANE_URL` runners dial; agents are never local |
 | `readyTimeoutMs`  | `buildkite`           | 10 minutes             | How long a build may wait for an agent                            |
-| `tokenEnv`        | `buildkite`           | `BUILDKITE_API_TOKEN`  | Host variable holding the API token                               |
 
 A Buildkite profile cannot hibernate, so it checkpoints on idle (see below).
-The host process needs the API token in `tokenEnv` at boot, with `read_builds`
-and `write_builds` on the pipeline. The pipeline shape, the registration token,
-and the limits are described in
+The API token, with `read_builds` and `write_builds` on the pipeline, resolves
+per Buildkite request, so a changed token reaches the next call without a
+restart:
+
+1. the credential stored for the profile, entered on **Settings → Sandboxes**
+   through the write-only credential API. It lives in the host credential
+   document (`$DSH_HOME/.credentials.yaml`) under a name derived from the
+   profile — `DSH_YAWN_BUILDKITE_<PROFILE>_TOKEN` — so two Buildkite profiles
+   keep two tokens, and it never reaches a sandbox.
+2. `BUILDKITE_API_TOKEN` in the control plane's process environment, the
+   deployment-managed fallback.
+
+A profile whose token resolves nowhere does not stop the host: it is named once
+in the log at boot, and its sessions fail at their first prompt with the
+setting to fix. The pipeline shape, the registration token, and the limits are
+described in
 [`docs/buildkite.md`](https://github.com/zhming0/dsh-yawn/blob/main/docs/buildkite.md).
 
 ### Archived sessions
@@ -359,15 +404,17 @@ must exist in the cluster (see [`docs/kubernetes.md`](../docs/kubernetes.md)):
 
 Profiles may mix backends, for example one Docker profile beside Kubernetes
 ones. Every session record stores the profile name and backend it was
-provisioned with. Removing a profile from the configuration keeps its existing
-sessions readable, but they cannot wake until a profile with that name is
-restored on the same backend. A session whose pending choice was removed falls
-back to an error at its first prompt, asking the user to pick again.
+provisioned with. Removing a profile — from the configuration or at runtime
+through the settings — keeps its existing sessions readable, but they cannot
+wake until a profile with that name is restored on the same backend. A
+session whose pending choice was removed falls back to an error at its first
+prompt, asking the user to pick again.
 
 With an empty map the host still boots, and sessions, history, secrets,
 instructions, and repository workspaces all keep working; only provisioning
-fails, and its error names the missing setting. Add a profile to the
-`sandbox-manager` row, then send the prompt again.
+fails, and its error names the missing setting. Add a profile — in the
+`sandbox-manager` settings layer or through the Web Sandboxes page — then
+send the prompt again.
 
 ### Idle and hibernation
 
@@ -471,6 +518,12 @@ Secrets and tokens never go in YAML, because a profile layer is a plain file
 and a chat transcript is durable. They go through the Web UI's
 **Settings → Secrets** page, which stores them in the broker file under
 `stateDir`.
+
+The Buildkite API token is the one control-plane-owned token the UI also
+stores: **Settings → Sandboxes** writes it, write-only, to the host credential
+document (`$DSH_HOME/.credentials.yaml`). That document is host-side and never
+pushed to a sandbox, which is what keeps this token out of the broker store
+that runners receive.
 
 The control plane reloads the broker file before the next sandbox command, so a
 saved change takes effect without restarting dsh.

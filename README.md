@@ -16,6 +16,7 @@
 * Deployed as an always-on service on your LAN or the internet.
 * Every session runs in its own sandbox: Kubernetes agent-sandbox, Buildkite, or Docker.
 * Sandboxes hibernate when idle and wake with the same files; backends that cannot pause checkpoint instead.
+* Sandbox profiles and lifecycle timers configured in the Web UI, applied without a restart.
 * OIDC authentication through oauth2-proxy and your identity provider.
 * Repository-centric workspaces: paste a URL, the session clones it.
 * Credentials management in the Web UI: Secrets only reach a sandbox only when its commands run, .
@@ -58,15 +59,12 @@ docker run -d --name dsh-yawn \
 docker run -d --name dsh-yawn-ui --network container:dsh-yawn --restart unless-stopped \
   alpine/socat TCP-LISTEN:3000,fork,reuseaddr TCP4:127.0.0.1:13000
 
-# Tell the control plane to use the Docker backend, then restart to apply.
-docker exec -i dsh-yawn sh -c 'cat > /data/.dsh/profiles/web/cordis.patch.yml' <<'EOF'
-- id: sandbox-manager
-  config:
-    profiles:
-      standard:
-        backend: docker
-EOF
-docker restart dsh-yawn
+# Tell the control plane to use the Docker backend in Settings → Sandboxes
+# (open the URL below, then Settings → Sandboxes → New profile):
+#   name: standard, backend: docker
+# It applies without a restart. The settings document lives at
+# /data/.dsh/settings.yaml inside the container if you would rather edit it
+# directly.
 ```
 
 What the pieces do:

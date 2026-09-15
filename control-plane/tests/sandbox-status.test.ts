@@ -252,7 +252,7 @@ describe("SandboxStatus reads", () => {
         checkpointedRecord(),
         runningRecord("live"),
       ]),
-      profiles: PROFILES,
+      profiles: () => PROFILES,
       runnerFor: (sessionId) => {
         asked.push(sessionId);
         return undefined;
@@ -286,7 +286,7 @@ describe("SandboxStatus reads", () => {
   it("leaves the image out for a backend that does not name one", async () => {
     const status = new SandboxStatus({
       store: stubStore([hibernatedRecord()]),
-      profiles: { standard: KAS_PROFILE },
+      profiles: () => ({ standard: KAS_PROFILE }),
       runnerFor: () => undefined,
     });
 

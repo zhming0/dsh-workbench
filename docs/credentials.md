@@ -38,8 +38,15 @@ Two credentials belong to the control plane and must never reach a sandbox:
 - the **shared registration token**, in the `dsh-yawn-registration-token` Secret the
   chart creates — warm pods must hold it before any session exists, and it only
   lets a runner register a tunnel;
-- a **Buildkite API token**, in a Secret you own, read into the control plane
-  environment by `controlPlane.extraEnv` — it can create and cancel builds.
+- a **Buildkite API token** — it can create and cancel builds. Store it in a
+  Secret you own and read it into the control plane environment with
+  `controlPlane.extraEnv`, or enter it on **Settings → Sandboxes** when you
+  create a Buildkite profile: the page writes it write-only into the host
+  credential document (`$DSH_HOME/.credentials.yaml`) on the data volume, under
+  a name derived from the profile (`DSH_YAWN_BUILDKITE_<PROFILE>_TOKEN`, so two
+  profiles keep two tokens). A stored token is used before the environment
+  fallback. Either way it stays on the control plane and never reaches a
+  sandbox.
 
 [`installations-control-plane.md`](installations-control-plane.md#credentials)
 sets both up, and

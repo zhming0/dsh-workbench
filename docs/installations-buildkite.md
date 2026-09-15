@@ -88,9 +88,10 @@ helm upgrade dsh-yawn-control-plane oci://ghcr.io/zhming0/charts/dsh-yawn \
   --values dsh-yawn.values.yaml
 ```
 
-The token is read at boot and never sent to a build, and it does not go in the
-control plane's secret store. Then run a session: the control plane creates a build, an
-agent picks it up, and the sandbox is live once its runner registers.
+The token is resolved for each Buildkite request and never sent to a build, and
+it does not go in the control plane's secret store. Then run a session: the
+control plane creates a build, an agent picks it up, and the sandbox is live
+once its runner registers.
 
 ## Reaching the tunnel
 

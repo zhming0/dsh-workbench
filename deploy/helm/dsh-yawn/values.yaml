@@ -42,7 +42,11 @@ controlPlane:
   # The sandbox-manager settings, stated as the chart's own values. They render
   # into a read-only patch layer at /data/.dsh/cordis.patch.yml, which dsh
   # applies after the seeded profile file, so they are the interface for this
-  # row on a chart install. Unset leaves the seeded file in charge, which seeds
+  # row on a chart install. They are also the base layer of the runtime
+  # settings namespace: Settings → Sandboxes in the Web UI overrides them per
+  # field at runtime, without a restart, and a reset returns to what this
+  # chart configures. Unset leaves
+  # the seeded file in charge, which seeds
   # no profile: the control plane boots but cannot provision a sandbox until
   # values name one. A Kubernetes profile that omits `namespace` is rendered
   # with the release namespace; every profile must target it, because the

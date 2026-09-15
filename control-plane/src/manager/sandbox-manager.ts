@@ -6,17 +6,27 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import type {} from "@deepseek-ai/dsh-storage-domain";
 import { SessionId, type Session } from "@deepseek-ai/dsh-session";
+// Type-only: puts the optional `settings` service on the Context below.
+import type {} from "@deepseek-ai/dsh-settings";
 import type {} from "@deepseek-ai/dsh-typert-registry";
 import { TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 
 import { CredentialBroker } from "../broker.js";
+import {
+  resolveBuildkiteToken,
+  type CredentialResolver,
+} from "../buildkite-token.js";
 import { CheckpointStore } from "../checkpoint.js";
 import {
   configSchema,
   resolveConfig,
   resolveRegistrationTokens,
+  resolveRuntime,
+  runtimeSettingsSchema,
   type Config,
   type ResolvedConfig,
+  type ResolvedRuntime,
+  type RuntimeConfig,
 } from "../config.js";
 import {
   FileIndexStore,
@@ -32,7 +42,7 @@ import type { SandboxStatusView } from "../sandbox-status-remote.js";
 import type { SessionProfileView } from "../session-profile-remote.js";
 import { SessionStore } from "../state-store.js";
 import { TunnelServer, type RunnerGateway } from "../tunnel.js";
-import type { SandboxBackend } from "../types.js";
+import type { BuildkiteProfile, SandboxBackend } from "../types.js";
 import {
   createRepositoryAnchor,
   repositoryForAnchor,
@@ -44,6 +54,7 @@ import { ProfileChoice } from "./profile-choice.js";
 import { ProfileRegistry } from "./profile-registry.js";
 import { RunnerAttachment } from "./runner-attachment.js";
 import { rootSessionId } from "./root-session.js";
+import { RuntimeSettings } from "./runtime-settings.js";
 import { SandboxLifecycle } from "./sandbox-lifecycle.js";
 import { SandboxNotices } from "./sandbox-notices.js";
 import { SandboxStatus } from "./sandbox-status.js";
@@ -58,6 +69,8 @@ export interface ManagerDependencies {
   gateway?: RunnerGateway;
   instructions?: InstructionStore;
   workspaceRegistry?: WorkspaceRegistryLike;
+  /** Credential resolution for Buildkite tokens; defaults to the host service. */
+  credentials?: CredentialResolver;
   /** Resolves a session id to its live agent; defaults to the agent registry. */
   agentLookup?: (sessionId: string) => Agent | undefined;
 }
@@ -88,11 +101,14 @@ export class SandboxManager extends TypertRemoteService {
 
   readonly workspace: string;
   private readonly config: ResolvedConfig;
+  /** The settings slice that can change while the host runs. */
+  private readonly runtime: RuntimeSettings;
   private readonly broker: CredentialBroker;
   private readonly ownedTunnel: TunnelServer | undefined;
   private readonly instructions: ManagedInstructions;
   private readonly workspaceRegistry: WorkspaceRegistryLike | undefined;
   private readonly engine: SandboxLifecycle;
+  private readonly registry: ProfileRegistry;
   private readonly idle: IdleSchedule;
   private readonly archiveRelease: ArchiveRelease;
   private readonly profileChoice: ProfileChoice;
@@ -104,6 +120,14 @@ export class SandboxManager extends TypertRemoteService {
   private readonly gateway: RunnerGateway;
   private readonly agentLookup: (sessionId: string) => Agent | undefined;
   private readonly rootSessions = new Map<string, string>();
+  /**
+   * The settings service's view of the runtime slice, once installed. While
+   * undefined (no settings service mounted, or not yet attached) the row's
+   * own config is the slice's source.
+   */
+  private settingsSource: (() => RuntimeConfig) | undefined;
+  /** Test-supplied credential resolution; production reads the host service. */
+  private readonly credentialsOverride: CredentialResolver | undefined;
 
   constructor(
     ctx: Context,
@@ -151,11 +175,15 @@ export class SandboxManager extends TypertRemoteService {
       this.gateway = dependencies.gateway;
     }
     this.workspaceRegistry = dependencies.workspaceRegistry;
-    this.profileChoice = new ProfileChoice(
-      this.config.profiles,
-      this.config.defaultProfile,
-      store,
-    );
+    this.credentialsOverride = dependencies.credentials;
+    this.runtime = new RuntimeSettings({
+      profiles: this.config.profiles,
+      defaultProfile: this.config.defaultProfile,
+      idleMs: this.config.idleMs,
+      expiresAfterMs: this.config.expiresAfterMs,
+    });
+    this.profileChoice = new ProfileChoice(this.runtime, store);
+    const runtime = this.runtime;
     const attachment = new RunnerAttachment({
       gateway: this.gateway,
       broker: this.broker,
@@ -167,24 +195,29 @@ export class SandboxManager extends TypertRemoteService {
     // deliberately not the engine, so it cannot provision or wake.
     this.status = new SandboxStatus({
       store,
-      profiles: this.config.profiles,
+      profiles: () => this.runtime.profiles,
       runnerFor: (sessionId) => attachment.clientFor(sessionId),
     });
-    const registry = new ProfileRegistry(
+    this.registry = new ProfileRegistry(
       this.config.profiles,
       dependencies.backends,
       tokens[0],
+      (profile) => this.buildkiteToken(profile),
     );
     this.engine = new SandboxLifecycle({
       store,
-      registry,
+      registry: this.registry,
       pendingProfile: (sessionId) => this.profileChoice.pending(sessionId),
       attachment,
       checkpoints: new CheckpointStore(
         join(this.config.stateDir, "checkpoints"),
       ),
-      expiresAfterMs: this.config.expiresAfterMs,
-      warn: (message) => this.ctx.logger("sandbox").warn(message),
+      // Read through the runtime holder: a settings change applies to the
+      // next hibernation without a restart.
+      get expiresAfterMs() {
+        return runtime.expiresAfterMs;
+      },
+      warn: (message) => ctx.logger("sandbox").warn(message),
     });
     this.fileIndexHooks = new FileIndexHooks({
       fileIndexes,
@@ -217,7 +250,11 @@ export class SandboxManager extends TypertRemoteService {
           | undefined),
     });
     this.idle = new IdleSchedule({
-      idleMs: this.config.idleMs,
+      // Read through the runtime holder: a settings change applies to every
+      // countdown armed after it. Timers already armed keep their old delay.
+      get idleMs() {
+        return runtime.idleMs;
+      },
       ready: () => this.ready,
       hibernate: (sessionId, guard) => this.engine.hibernate(sessionId, guard),
       warn: (message) => this.ctx.logger("sandbox").warn(message),
@@ -250,6 +287,41 @@ export class SandboxManager extends TypertRemoteService {
 
     ctx.inject(["typert"], (typertCtx) => {
       typertCtx.typert.register(yawnHost);
+    });
+
+    // The mutable settings slice lives in the dsh settings document when the
+    // settings service is mounted — dsh-base mounts the file provider — with
+    // this row's config as the composition base, so the Web Sandboxes page
+    // and direct edits to the settings document both take effect live.
+    // Without the service (a bare test context, an unusual profile) the row
+    // config alone stays authoritative, exactly as before.
+    ctx.inject(["settings"], (settingsCtx) => {
+      try {
+        settingsCtx.settings.installSection(
+          settingsCtx,
+          "sandbox-manager",
+          runtimeSettingsSchema,
+          runtimeEntry(config),
+          {
+            setSource: (current) => {
+              this.settingsSource = current;
+            },
+            onChange: () => this.applyRuntimeSettings(),
+            // Refuse the write at save time rather than storing a section
+            // the host cannot act on, such as a defaultProfile no profile
+            // defines or a controlPlaneUrl that is not a WebSocket URL.
+            validate: (value) => {
+              resolveRuntime(value, this.config.tunnel.port);
+            },
+          },
+        );
+      } catch (error) {
+        settingsCtx
+          .logger("sandbox")
+          .warn(
+            `could not register the sandbox-manager settings namespace; the row configuration stays fixed: ${errorMessage(error)}`,
+          );
+      }
     });
 
     // Provisioning waits for the first prompt: `agent/session-start` fires as
@@ -303,6 +375,87 @@ export class SandboxManager extends TypertRemoteService {
       if (record.state === "running") {
         this.idle.schedule(record.sessionId);
       }
+    }
+    await this.warnUnusableBuildkiteProfiles();
+  }
+
+  /**
+   * The API token of one Buildkite profile, resolved per request from the
+   * host credential service (the per-profile credential written by the
+   * Sandboxes page, then `BUILDKITE_API_TOKEN` in the process environment).
+   */
+  private buildkiteToken(profile: BuildkiteProfile): Promise<string> {
+    return resolveBuildkiteToken(
+      profile,
+      this.credentialsOverride ?? this.ctx.get("credentials"),
+    );
+  }
+
+  /**
+   * A Buildkite profile whose token cannot be resolved does not stop the host:
+   * the token is entered in the Web UI, so the host must stay up for the
+   * operator to fix it. Each such profile is named once at boot; its sessions
+   * fail at their first prompt with the same message.
+   */
+  private async warnUnusableBuildkiteProfiles(): Promise<void> {
+    for (const profile of Object.values(this.runtime.profiles)) {
+      if (profile.backend !== "buildkite") {
+        continue;
+      }
+      try {
+        await this.buildkiteToken(profile);
+      } catch (error) {
+        this.ctx
+          .logger("sandbox")
+          .warn(
+            `${errorMessage(error)}; sessions on this profile fail until it is set`,
+          );
+      }
+    }
+  }
+
+  /**
+   * Re-resolve the runtime slice from its current source and apply it: the
+   * registry rebuilds first (atomic — a backend that cannot be built throws
+   * before anything swaps), then the holder follows with the timers, the
+   * default profile, and the profile list the composer chip reads. A failed
+   * rebuild keeps the previous settings whole rather than half-applied; the
+   * write was already valid, so the operator fixes the cause or removes the
+   * profile.
+   */
+  private applyRuntimeSettings(): void {
+    const source = this.settingsSource;
+    if (source === undefined) {
+      return;
+    }
+    let next: ResolvedRuntime;
+    try {
+      next = resolveRuntime(source(), this.config.tunnel.port);
+    } catch (error) {
+      this.ctx
+        .logger("sandbox")
+        .warn(
+          `keeping the previous sandbox settings; the settings document has values the host cannot apply: ${errorMessage(error)}`,
+        );
+      return;
+    }
+    try {
+      this.registry.update(next.profiles);
+    } catch (error) {
+      this.ctx
+        .logger("sandbox")
+        .warn(
+          `keeping the previous sandbox settings; one of the new profiles cannot start: ${errorMessage(error)}`,
+        );
+      return;
+    }
+    const before = Object.keys(this.runtime.profiles).sort().join(", ");
+    this.runtime.apply(next);
+    const after = Object.keys(next.profiles).sort().join(", ");
+    if (before !== after) {
+      this.ctx
+        .logger("sandbox")
+        .info(`sandbox profiles are now: ${after === "" ? "(none)" : after}`);
     }
   }
 
@@ -555,6 +708,24 @@ export class SandboxManager extends TypertRemoteService {
       );
     }
   }
+}
+
+/** The runtime slice of a row config, used as the settings namespace's base. */
+function runtimeEntry(config: Config): RuntimeConfig {
+  return {
+    ...(config.profiles === undefined ? {} : { profiles: config.profiles }),
+    ...(config.defaultProfile === undefined
+      ? {}
+      : { defaultProfile: config.defaultProfile }),
+    ...(config.idleMs === undefined ? {} : { idleMs: config.idleMs }),
+    ...(config.expiresAfterMs === undefined
+      ? {}
+      : { expiresAfterMs: config.expiresAfterMs }),
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export default SandboxManager;

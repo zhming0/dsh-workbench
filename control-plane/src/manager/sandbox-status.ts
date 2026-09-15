@@ -16,7 +16,8 @@ const LIVE_FACTS_TIMEOUT_MS = 5_000;
 
 export interface SandboxStatusDependencies {
   store: SessionStore;
-  profiles: Record<string, SandboxProfile>;
+  /** The profiles as they stand now; a settings change can replace the map. */
+  profiles: () => Record<string, SandboxProfile>;
   /**
    * The attached runner of one session, or undefined when it has none. This is
    * a read: the caller supplies a lookup that cannot provision or wake.
@@ -66,7 +67,7 @@ export class SandboxStatus {
       repositoryUrl: record.repositoryUrl,
       startedAt: record.createdAt,
     };
-    const profile = this.deps.profiles[record.profile];
+    const profile = this.deps.profiles()[record.profile];
     // A removed profile keeps its sessions readable; the image goes with it.
     if (profile !== undefined && provisionsFromImage(profile)) {
       facts.image = profile.image;

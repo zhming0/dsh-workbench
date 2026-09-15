@@ -100,7 +100,7 @@ controlPlane:
           key: token
 ```
 
-The control plane reads these variables once, at startup: after changing the Secret,
+The pod's environment is fixed when it starts: after changing the Secret,
 restart the pod. A credential like this must not go in the control plane's secret
 store, which is pushed into every sandbox —
 [`credentials.md`](credentials.md) is about that store.
