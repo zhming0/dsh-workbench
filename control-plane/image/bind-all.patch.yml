@@ -1,0 +1,15 @@
+# Mounted by dsh-yawn-entrypoint when DSH_YAWN_BIND_ALL=1.
+#
+# The web bundle binds from a launch value: `host: !!js ctx.webStartup.host ??
+# '127.0.0.1'`. The launcher rejects `--host 0.0.0.0`, so this overlay restates
+# the row with a fallback that a published port can reach. A patch replaces the
+# whole config, so the other three fields are restated as the bundle declares
+# them. Only the single-machine Docker install sets the flag: Kubernetes keeps
+# pod loopback and puts oauth2-proxy in front.
+- id: webserver
+  config:
+    host: !!js ctx.webStartup.host ?? '0.0.0.0'
+    port: !!js ctx.webStartup.port ?? 3080
+    compression: gzip
+    compressionLevel: 1
+    compressionThresholdBytes: 1024
