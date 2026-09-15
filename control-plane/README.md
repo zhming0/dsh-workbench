@@ -179,6 +179,18 @@ the row in a patch layer:
       name: "@zhming0/dsh-yawn/launch-token"
 ```
 
+A second module rides in the bundle patch itself: `@zhming0/dsh-yawn/owns-host`.
+It injects `__DSH_TRANSPORT__ = { ownsHost: true }` into the served index, which
+tells the web client the page is served by the dsh host — always true for this
+distribution — so client settings persist to the host on any address. Without
+it, dsh's client treats a non-loopback page (an Ingress name, a LAN address) as
+untrusted for settings and keeps them in browser memory, and the
+model-provider page fails with "settings are unavailable in this browser"; that
+is why editing model credentials used to require `kubectl port-forward`. The
+injection grants no access: `/api` keeps the same Host/Origin fence and the
+same authentication. `tests/ui-owns-host.test.ts` pins the two dsh-internal
+seams this rides on, so a dsh bump that moves either fails CI.
+
 The default backend uses Docker on the same machine as dsh. The Kubernetes
 backend uses Kubernetes SIG agent-sandbox. The Buildkite backend runs each
 sandbox as one build on a pipeline you create. Runners connect out to the host's
