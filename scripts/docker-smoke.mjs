@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { DockerBackend } from "../control-plane/dist/backends/docker.js";
 import { TunnelServer } from "../control-plane/dist/tunnel.js";
@@ -33,8 +34,29 @@ try {
   await run(client, [
     "/bin/bash",
     "-lc",
-    'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version && python --version && uv --version && uvx --version && node --version && npm --version && jq --version && yq --version && docker --version && docker buildx version && docker compose version && for command in cc make pkg-config unzip zip xz file patch ssh rsync ps gh pnpm yarn; do command -v "$command" || exit 1; done && ! command -v pip && ! command -v dockerd && ! command -v containerd',
+    'test "$SMOKE_VALUE" = present && git --version && jj --version && mise --version && python --version && uv --version && uvx --version && node --version && npm --version && jq --version && yq --version && docker --version && docker buildx version && docker compose version && for command in cc make pkg-config unzip zip xz file patch ssh rsync ps gh pnpm yarn agent-browser install-browser; do command -v "$command" || exit 1; done && ! command -v pip && ! command -v dockerd && ! command -v containerd',
   ]);
+
+  // The browser is deliberately not in the image; `install-browser`, which the
+  // image does carry, adds it on demand. This runs that command for real and
+  // then proves Chrome renders a page, so a broken installer or a missing
+  // library fails here rather than in a session.
+  await run(client, [
+    "/bin/bash",
+    "-lc",
+    "! command -v google-chrome",
+  ]);
+  await client.writeFile({
+    path: "/tmp/verify-browser.mjs",
+    content: new TextEncoder().encode(
+      readFileSync(
+        new URL("./verify-browser.mjs", import.meta.url),
+        "utf8",
+      ),
+    ),
+    guard: { case: "createIfAbsent", value: true },
+  });
+  await run(client, ["/bin/bash", "-lc", "node /tmp/verify-browser.mjs"]);
   // Commands run as login shells, and Debian's /etc/profile resets PATH.
   // The image must restore the workspace install directories, and npm must
   // write global installs under $HOME, or `npm install -g` fails with EACCES.
@@ -54,6 +76,23 @@ try {
     "-c",
     'printf "home survived" > "$HOME/home-sentinel"',
   ]);
+
+  // The `using-agent-browser` skill writes media here. It is on the workspace
+  // volume but outside the checkout, so a wake keeps it and a capture never
+  // shows up as an untracked file in a repository.
+  await run(client, [
+    "sh",
+    "-c",
+    'mkdir -p /workspace/.agents/artifacts && printf "media" > /workspace/.agents/artifacts/smoke-sentinel',
+  ]);
+  const artifactsSentinel = (
+    await run(client, ["cat", "/workspace/.agents/artifacts/smoke-sentinel"])
+  ).trim();
+  if (artifactsSentinel !== "media") {
+    throw new Error(
+      `artifacts directory is not writable: ${artifactsSentinel}`,
+    );
+  }
 
   await run(client, ["mkdir", "-p", `${workspace}/.git`, `${workspace}/.agents`]);
   await client.writeFile({
@@ -119,6 +158,13 @@ try {
   });
   if (new TextDecoder().decode(homeSentinel.content) !== "home survived") {
     throw new Error("home directory content did not survive hibernation");
+  }
+  const artifactsAfterWake = await client.readFile({
+    path: "/workspace/.agents/artifacts/smoke-sentinel",
+    maxBytes: 1024n,
+  });
+  if (new TextDecoder().decode(artifactsAfterWake.content) !== "media") {
+    throw new Error("artifacts outside the checkout did not survive hibernation");
   }
   const nodeVersionAfterWake = await run(
     client,
